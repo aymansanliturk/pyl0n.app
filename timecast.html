@@ -1248,7 +1248,7 @@
     html2pdf().set({
       margin: 0, filename: name + '.pdf',
       image: { type: 'jpeg', quality: 0.97 },
-      html2canvas: { scale: 2, useCORS: true },
+      html2canvas: { scale: 2, useCORS: true, onclone: d => d.querySelectorAll('.print-bar,.persist-bar').forEach(el => el.remove()) },
       jsPDF: { unit: 'mm', format: fmt === 'A2' ? 'a2' : fmt === 'A4' ? 'a4' : 'a3', orientation: 'landscape' }
     }).from(document.getElementById('output')).save();
   }
