@@ -10,14 +10,14 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg:      #f5f4f0;
+    --bg:      #f8f9fa;
     --surface: #ffffff;
-    --border:  #e0ddd6;
+    --border:  #e8e8e4;
     --text:    #1a1916;
     --muted:   #6b6860;
     --faint:   #a8a49e;
-    --accent:  #2c4e87;
-    --accent2: #1e3a6b;
+    --accent:  #3b82f6;
+    --navy:    #1e3a5f;
   }
 
   body {
@@ -31,39 +31,65 @@
 
   /* ── Header ── */
   header {
-    border-bottom: 2px solid var(--text);
-    padding: 10px 48px;
+    padding: 14px 48px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     background: var(--surface);
+    border-bottom: 1px solid var(--border);
   }
 
-  .logo-wrap { display: flex; flex-direction: row; align-items: center; gap: 10px; }
-  .logo-wrap img { height: 128px; width: 256px; flex-shrink: 0; }
-  .site-name { font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--text); white-space: nowrap; }
+  .logo-wrap { display: flex; align-items: center; gap: 10px; }
 
-  .header-meta { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--faint); text-align: right; line-height: 1.8; }
+  .logo-icon {
+    width: 34px; height: 34px;
+    background: var(--navy);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .logo-icon svg { width: 18px; height: 18px; }
+
+  .site-name {
+    font-size: 15px; font-weight: 600;
+    color: var(--text); white-space: nowrap; letter-spacing: -0.3px;
+  }
+  .site-name .dot { opacity: 0.35; }
+
+  .header-meta {
+    font-family: 'DM Mono', monospace; font-size: 9px;
+    color: var(--faint); text-align: right; line-height: 1.8;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
 
   /* ── Hero ── */
   .hero {
     padding: 64px 48px 48px;
     max-width: 860px;
   }
-  .hero-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--faint); margin-bottom: 16px; }
-  .hero-title { font-size: 42px; font-weight: 700; letter-spacing: -1px; line-height: 1.1; color: var(--text); margin-bottom: 16px; }
+  .hero-eyebrow {
+    font-size: 10px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 16px;
+  }
+  .hero-title {
+    font-size: 48px; font-weight: 700; letter-spacing: -1.5px;
+    line-height: 1.05; color: var(--text); margin-bottom: 20px;
+  }
   .hero-title span { color: var(--accent); }
-  .hero-sub { font-size: 15px; color: var(--muted); line-height: 1.7; max-width: 560px; }
+  .hero-sub { font-size: 15px; color: var(--muted); line-height: 1.7; max-width: 540px; }
 
   /* ── Cards ── */
   .cards {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 18px;
-    padding: 0 48px 48px;
+    gap: 16px;
+    padding: 0 48px 64px;
     max-width: 1600px;
   }
+
   @media (max-width: 900px) {
+    header { padding: 14px 24px; }
+    .hero { padding: 40px 24px 32px; }
     .cards { grid-template-columns: repeat(2, 1fr); padding: 0 24px 32px; }
   }
   @media (max-width: 560px) {
@@ -73,41 +99,31 @@
   .card {
     background: var(--surface);
     border: 1.5px solid var(--border);
-    border-radius: 12px;
-    padding: 28px 30px 24px;
+    border-radius: 14px;
+    padding: 28px 26px 22px;
     text-decoration: none;
     color: inherit;
     display: flex;
     flex-direction: column;
-    gap: 0;
     transition: all 0.2s;
-    position: relative;
-    overflow: hidden;
   }
-  .card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 4px;
-    background: var(--card-color, var(--accent));
-    transform: scaleX(0);
-    transform-origin: left;
-    transition: transform 0.25s;
+  .card:hover {
+    border-color: var(--card-color, var(--accent));
+    box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+    transform: translateY(-2px);
   }
-  .card:hover { border-color: var(--card-color, var(--accent)); box-shadow: 0 4px 20px rgba(0,0,0,0.07); transform: translateY(-2px); }
-  .card:hover::before { transform: scaleX(1); }
 
   .card-icon {
     width: 44px; height: 44px;
-    border-radius: 10px;
+    border-radius: 11px;
     display: flex; align-items: center; justify-content: center;
-    margin-bottom: 18px;
+    margin-bottom: 20px;
     flex-shrink: 0;
   }
   .card-icon svg { width: 22px; height: 22px; }
 
-  .card-name { font-size: 20px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
-  .card-tagline { font-size: 10px; font-weight: 500; color: var(--faint); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 14px; }
+  .card-name { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; margin-bottom: 4px; }
+  .card-tagline { font-size: 9px; font-weight: 600; color: var(--faint); letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 14px; }
   .card-desc { font-size: 13px; color: var(--muted); line-height: 1.65; flex: 1; }
 
   .card-footer {
@@ -115,15 +131,14 @@
     border-top: 1px solid var(--border);
     display: flex; align-items: center; justify-content: space-between;
   }
-  .card-features { display: flex; gap: 6px; flex-wrap: wrap; }
-  .feat-tag { font-size: 9px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; padding: 2px 8px; border-radius: 20px; background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
-  .card-arrow { font-size: 18px; color: var(--faint); transition: all 0.2s; }
+  .feat-tag { font-size: 10px; font-weight: 500; color: var(--faint); }
+  .card-arrow { font-size: 16px; color: var(--faint); transition: all 0.2s; }
   .card:hover .card-arrow { color: var(--card-color, var(--accent)); transform: translateX(3px); }
 
   /* ── Footer ── */
   footer {
     margin-top: auto;
-    padding: 20px 48px;
+    padding: 18px 48px;
     border-top: 1px solid var(--border);
     display: flex; align-items: center; justify-content: space-between;
     font-family: 'DM Mono', monospace; font-size: 9px; color: var(--faint);
@@ -135,136 +150,123 @@
 
 <header>
   <div class="logo-wrap">
-    <img src="logo.svg" alt="Bid Forecast Tools">
-   <!--  <div class="site-name">Bid Forecast Tools</div> -->
+    <div class="logo-icon">
+      <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="7" height="7" rx="1.5" fill="white"/>
+        <rect x="10" y="1" width="7" height="7" rx="1.5" fill="white"/>
+        <rect x="1" y="10" width="7" height="7" rx="1.5" fill="white"/>
+        <rect x="10" y="10" width="7" height="7" rx="1.5" fill="white" opacity="0.4"/>
+      </svg>
+    </div>
+    <span class="site-name">Bid Forecast <span class="dot">.</span></span>
   </div>
   <div class="header-meta">
     Project Intelligence Suite<br>
-    Browser-based · No login required
+    100% Private · Local Execution
   </div>
 </header>
 
 <div class="hero">
-  <div class="hero-eyebrow">Project Intelligence Suite</div>
+  <div class="hero-eyebrow">Enterprise Intelligence Suite</div>
   <div class="hero-title">Tools built for <span>bid teams.</span></div>
-  <div class="hero-sub">Fast, browser-based tools for bid timelines, organisation charts, RFQ tracking, responsibility matrices and resource cost planning. No installation, no login.</div>
+  <div class="hero-sub">Streamlined, browser-based project tools. No installation required, all data is processed locally for maximum privacy.</div>
 </div>
 
 <div class="cards">
 
-  <a href="dorcast.html" class="card" style="--card-color: #b36a00;">
-    <div class="card-icon" style="background:#fdf3e3;">
-      <svg viewBox="0 0 24 24" fill="none" stroke="#b36a00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <a href="dorcast.html" class="card" style="--card-color:#d97706;">
+    <div class="card-icon" style="background:#fffbf0;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <rect x="3" y="3" width="18" height="18" rx="2"/>
         <line x1="3" y1="9" x2="21" y2="9"/>
         <line x1="3" y1="15" x2="21" y2="15"/>
         <line x1="9" y1="3" x2="9" y2="21"/>
       </svg>
     </div>
-    <div class="card-name" style="color:#b36a00;">Dorcast</div>
-    <div class="card-tagline">Division of Responsibilities Intelligence</div>
-    <div class="card-desc">Build multi-party responsibility matrices for bid and execution. Excel import/export, preset templates for Turnkey and Offshore projects.</div>
+    <div class="card-name">Dorcast</div>
+    <div class="card-tagline">Responsibility Matrix</div>
+    <div class="card-desc">Build multi-party responsibility matrices (DOR/RAC) for complex project scopes.</div>
     <div class="card-footer">
-      <div class="card-features">
-        <span class="feat-tag">Multi-Party</span>
-        <span class="feat-tag">Excel I/O</span>
-        <span class="feat-tag">PDF Export</span>
-      </div>
+      <span class="feat-tag">Excel · PDF · JSON</span>
       <span class="card-arrow">→</span>
     </div>
   </a>
 
-  <a href="orgcast.html" class="card" style="--card-color: #3a7a52;">
-    <div class="card-icon" style="background:#eef6f1;">
-      <svg viewBox="0 0 24 24" fill="none" stroke="#3a7a52" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="4" r="2" fill="#3a7a52" stroke="none"/>
-        <rect x="9" y="6" width="6" height="4" rx="1" fill="#3a7a52" stroke="none"/>
-        <line x1="12" y1="10" x2="12" y2="14"/>
-        <line x1="5" y1="14" x2="19" y2="14"/>
-        <rect x="2" y="14" width="6" height="4" rx="1" fill="#3a7a52" stroke="none"/>
-        <rect x="9" y="14" width="6" height="4" rx="1" fill="#3a7a52" stroke="none"/>
-        <rect x="16" y="14" width="6" height="4" rx="1" fill="#3a7a52" stroke="none"/>
+  <a href="orgcast.html" class="card" style="--card-color:#059669;">
+    <div class="card-icon" style="background:#f0fdf8;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="5" r="2.5"/>
+        <line x1="12" y1="7.5" x2="12" y2="12"/>
+        <line x1="5" y1="12" x2="19" y2="12"/>
+        <line x1="5" y1="12" x2="5" y2="15.5"/>
+        <line x1="12" y1="12" x2="12" y2="15.5"/>
+        <line x1="19" y1="12" x2="19" y2="15.5"/>
+        <rect x="2.5" y="15.5" width="5" height="3.5" rx="1"/>
+        <rect x="9.5" y="15.5" width="5" height="3.5" rx="1"/>
+        <rect x="16.5" y="15.5" width="5" height="3.5" rx="1"/>
       </svg>
     </div>
-    <div class="card-name" style="color:#3a7a52;">Orgcast</div>
-    <div class="card-tagline">Project Organisation Intelligence</div>
-    <div class="card-desc">Create project organisation charts with role and company colour coding. SVG connectors, vacancy nodes, and compact print layout.</div>
+    <div class="card-name">Orgcast</div>
+    <div class="card-tagline">Org Charts</div>
+    <div class="card-desc">Dynamic project organisation charts with SVG connectors and role-based coding.</div>
     <div class="card-footer">
-      <div class="card-features">
-        <span class="feat-tag">Org Chart</span>
-        <span class="feat-tag">Vacancy Nodes</span>
-        <span class="feat-tag">PDF Export</span>
-      </div>
+      <span class="feat-tag">SVG · Print</span>
       <span class="card-arrow">→</span>
     </div>
   </a>
 
-  <a href="resourcecast.html" class="card" style="--card-color: #1a7a6e;">
-    <div class="card-icon" style="background:#e6f4f2;">
-      <svg viewBox="0 0 24 24" fill="none" stroke="#1a7a6e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="2" y="3" width="20" height="14" rx="2"/>
-        <path d="M8 21h8m-4-4v4"/>
-        <line x1="6" y1="8" x2="10" y2="8"/>
-        <line x1="12" y1="8" x2="18" y2="8"/>
-        <line x1="6" y1="12" x2="14" y2="12"/>
-        <line x1="16" y1="12" x2="18" y2="12"/>
+  <a href="resourcecast.html" class="card" style="--card-color:#0d9488;">
+    <div class="card-icon" style="background:#f0fdfc;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="7" width="20" height="14" rx="2"/>
+        <path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/>
+        <line x1="12" y1="12" x2="12" y2="16"/>
+        <line x1="10" y1="14" x2="14" y2="14"/>
       </svg>
     </div>
-    <div class="card-name" style="color:#1a7a6e;">ResourceCast</div>
-    <div class="card-tagline">Resource &amp; Cost Intelligence</div>
-    <div class="card-desc">Plan team hours per project phase, calculate EUR and DKK costs with hedge rate, track travel and additional expenses with full % breakdown.</div>
+    <div class="card-name">ResourceCast</div>
+    <div class="card-tagline">Cost Intelligence</div>
+    <div class="card-desc">Plan team hours and calculate DKK/EUR costs with hedge rates and contingencies.</div>
     <div class="card-footer">
-      <div class="card-features">
-        <span class="feat-tag">Hours · Rates</span>
-        <span class="feat-tag">EUR / DKK</span>
-        <span class="feat-tag">PDF Export</span>
-      </div>
+      <span class="feat-tag">Rates · Multi-Currency</span>
       <span class="card-arrow">→</span>
     </div>
   </a>
 
-  <a href="rfqcast.html" class="card" style="--card-color: #7b4fa6;">
-    <div class="card-icon" style="background:#f5f0fa;">
-      <svg viewBox="0 0 24 24" fill="none" stroke="#7b4fa6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <a href="rfqcast.html" class="card" style="--card-color:#ea580c;">
+    <div class="card-icon" style="background:#fff7f0;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
         <rect x="9" y="3" width="6" height="4" rx="1"/>
         <line x1="9" y1="12" x2="15" y2="12"/>
         <line x1="9" y1="16" x2="13" y2="16"/>
       </svg>
     </div>
-    <div class="card-name" style="color:#7b4fa6;">RFQCAST</div>
-    <div class="card-tagline">Supplier RFQ Intelligence</div>
-    <div class="card-desc">Track supplier enquiries, offer status and validity across multiple vendors per item. Excel import/export, status dashboard.</div>
+    <div class="card-name">RFQCast</div>
+    <div class="card-tagline">Supplier Tracking</div>
+    <div class="card-desc">Track supplier enquiries, offer validity status, and high-volume RFQ package timelines.</div>
     <div class="card-footer">
-      <div class="card-features">
-        <span class="feat-tag">Multi-Vendor</span>
-        <span class="feat-tag">Validity Alerts</span>
-        <span class="feat-tag">Excel I/O</span>
-      </div>
+      <span class="feat-tag">Alerts · Dashboard</span>
       <span class="card-arrow">→</span>
     </div>
   </a>
 
-  <a href="timecast.html" class="card" style="--card-color: #2c4e87;">
-    <div class="card-icon" style="background:#eef2fb;">
-      <svg viewBox="0 0 24 24" fill="none" stroke="#2c4e87" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="4" width="18" height="16" rx="2"/>
-        <line x1="3" y1="9" x2="21" y2="9"/>
-        <line x1="7" y1="4" x2="7" y2="9"/>
-        <line x1="17" y1="4" x2="17" y2="9"/>
-        <line x1="7" y1="13" x2="13" y2="13"/>
-        <line x1="7" y1="16" x2="11" y2="16"/>
+  <a href="timecast.html" class="card" style="--card-color:#4f46e5;">
+    <div class="card-icon" style="background:#f5f3ff;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="5" width="20" height="15" rx="2"/>
+        <line x1="2" y1="10" x2="22" y2="10"/>
+        <line x1="7" y1="5" x2="7" y2="10"/>
+        <line x1="17" y1="5" x2="17" y2="10"/>
+        <line x1="6" y1="14" x2="14" y2="14"/>
+        <line x1="6" y1="17" x2="10" y2="17"/>
       </svg>
     </div>
-    <div class="card-name" style="color:#2c4e87;">Timecast</div>
-    <div class="card-tagline">Bid Timeline Intelligence</div>
-    <div class="card-desc">Build multi-project Gantt charts for bid and execution phases. Baseline tracking, milestones, and A3-ready PDF export.</div>
+    <div class="card-name">Timecast</div>
+    <div class="card-tagline">Timeline Intelligence</div>
+    <div class="card-desc">Multi-project Gantt charts with baseline tracking and A3-ready PDF output.</div>
     <div class="card-footer">
-      <div class="card-features">
-        <span class="feat-tag">Bid · Execution</span>
-        <span class="feat-tag">Multi-project</span>
-        <span class="feat-tag">PDF Export</span>
-      </div>
+      <span class="feat-tag">Gantt · Baseline</span>
       <span class="card-arrow">→</span>
     </div>
   </a>
@@ -273,7 +275,7 @@
 
 <footer>
   <span>Made with ♥ @ CPH</span>
-  <span>Files are processed locally in your browser — no data is sent to any server</span>
+  <span>Local Processing — Your data never leaves your browser</span>
 </footer>
 
 </body>
