@@ -6,7 +6,48 @@
 <title>RESOURCECAST — Project Resource &amp; Cost Intelligence</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-<style id="page-size-style">@page { size: A3 landscape; margin: 8mm; }</style>
+<style id="page-size-style">@page { size: A3 landscape; margin: 8mm; }
+  /* ── Resource Gantt Chart ── */
+  .gantt-page { page-break-before: always; margin-top: 0; }
+  #rc-gantt {
+    display: grid;
+    border: 1px solid #e8e3dc;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 14px;
+    font-size: 8.5px;
+  }
+  #rc-gantt .rg-corner { background:#f0ede8; border-right:1px solid #e0dbd5; border-bottom:1px solid #e0dbd5; padding:4px 8px; font-size:8px; font-weight:600; color:#aaa; display:flex; align-items:flex-end; }
+  #rc-gantt .rg-yr { text-align:center; font-weight:700; font-size:8px; background:#f0ede8; padding:3px 2px; border-right:1px solid #e0dbd5; border-bottom:1px solid #e8e3dc; color:#555; display:flex; align-items:center; justify-content:center; }
+  #rc-gantt .rg-mo { text-align:center; font-size:7px; color:#bbb; background:#f7f5f2; padding:2px 1px; border-right:1px solid #f0ede8; border-bottom:1px solid #e8e3dc; display:flex; align-items:center; justify-content:center; min-width:0; overflow:hidden; }
+  #rc-gantt .rg-mo.rg-today { background:#fff8f0; color:#e07b2a; font-weight:700; }
+  #rc-gantt .rg-mo.rg-today::after { content:'▼'; font-size:5px; display:block; position:absolute; }
+  #rc-gantt .rg-ph-lbl { font-size:8px; font-weight:600; padding:3px 8px; border-right:1px solid #e0dbd5; border-bottom:1px solid #f0ede8; background:#faf9f7; display:flex; align-items:center; white-space:nowrap; overflow:hidden; }
+  #rc-gantt .rg-ph-cell { border-bottom:1px solid #f5f2ee; position:relative; height:12px; border-right:1px solid #f7f5f2; }
+  #rc-gantt .rg-ph-bar-s { position:absolute; inset:2px 0 2px 1px; border-radius:3px 0 0 3px; }
+  #rc-gantt .rg-ph-bar-m { position:absolute; inset:2px 0; border-radius:0; }
+  #rc-gantt .rg-ph-bar-e { position:absolute; inset:2px 1px 2px 0; border-radius:0 3px 3px 0; }
+  #rc-gantt .rg-ph-bar-solo { position:absolute; inset:2px 1px; border-radius:3px; }
+  #rc-gantt .rg-ph-lbl-overlay { position:absolute; inset:0; display:flex; align-items:center; padding:0 4px; font-size:7px; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; pointer-events:none; }
+  #rc-gantt .rg-role-lbl { font-size:8.5px; padding:3px 8px 3px 6px; border-right:1px solid #e0dbd5; border-top:1px solid #f0ede8; background:#fff; display:flex; align-items:center; gap:5px; white-space:nowrap; overflow:hidden; min-width:0; }
+  #rc-gantt .rg-role-lbl.alt { background:#fdf9f7; }
+  #rc-gantt .rg-role-cell { border-top:1px solid #f5f2ee; border-right:1px solid #f7f5f2; position:relative; height:22px; }
+  #rc-gantt .rg-role-cell.alt { background:#fdfcfb; }
+  #rc-gantt .rg-bar-s { position:absolute; top:3px; bottom:3px; border-radius:4px 0 0 4px; right:0; }
+  #rc-gantt .rg-bar-m { position:absolute; top:3px; bottom:3px; border-radius:0; left:0; right:0; }
+  #rc-gantt .rg-bar-e { position:absolute; top:3px; bottom:3px; border-radius:0 4px 4px 0; left:0; }
+  #rc-gantt .rg-bar-solo { position:absolute; top:3px; bottom:3px; border-radius:4px; left:1px; right:1px; }
+  #rc-gantt .rg-bar-lbl { position:absolute; top:0; bottom:0; left:4px; right:4px; display:flex; align-items:center; font-size:7px; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; pointer-events:none; text-shadow:0 0 4px rgba(0,0,0,0.3); }
+  #rc-gantt .rg-today-line { position:absolute; top:0; bottom:0; left:50%; width:1.5px; background:#e07b2a; opacity:0.6; pointer-events:none; z-index:2; }
+  .rg-co-badge { font-size:6.5px; font-weight:700; padding:1px 4px; border-radius:3px; flex-shrink:0; line-height:1.4; }
+  #rc-gantt .rg-total-lbl { font-size:8px; font-weight:600; color:#888; padding:3px 6px; border-right:1px solid #e0dbd5; border-top:1px solid #f0ede8; background:#fff; display:flex; align-items:center; white-space:nowrap; }
+  #rc-gantt .rg-total-lbl.alt { background:#fdf9f7; }
+  .gantt-legend { display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; font-size:8.5px; color:#888; align-items:center; }
+  .gantt-legend-item { display:flex; align-items:center; gap:4px; }
+  .gantt-legend-dot { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
+  .gantt-fte-scale { display:flex; align-items:center; gap:4px; }
+  .gantt-fte-grad { width:40px; height:8px; border-radius:2px; background:linear-gradient(to right, rgba(44,78,135,0.15), rgba(44,78,135,1)); }
+</style>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -279,7 +320,10 @@
         <tfoot id="res-tfoot"></tfoot>
       </table>
     </div>
-    <button class="btn-add" onclick="addRole({})">+ Add Role</button>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <button class="btn-add" onclick="addRole({})">+ Add Role</button>
+      <button class="btn-secondary" onclick="loadSETemplate()" style="font-size:11px;padding:5px 12px;" title="Load 17 standard SE roles with correct DKK rates from the hours calculation template">⚙ Load SE Template</button>
+    </div>
   </div>
 
   <!-- Additional Costs -->
@@ -328,6 +372,22 @@
     <table class="out-table" id="out-table"></table>
     <div class="out-hedge" id="out-hedge"></div>
     <div class="out-watermark">Generated with ResourceCast &nbsp;·&nbsp; Project Resource &amp; Cost Intelligence</div>
+  </div>
+
+  <!-- ─── Resource Gantt Page ─── -->
+  <div class="out-page gantt-page" id="gantt-page" style="display:none">
+    <div class="out-header">
+      <div id="gantt-print-logo" style="flex-shrink:0;"></div>
+      <div></div>
+      <div class="out-title-wrap">
+        <div class="out-doc-title" id="gantt-out-title">Resource Loading Plan</div>
+        <div class="out-doc-sub"   id="gantt-out-sub"></div>
+      </div>
+      <div class="out-meta" id="gantt-out-meta"></div>
+    </div>
+    <div id="rc-gantt"></div>
+    <div class="gantt-legend" id="gantt-legend"></div>
+    <div class="out-watermark">Generated with ResourceCast &nbsp;·&nbsp; Resource Loading Visualization</div>
   </div>
 </div>
 
@@ -379,6 +439,37 @@ function updateLogoUI() {
     'Manufacturing','FAT Testing','Site Installation','Commissioning',
   ];
 
+  // SE standard template roles extracted from BM_GEN_3_O_01 hours calculation workbook
+  // Rates in EUR (DKK rates divided by 7.45 exchange rate, flat EUR rates kept as-is)
+  const SE_TEMPLATE_ROLES = [
+    { name:'General PM',                                    company:'SE', rate:114 },
+    { name:'TPM, Mechanical (GIS/TR/SHR/EAT)',             company:'SE', rate:111 },
+    { name:'TPM, Electrical (Interfaces/Secondary/Cables)', company:'SE', rate:111 },
+    { name:'Lead Engineer, Control Cables',                 company:'SE', rate:60  },
+    { name:'Lead Engineer, ICMS',                          company:'SE', rate:107 },
+    { name:'Lead Engineer, CT/VT Calculations',            company:'SE', rate:60  },
+    { name:'Project Controller / CPM',                     company:'SE', rate:97  },
+    { name:'Quality Manager',                              company:'SE', rate:114 },
+    { name:'EHS Manager',                                  company:'SE', rate:114 },
+    { name:'Purchaser / Strategic Procurement',            company:'SE', rate:77  },
+    { name:'Secondary Engineer Lead',                      company:'SE', rate:107 },
+    { name:'Secondary Engineer',                           company:'SE', rate:60  },
+    { name:'Document Controller',                          company:'SE', rate:87  },
+    { name:'Contract Manager',                             company:'SE', rate:114 },
+    { name:'Site Manager',                                 company:'SE', rate:111 },
+    { name:'Site HSE Manager',                             company:'SE', rate:111 },
+    { name:'Site Commissioning Manager',                   company:'SE', rate:111 },
+  ];
+
+  function loadSETemplate() {
+    if (!confirm('This will replace all current roles with the SE standard template (17 roles). Phases and hours will be cleared. Continue?')) return;
+    document.getElementById('res-tbody').innerHTML = '';
+    roleCount = 0;
+    SE_TEMPLATE_ROLES.forEach(r => addRole(r));
+    rebuildGrid();
+    _scheduleSnap();
+  }
+
   // ── Helpers ──
   function esc(s) {
     return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -414,6 +505,10 @@ function updateLogoUI() {
     const chip = document.createElement('div');
     chip.className  = 'phase-chip';
     chip.dataset.id = id;
+    chip.dataset.sm = data.sm || '';
+    chip.dataset.sy = data.sy || '';
+    chip.dataset.em = data.em || '';
+    chip.dataset.ey = data.ey || '';
     chip.draggable  = true;
     chip.innerHTML  = `<span class="drag-handle">⠿</span>
       <input type="text" value="${esc(name)}" placeholder="Phase name" oninput="rebuildGrid()">
@@ -444,6 +539,10 @@ function updateLogoUI() {
     return [...document.querySelectorAll('.phase-chip')].map(c => ({
       id:   String(c.dataset.id),
       name: c.querySelector('input').value.trim() || 'Phase',
+      sm:   parseInt(c.dataset.sm) || 0,
+      sy:   parseInt(c.dataset.sy) || 0,
+      em:   parseInt(c.dataset.em) || 0,
+      ey:   parseInt(c.dataset.ey) || 0,
     }));
   }
 
@@ -770,19 +869,362 @@ function updateLogoUI() {
 
     html += '</tbody>';
     document.getElementById('out-table').innerHTML = html;
+    renderGantt();
+
     document.getElementById('editor').style.display = 'none';
     document.getElementById('output').style.display = 'block';
     window.scrollTo(0, 0);
   }
 
+
+  // ── Resource Gantt Chart ──────────────────────────────────────
+  const MN_G = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const PHASE_COLORS_G = [
+    '#2c4e87','#3a7a52','#c47a1e','#7b3dbf','#c43c3c',
+    '#1e7a8c','#6a5c1e','#2e6e6e','#87542c','#4a4e87',
+  ];
+
+  function _buildMonths(sm, sy, em, ey) {
+    const out = []; let m = sm, y = sy;
+    while (y < ey || (y === ey && m <= em)) {
+      out.push({ m, y });
+      m++; if (m > 11) { m = 0; y++; }
+    }
+    return out;
+  }
+
+  function _yearBands(months) {
+    const b = []; let cur = null;
+    for (const mo of months) {
+      if (!cur || cur.year !== mo.y) { cur = { year: mo.y, span: 0 }; b.push(cur); }
+      cur.span++;
+    }
+    return b;
+  }
+
+  function renderGantt() {
+    const phases  = getPhases();
+    const roleEls = [...document.querySelectorAll('.role-row')];
+    const roles   = roleEls.map(tr => {
+      const hours = {};
+      tr.querySelectorAll('.phase-inp').forEach(inp => {
+        const h = parseFloat(inp.value) || 0;
+        if (h > 0) hours[String(inp.dataset.phase)] = h;
+      });
+      const totalH = Object.values(hours).reduce((s,v)=>s+v, 0);
+      return {
+        name:    tr.querySelector('.role-name').value.trim(),
+        company: tr.querySelector('select').value,
+        rate:    parseFloat(tr.querySelector('.role-rate')?.value) || 0,
+        hours, totalH,
+      };
+    }).filter(r => r.name && r.totalH > 0);
+
+    const gantt  = document.getElementById('rc-gantt');
+    const legend = document.getElementById('gantt-legend');
+    gantt.innerHTML  = '';
+    legend.innerHTML = '';
+
+    if (!phases.length || !roles.length) {
+      document.getElementById('gantt-page').style.display = 'none';
+      return;
+    }
+
+    // Header info
+    const state = collectState();
+    document.getElementById('gantt-out-title').textContent = state.projName || 'Resource Loading Plan';
+    document.getElementById('gantt-out-sub').textContent   = state.projSub  || '';
+    const metaParts = [];
+    if (state.rev)      metaParts.push('Rev. ' + state.rev);
+    if (state.projDate) metaParts.push(state.projDate);
+    document.getElementById('gantt-out-meta').textContent = metaParts.join(' · ');
+    const logoSrc = localStorage.getItem('bidcast_logo');
+    document.getElementById('gantt-print-logo').innerHTML = logoSrc
+      ? `<img src="${logoSrc}" style="height:36px;max-width:150px;object-fit:contain;">` : '';
+
+    // Check if phases have calendar dates
+    const hasDates = phases.some(p => p.sm > 0 && p.sy > 0 && p.em > 0 && p.ey > 0);
+
+    if (hasDates) {
+      _renderCalendarGantt(phases, roles, gantt, legend);
+    } else {
+      _renderPhaseGantt(phases, roles, gantt, legend);
+    }
+
+    document.getElementById('gantt-page').style.display = '';
+  }
+
+  // Calendar-based Gantt (when phases have date ranges from TimeCast sync)
+  function _renderCalendarGantt(phases, roles, gantt, legend) {
+    // Build time range
+    let minSm=11, minSy=9999, maxEm=0, maxEy=0;
+    phases.forEach(p => {
+      if (!p.sm||!p.sy||!p.em||!p.ey) return;
+      const sm0=p.sm-1, em0=p.em-1; // to 0-based month
+      if (p.sy < minSy || (p.sy===minSy && sm0 < minSm)) { minSm=sm0; minSy=p.sy; }
+      if (p.ey > maxEy || (p.ey===maxEy && em0 > maxEm)) { maxEm=em0; maxEy=p.ey; }
+    });
+    const months = _buildMonths(minSm, minSy, maxEm, maxEy);
+    const n      = months.length;
+    if (n === 0) { _renderPhaseGantt(phases, roles, gantt, legend); return; }
+    const bands  = _yearBands(months);
+    const colOf  = (m,y) => months.findIndex(mo=>mo.m===m&&mo.y===y);
+    const now    = new Date();
+    const todayI = colOf(now.getMonth(), now.getFullYear());
+
+    const LABEL_W = '140px';
+    const TOTAL_W = '52px';
+    gantt.style.gridTemplateColumns = `${LABEL_W} repeat(${n}, minmax(0,1fr)) ${TOTAL_W}`;
+
+    function mk(cls, html, span) {
+      const d = document.createElement('div');
+      d.className = cls;
+      if (html !== undefined) d.innerHTML = html;
+      if (span > 1) d.style.gridColumn = `span ${span}`;
+      return d;
+    }
+
+    // Year header row
+    gantt.appendChild(mk('rg-corner',''));
+    bands.forEach(b => gantt.appendChild(mk('rg-yr', b.year.toString(), b.span)));
+    gantt.appendChild(mk('rg-corner','Total'));
+
+    // Month header row
+    gantt.appendChild(mk('rg-corner','Resource'));
+    months.forEach((mo,i) => {
+      const isT = i===todayI;
+      gantt.appendChild(mk(`rg-mo${isT?' rg-today':''}`, MN_G[mo.m].slice(0,1)));
+    });
+    gantt.appendChild(mk('rg-corner',''));
+
+    // Phase header rows
+    phases.forEach((ph, pi) => {
+      if (!ph.sm||!ph.sy) return;
+      const color = PHASE_COLORS_G[pi % PHASE_COLORS_G.length];
+      const si = colOf(ph.sm-1, ph.sy);
+      const ei = colOf(ph.em-1, ph.ey);
+
+      const lbl = mk('rg-ph-lbl','');
+      lbl.innerHTML = `<span style="width:8px;height:8px;border-radius:2px;background:${color};flex-shrink:0;display:inline-block;margin-right:4px;"></span>${esc(ph.name)}`;
+      lbl.style.color = color;
+      gantt.appendChild(lbl);
+
+      for (let c=0; c<n; c++) {
+        const cell = mk('rg-ph-cell','');
+        if (c===todayI) cell.appendChild(mk('rg-today-line',''));
+        if (si!==-1 && ei!==-1 && c>=si && c<=ei) {
+          let barCls = 'rg-ph-bar-m';
+          if (si===ei) barCls='rg-ph-bar-solo';
+          else if (c===si) barCls='rg-ph-bar-s';
+          else if (c===ei) barCls='rg-ph-bar-e';
+          const bar = mk(barCls,'');
+          bar.style.background = color;
+          cell.appendChild(bar);
+          // Phase name overlay on first cell
+          if (c===si) {
+            const ov=mk('rg-ph-lbl-overlay','');
+            ov.textContent = ph.name;
+            cell.appendChild(ov);
+          }
+        }
+        gantt.appendChild(cell);
+      }
+      gantt.appendChild(mk('rg-corner',''));
+    });
+
+    // Role rows
+    roles.forEach((role, ri) => {
+      const alt   = ri%2===1;
+      const co    = COMPANIES.find(c=>c.key===role.company)||COMPANIES[3];
+      const altCls = alt ? ' alt' : '';
+
+      // Find active months range
+      let firstCol=n, lastCol=-1;
+      phases.forEach(ph => {
+        if (!role.hours[String(ph.id)]) return;
+        if (!ph.sm||!ph.sy) return;
+        const si = colOf(ph.sm-1,ph.sy);
+        const ei = colOf(ph.em-1,ph.ey);
+        if (si>=0) { firstCol=Math.min(firstCol,si); lastCol=Math.max(lastCol,ei>=0?ei:si); }
+      });
+
+      // Label cell
+      const lbl = mk(`rg-role-lbl${altCls}`,'');
+      lbl.innerHTML = `<span class="rg-co-badge" style="background:${co.bg};color:${co.color}">${co.key}</span>${esc(role.name)}`;
+      gantt.appendChild(lbl);
+
+      // Month cells
+      const barColor = co.color;
+      let labelPlaced = false;
+      const midCol = firstCol !== n ? Math.round((firstCol + lastCol) / 2) : -1;
+
+      for (let c=0; c<n; c++) {
+        const cell = mk(`rg-role-cell${altCls}`,'');
+        if (c===todayI) cell.appendChild(mk('rg-today-line',''));
+
+        if (firstCol!==n && lastCol!==-1 && c>=firstCol && c<=lastCol) {
+          // Which phase owns this month?
+          let phHours=0, phLen=1;
+          phases.forEach(ph => {
+            if (!role.hours[String(ph.id)]) return;
+            if (!ph.sm||!ph.sy) return;
+            const si=colOf(ph.sm-1,ph.sy), ei=colOf(ph.em-1,ph.ey);
+            if (si>=0&&ei>=0&&c>=si&&c<=ei) {
+              phHours = role.hours[String(ph.id)];
+              phLen   = Math.max(1, ei-si+1);
+            }
+          });
+          const monthH = phHours / phLen;
+          const fte    = Math.min(1, monthH / 160);
+          const alpha  = Math.max(0.18, fte);
+
+          let barCls='rg-bar-m';
+          if (firstCol===lastCol) barCls='rg-bar-solo';
+          else if (c===firstCol)  barCls='rg-bar-s';
+          else if (c===lastCol)   barCls='rg-bar-e';
+
+          const bar = mk(barCls,'');
+          bar.style.background = barColor;
+          bar.style.opacity    = String(alpha);
+          cell.appendChild(bar);
+
+          // Label in center bar cell
+          if (c===midCol) {
+            const lblBar = mk('rg-bar-lbl','');
+            lblBar.textContent = `${role.name}  ·  ${role.totalH.toLocaleString()}h`;
+            bar.style.opacity = '1';
+            cell.appendChild(lblBar);
+            labelPlaced = true;
+          }
+        }
+        gantt.appendChild(cell);
+      }
+
+      // Total column
+      const tot = mk(`rg-total-lbl${altCls}`,'');
+      const avgFTE = (() => {
+        if (firstCol===n||lastCol===-1) return 0;
+        const activeMonths = lastCol-firstCol+1;
+        return role.totalH / (activeMonths * 160);
+      })();
+      tot.innerHTML = `<span style="font-weight:700;color:#333">${role.totalH.toLocaleString()}h</span>
+        <span style="color:#aaa;font-size:7px;margin-left:3px;">${avgFTE.toFixed(2)} FTE</span>`;
+      gantt.appendChild(tot);
+    });
+
+    // Legend
+    legend.innerHTML = '<span style="font-weight:600;color:#555;">Roles:</span>';
+    roles.forEach(role => {
+      const co = COMPANIES.find(c=>c.key===role.company)||COMPANIES[3];
+      legend.innerHTML += `<div class="gantt-legend-item"><div class="gantt-legend-dot" style="background:${co.color}"></div>${esc(role.name)}</div>`;
+    });
+    legend.innerHTML += `<span style="margin-left:8px;font-weight:600;color:#555;">FTE loading:</span>
+      <div class="gantt-fte-scale"><span>low</span><div class="gantt-fte-grad"></div><span>full</span></div>
+      <span style="color:#bbb;">(bar opacity = FTE fraction, 160h/month = 1.0 FTE)</span>`;
+  }
+
+  // Phase-index Gantt (fallback when no calendar dates)
+  function _renderPhaseGantt(phases, roles, gantt, legend) {
+    const n = phases.length;
+    gantt.style.gridTemplateColumns = `140px repeat(${n}, 1fr) 52px`;
+
+    function mk(cls, html, span) {
+      const d = document.createElement('div');
+      d.className = cls;
+      if (html !== undefined) d.innerHTML = html;
+      if (span > 1) d.style.gridColumn = `span ${span}`;
+      return d;
+    }
+
+    // Header
+    gantt.appendChild(mk('rg-corner','Resource'));
+    phases.forEach((ph, pi) => {
+      const color = PHASE_COLORS_G[pi % PHASE_COLORS_G.length];
+      const h = mk('rg-ph-lbl','');
+      h.innerHTML = `<span style="width:7px;height:7px;border-radius:1px;background:${color};flex-shrink:0;display:inline-block;margin-right:4px;"></span>${esc(ph.name)}`;
+      h.style.cssText += `;color:${color};border-bottom:2px solid ${color};background:#fff;font-size:7.5px;`;
+      gantt.appendChild(h);
+    });
+    gantt.appendChild(mk('rg-corner','Total'));
+
+    // Role rows
+    roles.forEach((role, ri) => {
+      const alt   = ri%2===1;
+      const co    = COMPANIES.find(c=>c.key===role.company)||COMPANIES[3];
+      const altCls= alt?' alt':'';
+
+      const lbl = mk(`rg-role-lbl${altCls}`,'');
+      lbl.innerHTML = `<span class="rg-co-badge" style="background:${co.bg};color:${co.color}">${co.key}</span>${esc(role.name)}`;
+      gantt.appendChild(lbl);
+
+      // Find active phase range
+      let firstP=-1, lastP=-1;
+      phases.forEach((ph,pi) => {
+        if (role.hours[String(ph.id)] > 0) {
+          if (firstP===-1) firstP=pi;
+          lastP=pi;
+        }
+      });
+
+      const maxPhH = Math.max(...phases.map(ph => role.hours[String(ph.id)]||0), 1);
+
+      phases.forEach((ph, pi) => {
+        const h = role.hours[String(ph.id)] || 0;
+        const cell = mk(`rg-role-cell${altCls}`,'');
+        if (h > 0) {
+          const fte   = Math.min(1, h / (2 * 160)); // ~2 month per phase heuristic
+          const alpha = Math.max(0.2, fte * 2);
+          let barCls='rg-bar-m';
+          if (firstP===lastP) barCls='rg-bar-solo';
+          else if (pi===firstP) barCls='rg-bar-s';
+          else if (pi===lastP)  barCls='rg-bar-e';
+          const bar=mk(barCls,'');
+          bar.style.background=co.color;
+          bar.style.opacity=String(Math.min(1,alpha));
+          cell.appendChild(bar);
+          if (pi===Math.round((firstP+lastP)/2)) {
+            const lbarLbl=mk('rg-bar-lbl','');
+            lbarLbl.textContent=`${h.toLocaleString()}h`;
+            bar.style.opacity='1';
+            cell.appendChild(lbarLbl);
+          }
+        }
+        gantt.appendChild(cell);
+      });
+
+      // Total
+      const tot=mk(`rg-total-lbl${altCls}`,'');
+      tot.innerHTML=`<span style="font-weight:700;color:#333">${role.totalH.toLocaleString()}h</span>`;
+      gantt.appendChild(tot);
+    });
+
+    // Phase total row
+    gantt.appendChild(mk('rg-ph-lbl','<strong>Phase Total</strong>'));
+    phases.forEach(ph => {
+      const phTotal = roles.reduce((s,r)=>s+(r.hours[String(ph.id)]||0),0);
+      const c=mk('rg-ph-cell','');
+      c.style.cssText='display:flex;align-items:center;justify-content:center;font-size:7.5px;font-weight:700;color:#555;border-top:1.5px solid #e0dbd5;';
+      c.textContent = phTotal ? phTotal.toLocaleString()+'h' : '—';
+      gantt.appendChild(c);
+    });
+    const grandH = roles.reduce((s,r)=>s+r.totalH,0);
+    const grandTot=mk('rg-total-lbl','');
+    grandTot.style.cssText='font-weight:700;color:#333;border-top:1.5px solid #e0dbd5;font-size:8.5px;';
+    grandTot.textContent=grandH.toLocaleString()+'h';
+    gantt.appendChild(grandTot);
+
+    legend.innerHTML='<span style="font-weight:600;color:#555;">Bar opacity = FTE loading · Enter phase dates in TimeCast for calendar timeline view</span>';
+  }
+
   function goBack() {
     document.getElementById('output').style.display = 'none';
     document.getElementById('editor').style.display = 'block';
+    document.getElementById('gantt-page').style.display = 'none';
   }
 
   // ── collectState / applyState ──
   function collectState() {
-    const phases = getPhases();
+    const phases = getPhases(); // already includes sm/sy/em/ey
     const roles  = [...document.querySelectorAll('.role-row')].map(tr => ({
       id:      tr.dataset.id,
       name:    tr.querySelector('.role-name').value.trim(),
@@ -983,9 +1425,24 @@ function suiteRead(sync) {
   try {
     if (!sync || sync._from === 'resourcecast') { _updateSyncBadge(); return; }
     if (sync.phases && sync.phases.length) {
-      const existing = new Set(getPhases().map(p => p.name.trim().toLowerCase()));
-      const toAdd = sync.phases.filter(p => p.name && !existing.has(p.name.trim().toLowerCase()));
-      toAdd.forEach(p => addPhase({ name: p.name }));
+      const existingChips = new Map([...document.querySelectorAll('.phase-chip')].map(c =>
+        [c.querySelector('input').value.trim().toLowerCase(), c]));
+      const toAdd = [];
+      sync.phases.forEach(p => {
+        if (!p.name) return;
+        const key = p.name.trim().toLowerCase();
+        if (existingChips.has(key)) {
+          // Update date ranges on existing chip (TimeCast is source of truth)
+          const chip = existingChips.get(key);
+          if (p.sm) chip.dataset.sm = p.sm;
+          if (p.sy) chip.dataset.sy = p.sy;
+          if (p.em) chip.dataset.em = p.em;
+          if (p.ey) chip.dataset.ey = p.ey;
+        } else {
+          toAdd.push(p);
+        }
+      });
+      toAdd.forEach(p => addPhase({ name: p.name, sm: p.sm, sy: p.sy, em: p.em, ey: p.ey }));
       if (toAdd.length) updateTotals();
     }
     _updateSyncBadge();

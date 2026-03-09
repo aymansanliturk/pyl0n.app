@@ -1261,7 +1261,8 @@ function suiteWrite() {
     [...(proj.bidTasks||[]), ...(proj.execTasks||[])].forEach(t => {
       if (t.type === 'bar' && t.name && !seen.has(t.name)) {
         seen.add(t.name);
-        phases.push({ id: 'tc_' + phases.length, name: t.name });
+        phases.push({ id: 'tc_' + phases.length, name: t.name,
+          sm: t.sm, sy: t.sy, em: t.em, ey: t.ey });
       }
     });
     const prev = JSON.parse(localStorage.getItem('bidcast_suite_sync') || '{}');
