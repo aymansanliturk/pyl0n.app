@@ -446,16 +446,25 @@ function updateLogoUI() {
   }
 
   function getPeople() {
-    return [...document.querySelectorAll('#people-body tr.node-row')].map(tr => ({
+    const allRows = [...document.querySelectorAll('#people-body tr.node-row')];
+    // Filter first so positional indices are stable
+    const rows = allRows.filter(tr =>
+      tr.querySelector('.p-name').value.trim() || tr.dataset.vac === '1'
+    );
+    // Map internal DOM id → positional index so parent refs survive reload
+    const idToPos = {};
+    rows.forEach((r, i) => { idToPos[r.dataset.id] = String(i); });
+
+    return rows.map(tr => ({
       id:      tr.dataset.id,
       vacancy: tr.dataset.vac === '1',
       name:    tr.querySelector('.p-name').value.trim(),
       title:   tr.querySelector('.p-title').value.trim(),
       role:    tr.querySelector('.p-role').value,
       company: tr.querySelector('.p-company').value,
-      parent:  tr.querySelector('.p-parent').value.trim(),
+      parent:  idToPos[tr.querySelector('.p-parent').value.trim()] ?? '',
       color:   tr.querySelector('.p-color').value,
-    })).filter(p => p.name || p.vacancy);
+    }));
   }
 
   // ── Drag ──

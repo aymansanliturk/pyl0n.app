@@ -572,19 +572,27 @@ function updateLogoUI() {
     const btr = document.createElement('tr');
     btr.className = 'baseline-row';
     btr.style.display = 'none';
+    const bl = data.baseline || {};
     btr.innerHTML = `
       <td></td><td></td>
       <td><span class="baseline-label">Planned:</span></td>
-      <td><select class="t-bsm">${monthOpts(data.bsm??data.sm??0)}</select></td>
-      <td><input class="t-bsy" type="number" value="${data.bsy||data.sy||2025}" min="2000" max="2099" style="width:60px"></td>
-      <td><select class="t-bem">${monthOpts(data.bem??data.em??0)}</select></td>
-      <td><input class="t-bey" type="number" value="${data.bey||data.ey||2025}" min="2000" max="2099" style="width:60px"></td>
+      <td><select class="t-bsm">${monthOpts(bl.sm??data.bsm??data.sm??0)}</select></td>
+      <td><input class="t-bsy" type="number" value="${bl.sy||data.bsy||data.sy||2025}" min="2000" max="2099" style="width:60px"></td>
+      <td><select class="t-bem">${monthOpts(bl.em??data.bem??data.em??0)}</select></td>
+      <td><input class="t-bey" type="number" value="${bl.ey||data.bey||data.ey||2025}" min="2000" max="2099" style="width:60px"></td>
       <td colspan="4" style="font-size:9px;color:#ccc;padding:0 6px;">← original planned schedule</td>
     `;
 
     tr.querySelector('.t-color').addEventListener('input', function() { this.nextElementSibling.textContent = this.value; });
     tbody.appendChild(tr);
     tbody.appendChild(btr);
+
+    if (data.baseline) {
+      btr.style.display = '';
+      tr.dataset.hasBaseline = '1';
+      const btn = tr.querySelector('.btn-baseline-toggle');
+      if (btn) btn.classList.add('active');
+    }
   }
 
   function removeTaskRow(btn) {
@@ -1061,24 +1069,10 @@ function updateLogoUI() {
       const card = document.getElementById(`proj-card-${id}`);
       if (!card) return null;
       const titleEl = card.querySelector('.proj-name-inp');
-      function getTaskRows(tbody) {
-        return [...tbody.querySelectorAll('tr.task-row')].map(tr => ({
-          type:  tr.dataset.type  || 'bar',
-          name:  tr.querySelector('.t-name')?.value   || '',
-          sy:    tr.querySelector('.t-sy')?.value     || '',
-          sm:    tr.querySelector('.t-sm')?.value     || '',
-          ey:    tr.querySelector('.t-ey')?.value     || '',
-          em:    tr.querySelector('.t-em')?.value     || '',
-          notes: tr.querySelector('.t-notes')?.value  || '',
-          color: tr.querySelector('.t-color')?.value || '',
-        }));
-      }
-      const bidBody  = document.getElementById(`bid-body-${id}`);
-      const execBody = document.getElementById(`exec-body-${id}`);
       return {
         title:     titleEl?.value || '',
-        bidTasks:  bidBody  ? getTaskRows(bidBody)  : [],
-        execTasks: execBody ? getTaskRows(execBody) : [],
+        bidTasks:  getRows(`bid-body-${id}`),
+        execTasks: getRows(`exec-body-${id}`),
       };
     }).filter(Boolean);
 
