@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RESOURCECAST — Project Resource &amp; Cost Intelligence</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style id="page-size-style">@page { size: A3 landscape; margin: 8mm; }
   /* ── Resource Gantt Chart ── */
   .gantt-page { page-break-before: always; margin-top: 0; }
@@ -205,6 +205,45 @@
     .print-bar { display: none !important; }
     .out-page { padding: 0; }
   }
+
+  /* ── Monthly Grid ── */
+  .monthly-table { border-collapse: separate; border-spacing: 0; min-width: 100%; font-size:12px; }
+  .monthly-table th { font-size:9px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; color:var(--faint); padding:0 4px 8px; text-align:center; white-space:nowrap; }
+  .monthly-table th.left { text-align:left; }
+  .monthly-table tbody tr { border-top:1px solid #f0ede8; }
+  .monthly-table tbody tr:hover { background:#fdf9f7; }
+  .monthly-table td { padding:2px 2px; vertical-align:middle; }
+  /* Sticky name + rate columns */
+  .mg-sticky-name { position:sticky; left:0; z-index:2; background:var(--surface); box-shadow:2px 0 4px rgba(0,0,0,0.04); min-width:155px; }
+  .mg-sticky-rate { position:sticky; left:159px; z-index:2; background:var(--surface); border-right:2px solid var(--border); min-width:72px; }
+  .monthly-table thead .mg-sticky-name,
+  .monthly-table thead .mg-sticky-rate,
+  .monthly-table tfoot .mg-sticky-name,
+  .monthly-table tfoot .mg-sticky-rate { z-index:3; background:#f0f4fb; }
+  .monthly-table tfoot .mg-sticky-name { background:#f0f4fb; }
+  /* Phase group headers */
+  .mg-ph-th { padding:5px 6px 4px; text-align:center; font-size:9px; font-weight:700; text-transform:none; letter-spacing:0; white-space:nowrap; }
+  .mg-ph-range { font-size:8px; font-weight:400; opacity:0.7; margin-left:5px; }
+  .mg-toggle-btn { background:none; border:none; cursor:pointer; font-size:9px; padding:0 3px 0 0; opacity:0.8; }
+  .mg-toggle-btn:hover { opacity:1; }
+  /* Month column headers */
+  .mg-mo-th { font-size:8px; padding:3px 2px 5px; text-align:center; color:var(--faint); min-width:46px; }
+  .mg-mo-th.mg-today { color:#e07b2a; font-weight:700; }
+  .mg-yr-lbl { font-size:7px; opacity:0.7; font-weight:400; }
+  .mg-agg-col { font-size:9px; font-weight:600; min-width:60px; }
+  /* Input cells */
+  .mg-cell { padding:1px 1px; }
+  .mg-inp { font-family:'DM Mono',monospace; font-size:11px; width:44px; text-align:right; padding:4px 4px; background:#fafaf8; border:1px solid transparent; border-radius:3px; outline:none; transition:border-color 0.12s; }
+  .mg-inp:focus { border-color:var(--accent); background:#fff; }
+  .mg-inp:not(:placeholder-shown) { border-color:#e8e3dc; }
+  .mg-agg-inp { width:58px; font-weight:600; }
+  /* Totals */
+  .mg-tot-cell { font-family:'DM Mono',monospace; font-size:10px; text-align:right; padding:4px 3px; color:var(--muted); white-space:nowrap; min-width:44px; }
+  .mg-tot-cell.phase-tot { font-weight:700; color:var(--accent); }
+  /* Role row name cell content */
+  .mg-sticky-name .drag-handle { cursor:grab; color:#ccc; font-size:13px; margin-right:3px; display:inline-block; }
+  /* FTE indicator beneath month input */
+  .mg-fte-bar { height:2px; background:var(--accent); border-radius:1px; margin-top:1px; opacity:0.4; transition:width 0.15s; }
 </style>
 </head>
 <body>
@@ -311,17 +350,26 @@
 
   <!-- Resource Grid -->
   <div class="section">
-    <div class="section-title">Resource Plan — Hours per Phase</div>
-    <div class="res-wrap">
-      <table class="res-table">
+    <div class="section-title">
+      Resource Plan — Monthly Hours
+      <span style="font-size:10px;font-weight:400;color:var(--faint);text-transform:none;letter-spacing:0;">— click ▼/▶ on a phase header to expand/collapse its months</span>
+    </div>
+    <div class="res-wrap" id="res-wrap" style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+      <table class="monthly-table">
         <thead id="res-thead"></thead>
         <tbody id="res-tbody"></tbody>
         <tfoot id="res-tfoot"></tfoot>
       </table>
     </div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;">
       <button class="btn-add" onclick="addRole({})">+ Add Role</button>
-      <button class="btn-secondary" onclick="loadSETemplate()" style="font-size:11px;padding:5px 12px;" title="Load 17 standard SE roles with correct DKK rates from the hours calculation template">⚙ Load SE Template</button>
+      <button class="btn-secondary" onclick="loadSETemplate()" style="font-size:11px;padding:5px 12px;" title="Load 17 standard SE roles with correct DKK rates from the hours calculation template">⚙ SE Template</button>
+      <div class="pb-sep"></div>
+      <label class="pb-btn" style="margin:0;cursor:pointer;">
+        📥 Import Excel
+        <input type="file" accept=".xlsx,.xls" style="display:none" onchange="importExcel(this)">
+      </label>
+      <button class="pb-btn" onclick="exportExcel()">📤 Export Excel</button>
     </div>
   </div>
 
@@ -353,7 +401,7 @@
   <div class="print-bar">
     <button class="btn-secondary" onclick="goBack()">← Edit Data</button>
     <button class="btn-print" onclick="window.print()">🖨 Print</button>
-    <button class="btn-pdf"   onclick="exportPDF()">⬇ PDF</button>
+    <button class="btn-pdf"   onclick="window.print()">⬇ Print PDF</button>
   </div>
 
   <div class="out-page" id="out-page">
@@ -416,21 +464,19 @@ function updateLogoUI() {
 }
 
   // ── Constants ──
-
-  const COMPANIES = [
-    { key:'SE',   label:'Our Company', bg:'#dde8f7', color:'#2c4e87' },
-    { key:'CUST', label:'Customer',        bg:'#fde8e6', color:'#c0392b' },
-    { key:'SUB',  label:'Subcontractor',   bg:'#ece6f7', color:'#7b4fa6' },
-    { key:'OTH',  label:'Other',           bg:'#eeede9', color:'#6b6860' },
+  const PHASE_COLORS = [
+    '#2c4e87','#3a7a52','#c47a1e','#7b3dbf','#c43c3c',
+    '#1e7a8c','#6a5c1e','#2e6e6e','#87542c','#4a4e87',
   ];
+  const MN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
   const DEFAULT_ROLES = [
-    { name:'Project Manager',   company:'SE', rate:165 },
-    { name:'Technical PM',      company:'SE', rate:145 },
-    { name:'Lead Engineer',     company:'SE', rate:135 },
-    { name:'Procurement Lead',  company:'SE', rate:120 },
-    { name:'Quality Manager',   company:'SE', rate:115 },
-    { name:'HSE Manager',       company:'SE', rate:110 },
+    { name:'Project Manager',  rate:165 },
+    { name:'Technical PM',     rate:145 },
+    { name:'Lead Engineer',    rate:135 },
+    { name:'Procurement Lead', rate:120 },
+    { name:'Quality Manager',  rate:115 },
+    { name:'HSE Manager',      rate:110 },
   ];
 
   const DEFAULT_PHASES = [
@@ -439,33 +485,32 @@ function updateLogoUI() {
   ];
 
   // SE standard template roles extracted from BM_GEN_3_O_01 hours calculation workbook
-  // Rates in EUR (DKK rates divided by 7.45 exchange rate, flat EUR rates kept as-is)
+  // Rates in EUR (DKK rates divided by 7.45 exchange rate)
   const SE_TEMPLATE_ROLES = [
-    { name:'General PM',                                    company:'SE', rate:114 },
-    { name:'TPM, Mechanical (GIS/TR/SHR/EAT)',             company:'SE', rate:111 },
-    { name:'TPM, Electrical (Interfaces/Secondary/Cables)', company:'SE', rate:111 },
-    { name:'Lead Engineer, Control Cables',                 company:'SE', rate:60  },
-    { name:'Lead Engineer, ICMS',                          company:'SE', rate:107 },
-    { name:'Lead Engineer, CT/VT Calculations',            company:'SE', rate:60  },
-    { name:'Project Controller / CPM',                     company:'SE', rate:97  },
-    { name:'Quality Manager',                              company:'SE', rate:114 },
-    { name:'EHS Manager',                                  company:'SE', rate:114 },
-    { name:'Purchaser / Strategic Procurement',            company:'SE', rate:77  },
-    { name:'Secondary Engineer Lead',                      company:'SE', rate:107 },
-    { name:'Secondary Engineer',                           company:'SE', rate:60  },
-    { name:'Document Controller',                          company:'SE', rate:87  },
-    { name:'Contract Manager',                             company:'SE', rate:114 },
-    { name:'Site Manager',                                 company:'SE', rate:111 },
-    { name:'Site HSE Manager',                             company:'SE', rate:111 },
-    { name:'Site Commissioning Manager',                   company:'SE', rate:111 },
+    { name:'General PM',                                    rate:114 },
+    { name:'TPM, Mechanical (GIS/TR/SHR/EAT)',             rate:111 },
+    { name:'TPM, Electrical (Interfaces/Secondary/Cables)', rate:111 },
+    { name:'Lead Engineer, Control Cables',                 rate:60  },
+    { name:'Lead Engineer, ICMS',                          rate:107 },
+    { name:'Lead Engineer, CT/VT Calculations',            rate:60  },
+    { name:'Project Controller / CPM',                     rate:97  },
+    { name:'Quality Manager',                              rate:114 },
+    { name:'EHS Manager',                                  rate:114 },
+    { name:'Purchaser / Strategic Procurement',            rate:77  },
+    { name:'Secondary Engineer Lead',                      rate:107 },
+    { name:'Secondary Engineer',                           rate:60  },
+    { name:'Document Controller',                          rate:87  },
+    { name:'Contract Manager',                             rate:114 },
+    { name:'Site Manager',                                 rate:111 },
+    { name:'Site HSE Manager',                             rate:111 },
+    { name:'Site Commissioning Manager',                   rate:111 },
   ];
 
   function loadSETemplate() {
-    if (!confirm('This will replace all current roles with the SE standard template (17 roles). Phases and hours will be cleared. Continue?')) return;
+    if (!confirm('This will replace all current roles with the SE standard template (17 roles). Monthly hours will be cleared. Continue?')) return;
     document.getElementById('res-tbody').innerHTML = '';
     roleCount = 0;
     SE_TEMPLATE_ROLES.forEach(r => addRole(r));
-    rebuildGrid();
     _scheduleSnap();
   }
 
@@ -480,10 +525,6 @@ function updateLogoUI() {
   function fmtEUR(n) { return n ? fmtN(n) + ' €' : '—'; }
   function fmtDKK(n) { return n ? fmtN(Math.round(n)) + ' kr' : '—'; }
   function hedgeRate() { return parseFloat(document.getElementById('hedge-rate').value) || 7.46; }
-  function coBadgeHtml(key) {
-    const c = COMPANIES.find(x=>x.key===key) || COMPANIES[3];
-    return `<span class="co-badge" style="background:${c.bg};color:${c.color}">${c.label}</span>`;
-  }
 
   // ── Format ──
   let currentFormat = 'A3';
@@ -491,6 +532,61 @@ function updateLogoUI() {
     currentFormat = fmt;
     document.getElementById('page-size-style').textContent = `@page { size: ${fmt} landscape; margin: 8mm; }`;
     document.querySelectorAll('.format-btn').forEach(b => b.classList.toggle('active', b.dataset.fmt === fmt));
+  }
+
+  // ── Phase collapse state ──
+  let phaseCollapsed = {}; // phaseId (string) → boolean
+
+  function togglePhase(phaseId) {
+    const pid = String(phaseId);
+    phaseCollapsed[pid] = !phaseCollapsed[pid];
+    // When collapsing: aggregate monthly hours into ph:ID key per role
+    if (phaseCollapsed[pid]) {
+      const ph = getPhases().find(p => p.id === pid);
+      if (ph && ph.sm > 0 && ph.sy > 0) {
+        document.querySelectorAll('.role-row').forEach(tr => {
+          const mh = _getRowMonthHours(tr);
+          let sum = 0;
+          let m = ph.sm - 1, y = ph.sy, em0 = ph.em - 1, ey = ph.ey;
+          while (y < ey || (y === ey && m <= em0)) {
+            sum += mh[`${y}-${String(m+1).padStart(2,'0')}`] || 0;
+            m++; if (m > 11) { m = 0; y++; }
+          }
+          // Store in a dataset attribute for transfer
+          tr.dataset['agg_' + pid] = sum;
+        });
+      }
+    }
+    rebuildMonthlyGrid();
+  }
+
+  // ── Build column list ──
+  function _buildCols(phases) {
+    const cols = [];
+    phases.forEach(ph => {
+      const hasDates = ph.sm > 0 && ph.sy > 0 && ph.em > 0 && ph.ey > 0;
+      const isCollapsed = !!phaseCollapsed[ph.id];
+      if (hasDates && !isCollapsed) {
+        let m = ph.sm - 1, y = ph.sy, em0 = ph.em - 1, ey = ph.ey;
+        while (y < ey || (y === ey && m <= em0)) {
+          const key = `${y}-${String(m+1).padStart(2,'0')}`;
+          cols.push({ type:'month', key, m, y, phaseId: ph.id });
+          m++; if (m > 11) { m = 0; y++; }
+        }
+      } else {
+        cols.push({ type:'agg', key:`ph:${ph.id}`, phaseId: ph.id, hasDates });
+      }
+    });
+    return cols;
+  }
+
+  function _getRowMonthHours(tr) {
+    const h = {};
+    tr.querySelectorAll('.month-inp').forEach(inp => {
+      const v = parseFloat(inp.value) || 0;
+      if (v) h[inp.dataset.key] = v;
+    });
+    return h;
   }
 
   // ── Phases ──
@@ -510,7 +606,7 @@ function updateLogoUI() {
     chip.dataset.ey = data.ey || '';
     chip.draggable  = true;
     chip.innerHTML  = `<span class="drag-handle">⠿</span>
-      <input type="text" value="${esc(name)}" placeholder="Phase name" oninput="rebuildGrid()">
+      <input type="text" value="${esc(name)}" placeholder="Phase name" oninput="rebuildMonthlyGrid()">
       <button class="phase-chip-del" onclick="removePhase(${id})" title="Remove phase">×</button>`;
 
     chip.addEventListener('dragstart', e => { phaseDragSrc=chip; chip.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; });
@@ -521,17 +617,17 @@ function updateLogoUI() {
       if (!phaseDragSrc||phaseDragSrc===chip) return;
       chip.parentNode.insertBefore(phaseDragSrc, chip);
       chip.classList.remove('drag-over');
-      rebuildGrid();
+      rebuildMonthlyGrid();
     });
 
     document.getElementById('phases-wrap').appendChild(chip);
-    rebuildGrid();
+    rebuildMonthlyGrid();
   }
 
   function removePhase(id) {
     document.querySelector(`.phase-chip[data-id="${id}"]`)?.remove();
-    document.querySelectorAll(`.phase-inp[data-phase="${id}"]`).forEach(el => el.closest('td')?.remove());
-    rebuildGrid();
+    delete phaseCollapsed[String(id)];
+    rebuildMonthlyGrid();
   }
 
   function getPhases() {
@@ -545,76 +641,124 @@ function updateLogoUI() {
     }));
   }
 
-  // ── Rebuild header + sync role rows ──
-  function rebuildGrid() {
+  // ── Monthly Grid Rebuild ──
+  function rebuildMonthlyGrid() {
     const phases = getPhases();
+    const cols   = _buildCols(phases);
 
-    // Thead
-    const thead = document.getElementById('res-thead');
-    thead.innerHTML = `<tr>
-      <th style="width:16px;"></th>
-      <th class="left" style="min-width:160px;">Role / Name</th>
-      <th style="width:80px;">Rate €/h</th>
-      ${phases.map(p=>`<th style="width:72px;">${esc(p.name)}</th>`).join('')}
-      <th style="width:68px;">Total h</th>
-      <th style="width:90px;">Cost EUR</th>
-      <th style="width:24px;"></th>
-    </tr>`;
-
-    // Sync role rows: add missing / remove orphan phase cells
-    document.querySelectorAll('.role-row').forEach(tr => {
-      const rid  = tr.dataset.id;
-      const tds  = [...tr.querySelectorAll('td')];
-      const insertBefore = tds[tds.length - 3]; // before total-h, total-eur, del
-      const existing = [...tr.querySelectorAll('.phase-inp')].map(i=>String(i.dataset.phase));
-
-      phases.forEach(p => {
-        if (!existing.includes(String(p.id))) {
-          const td = document.createElement('td');
-          td.innerHTML = `<input type="number" class="res-inp res-inp-phase phase-inp"
-            data-role="${rid}" data-phase="${p.id}"
-            value="" min="0" max="99999" placeholder="0" oninput="updateTotals()">`;
-          tr.insertBefore(td, insertBefore);
+    // 1. Save existing role data before clearing
+    const existingRoles = [...document.querySelectorAll('.role-row')].map(tr => {
+      const monthHours = _getRowMonthHours(tr);
+      // Pull in any aggregated sums stored during collapse
+      Object.keys(tr.dataset).forEach(k => {
+        if (k.startsWith('agg_')) {
+          const v = parseFloat(tr.dataset[k]) || 0;
+          const pid = k.slice(4);
+          if (v) monthHours[`ph:${pid}`] = v;
         }
       });
-      tr.querySelectorAll('.phase-inp').forEach(inp => {
-        if (!phases.find(p=>String(p.id)===String(inp.dataset.phase))) inp.closest('td').remove();
-      });
+      return {
+        id:   tr.dataset.id,
+        name: tr.querySelector('.role-name').value.trim(),
+        rate: parseFloat(tr.querySelector('.role-rate').value) || 0,
+        monthHours,
+      };
     });
 
-    updateTotals();
+    // 2. Build thead (2 rows: phase groups + month labels)
+    const thead = document.getElementById('res-thead');
+    const now   = new Date();
+
+    let r1 = '<tr>';
+    r1 += `<th class="left mg-sticky-name" rowspan="2" style="padding-bottom:4px;text-align:left;">Role / Name</th>`;
+    r1 += `<th class="mg-sticky-rate" rowspan="2" style="padding-bottom:4px;">Rate<br><span style="font-weight:400;font-size:8px;">€/h</span></th>`;
+
+    phases.forEach((ph, pi) => {
+      const pCols = cols.filter(c => c.phaseId === ph.id);
+      if (!pCols.length) return;
+      const span    = pCols.length;
+      const color   = PHASE_COLORS[pi % PHASE_COLORS.length];
+      const hasDates = ph.sm > 0 && ph.sy > 0 && ph.em > 0 && ph.ey > 0;
+      const isCol   = !!phaseCollapsed[ph.id];
+      const rangeStr = hasDates
+        ? `${MN[ph.sm-1]}'${String(ph.sy).slice(-2)}–${MN[ph.em-1]}'${String(ph.ey).slice(-2)}`
+        : '';
+      const toggleBtn = hasDates
+        ? `<button class="mg-toggle-btn" onclick="togglePhase('${ph.id}')" title="${isCol?'Expand months':'Collapse to total'}">${isCol?'▶':'▼'}</button>`
+        : '';
+      r1 += `<th colspan="${span}" class="mg-ph-th" style="background:${color}12;color:${color};border-left:2px solid ${color}55;border-right:2px solid ${color}55;">${toggleBtn}<strong>${esc(ph.name)}</strong>${rangeStr ? `<span class="mg-ph-range">${rangeStr}</span>` : ''}</th>`;
+    });
+
+    r1 += `<th rowspan="2" style="width:68px;">Total h</th>`;
+    r1 += `<th rowspan="2" style="width:88px;">Cost EUR</th>`;
+    r1 += `<th rowspan="2" style="width:24px;"></th>`;
+    r1 += '</tr>';
+
+    let r2 = '<tr>';
+    cols.forEach(col => {
+      const pi    = phases.findIndex(p => p.id === col.phaseId);
+      const color = PHASE_COLORS[pi % PHASE_COLORS.length];
+      if (col.type === 'month') {
+        const isToday = (now.getMonth() === col.m && now.getFullYear() === col.y);
+        r2 += `<th class="mg-mo-th${isToday ? ' mg-today' : ''}" style="border-left:1px solid ${color}22;">${MN[col.m].slice(0,3)}<br><span class="mg-yr-lbl">'${String(col.y).slice(-2)}</span></th>`;
+      } else {
+        const ph = phases.find(p => p.id === col.phaseId);
+        r2 += `<th class="mg-mo-th mg-agg-col" style="color:${color};border-left:2px solid ${color}55;">${ph?.sm > 0 ? '∑ hrs' : 'hrs'}</th>`;
+      }
+    });
+    r2 += '</tr>';
+
+    thead.innerHTML = r1 + r2;
+
+    // 3. Rebuild tbody
+    const tbody = document.getElementById('res-tbody');
+    tbody.innerHTML = '';
+    roleCount = 0;
+    existingRoles.forEach(r => addRole(r, cols));
+
+    updateMonthlyTotals();
   }
 
   // ── Roles ──
   let roleCount   = 0;
   let roleDragSrc = null;
 
-  function addRole(data = {}) {
-    const id     = data.id ? (roleCount = Math.max(roleCount, +data.id), +data.id) : ++roleCount;
-    const name   = data.name    || '';
-    const co     = data.company || 'SE';
-    const rate   = data.rate    != null ? data.rate : '';
-    const hours  = data.hours   || {};
+  function addRole(data = {}, cols) {
+    if (!cols) cols = _buildCols(getPhases());
     const phases = getPhases();
+    const id     = data.id ? (roleCount = Math.max(roleCount, +data.id), +data.id) : ++roleCount;
+    const name   = data.name || '';
+    const rate   = data.rate != null ? data.rate : '';
+
+    // Merge monthHours + legacy hours (phase-id keyed) into unified map
+    const monthHours = Object.assign({}, data.monthHours || {});
+    if (data.hours) {
+      Object.entries(data.hours).forEach(([k, v]) => {
+        const aggKey = `ph:${k}`;
+        if (v && !monthHours[aggKey]) monthHours[aggKey] = v;
+      });
+    }
+
+    const monthCells = cols.map(col => {
+      const pi    = phases.findIndex(p => p.id === col.phaseId);
+      const color = PHASE_COLORS[pi % PHASE_COLORS.length];
+      const v     = monthHours[col.key] != null ? monthHours[col.key] : '';
+      const borderStyle = col.type === 'agg'
+        ? `border-left:2px solid ${color}44;`
+        : `border-left:1px solid ${color}11;`;
+      const wClass = col.type === 'agg' ? ' mg-agg-inp' : '';
+      return `<td class="mg-cell" style="${borderStyle}"><input type="number" class="res-inp month-inp mg-inp${wClass}" data-key="${col.key}" data-role="${id}" value="${v !== '' ? v : ''}" min="0" max="99999" step="1" placeholder="" oninput="updateMonthlyTotals()"></td>`;
+    }).join('');
 
     const tr = document.createElement('tr');
     tr.className  = 'role-row';
     tr.dataset.id = id;
     tr.draggable  = true;
 
-    const phaseCells = phases.map(p => {
-      const h = hours[String(p.id)] != null ? hours[String(p.id)] : '';
-      return `<td><input type="number" class="res-inp res-inp-phase phase-inp"
-        data-role="${id}" data-phase="${p.id}"
-        value="${h}" min="0" max="99999" placeholder="0" oninput="updateTotals()"></td>`;
-    }).join('');
-
     tr.innerHTML = `
-      <td><span class="drag-handle">⠿</span></td>
-      <td><input type="text" class="res-inp res-inp-name role-name" value="${esc(name)}" placeholder="Name / role"></td>
-      <td><input type="number" class="res-inp res-inp-rate role-rate"
-        data-role="${id}" value="${rate}" min="0" max="9999" step="1" placeholder="0" oninput="updateTotals()"></td>
-      ${phaseCells}
+      <td class="mg-sticky-name"><span class="drag-handle">⠿</span><input type="text" class="res-inp res-inp-name role-name" value="${esc(name)}" placeholder="Name / role" oninput="updateMonthlyTotals()"></td>
+      <td class="mg-sticky-rate"><input type="number" class="res-inp res-inp-rate role-rate" value="${rate}" min="0" max="9999" step="1" placeholder="0" oninput="updateMonthlyTotals()"></td>
+      ${monthCells}
       <td class="calc-cell role-total-h" data-role="${id}">—</td>
       <td class="calc-cell hi role-total-eur" data-role="${id}">—</td>
       <td><button class="btn-del-row" onclick="removeRole(this)">×</button></td>`;
@@ -630,48 +774,55 @@ function updateLogoUI() {
       if (!roleDragSrc||roleDragSrc===tr) return;
       tbody.insertBefore(roleDragSrc, tr);
       tr.classList.remove('drag-over');
-      updateTotals();
+      updateMonthlyTotals();
     });
 
-    updateTotals();
+    updateMonthlyTotals();
   }
 
-  function removeRole(btn) { btn.closest('tr').remove(); updateTotals(); }
+  function removeRole(btn) { btn.closest('tr').remove(); updateMonthlyTotals(); }
 
   // ── Totals ──
-  function updateTotals() {
+  function updateMonthlyTotals() {
     const phases = getPhases();
+    const cols   = _buildCols(phases);
     const rate   = hedgeRate();
-    const phaseTotH = {};
-    phases.forEach(p => { phaseTotH[p.id] = 0; });
+
+    const colTotals = {};
+    cols.forEach(col => { colTotals[col.key] = 0; });
     let grandH = 0, grandEur = 0;
 
     document.querySelectorAll('.role-row').forEach(tr => {
-      const roleRate = parseFloat(tr.querySelector('.role-rate').value) || 0;
+      const roleRate = parseFloat(tr.querySelector('.role-rate')?.value) || 0;
       let totalH = 0;
-      tr.querySelectorAll('.phase-inp').forEach(inp => {
-        const h = parseFloat(inp.value) || 0;
-        totalH += h;
-        if (phaseTotH[inp.dataset.phase] != null) phaseTotH[inp.dataset.phase] += h;
+      tr.querySelectorAll('.month-inp').forEach(inp => {
+        const v = parseFloat(inp.value) || 0;
+        totalH += v;
+        if (colTotals[inp.dataset.key] !== undefined) colTotals[inp.dataset.key] += v;
       });
       const totalEur = totalH * roleRate;
       grandH   += totalH;
       grandEur += totalEur;
-      tr.querySelector('.role-total-h').textContent   = totalH   ? fmtN(totalH) + ' h' : '—';
-      tr.querySelector('.role-total-eur').textContent = totalEur ? fmtEUR(totalEur)     : '—';
+      const totHCell   = tr.querySelector('.role-total-h');
+      const totEurCell = tr.querySelector('.role-total-eur');
+      if (totHCell)   totHCell.textContent   = totalH   ? fmtN(totalH) + ' h' : '—';
+      if (totEurCell) totEurCell.textContent = totalEur ? fmtEUR(totalEur)     : '—';
     });
 
-    const phaseCells = phases.map(p =>
-      `<td class="calc-cell">${phaseTotH[p.id] ? fmtN(phaseTotH[p.id]) + ' h' : '—'}</td>`
-    ).join('');
+    // Build tfoot
+    const colTotCells = cols.map(col => {
+      const v  = colTotals[col.key];
+      const pi = phases.findIndex(p => p.id === col.phaseId);
+      const isTot = col.type === 'agg';
+      return `<td class="mg-tot-cell${isTot?' phase-tot':''}">${v ? fmtN(v) : '—'}</td>`;
+    }).join('');
 
     document.getElementById('res-tfoot').innerHTML = `<tr class="totals-row">
-      <td></td>
-      <td class="totals-label">Phase Totals</td>
-      <td></td>
-      ${phaseCells}
-      <td class="calc-cell hi">${grandH   ? fmtN(grandH) + ' h' : '—'}</td>
-      <td class="calc-cell hi">${grandEur ? fmtEUR(grandEur)     : '—'}</td>
+      <td class="totals-label mg-sticky-name">Totals</td>
+      <td class="mg-sticky-rate"></td>
+      ${colTotCells}
+      <td class="calc-cell hi">${grandH   ? fmtN(grandH) + ' h'  : '—'}</td>
+      <td class="calc-cell hi">${grandEur ? fmtEUR(grandEur)      : '—'}</td>
       <td></td>
     </tr>`;
 
@@ -682,6 +833,9 @@ function updateLogoUI() {
     });
     updateExpTotals();
   }
+
+  // Alias for compatibility
+  function updateTotals() { updateMonthlyTotals(); }
 
   // ── Expenses ──
   let expCount = 0;
@@ -731,16 +885,30 @@ function updateLogoUI() {
   function getRoleData() {
     const phases = getPhases();
     return [...document.querySelectorAll('.role-row')].map(tr => {
-      const rRate = parseFloat(tr.querySelector('.role-rate').value) || 0;
-      const hours = {};
-      tr.querySelectorAll('.phase-inp').forEach(inp => { hours[String(inp.dataset.phase)] = parseFloat(inp.value) || 0; });
-      const totalH   = Object.values(hours).reduce((s,h)=>s+h, 0);
+      const rRate      = parseFloat(tr.querySelector('.role-rate').value) || 0;
+      const monthHours = _getRowMonthHours(tr);
+
+      // Aggregate per phase (sum monthly keys + agg key)
+      const phaseHours = {};
+      phases.forEach(ph => {
+        let sum = monthHours[`ph:${ph.id}`] || 0;
+        if (ph.sm > 0 && ph.sy > 0 && ph.em > 0 && ph.ey > 0) {
+          let m = ph.sm - 1, y = ph.sy, em0 = ph.em - 1, ey = ph.ey;
+          while (y < ey || (y === ey && m <= em0)) {
+            sum += monthHours[`${y}-${String(m+1).padStart(2,'0')}`] || 0;
+            m++; if (m > 11) { m = 0; y++; }
+          }
+        }
+        phaseHours[ph.id] = sum;
+      });
+
+      const totalH   = Object.values(phaseHours).reduce((s, v) => s + v, 0);
       const totalEur = totalH * rRate;
       return {
-        id:      tr.dataset.id,
-        name:    tr.querySelector('.role-name').value.trim() || '—',
-        rate:    rRate,
-        hours, totalH, totalEur,
+        id: tr.dataset.id,
+        name: tr.querySelector('.role-name').value.trim() || '—',
+        rate: rRate,
+        monthHours, phaseHours, totalH, totalEur,
       };
     });
   }
@@ -793,7 +961,7 @@ function updateLogoUI() {
     roles.forEach(r => {
       const pct     = grandEur > 0 ? (r.totalEur / grandEur * 100).toFixed(1) + '%' : '—';
       const phCells = phases.map(p => {
-        const h = r.hours[String(p.id)] || 0;
+        const h = r.phaseHours[String(p.id)] || 0;
         return `<td class="num">${h ? fmtN(h) : '—'}</td>`;
       }).join('');
       html += `<tr>
@@ -809,8 +977,8 @@ function updateLogoUI() {
 
     // Phase subtotals
     const phSubH = phases.map(p => {
-      const h = roles.reduce((s,r)=>s+(r.hours[String(p.id)]||0), 0);
-      const c = roles.reduce((s,r)=>s+(r.hours[String(p.id)]||0)*r.rate, 0);
+      const h = roles.reduce((s,r)=>s+(r.phaseHours[String(p.id)]||0), 0);
+      const c = roles.reduce((s,r)=>s+(r.phaseHours[String(p.id)]||0)*r.rate, 0);
       return `<td class="num"><div>${h ? fmtN(h) + ' h' : '—'}</div><div style="color:var(--accent);font-weight:700;">${c ? fmtEUR(c) : '—'}</div></td>`;
     }).join('');
     html += `<tr class="phase-sub-row">
@@ -893,21 +1061,12 @@ function updateLogoUI() {
   }
 
   function renderGantt() {
-    const phases  = getPhases();
-    const roleEls = [...document.querySelectorAll('.role-row')];
-    const roles   = roleEls.map(tr => {
-      const hours = {};
-      tr.querySelectorAll('.phase-inp').forEach(inp => {
-        const h = parseFloat(inp.value) || 0;
-        if (h > 0) hours[String(inp.dataset.phase)] = h;
-      });
-      const totalH = Object.values(hours).reduce((s,v)=>s+v, 0);
-      return {
-        name:    tr.querySelector('.role-name').value.trim(),
-        rate:    parseFloat(tr.querySelector('.role-rate')?.value) || 0,
-        hours, totalH,
-      };
-    }).filter(r => r.name && r.totalH > 0);
+    const phases = getPhases();
+    // Use getRoleData() which handles the new monthly model and aggregates per phase
+    const roles  = getRoleData().filter(r => r.name && r.totalH > 0).map(r => ({
+      ...r,
+      hours: r.phaseHours, // keep Gantt compat: hours[phaseId]
+    }));
 
     const gantt  = document.getElementById('rc-gantt');
     const legend = document.getElementById('gantt-legend');
@@ -1052,20 +1211,23 @@ function updateLogoUI() {
         if (c===todayI) cell.appendChild(mk('rg-today-line',''));
 
         if (firstCol!==n && lastCol!==-1 && c>=firstCol && c<=lastCol) {
-          // Which phase owns this month?
-          let phHours=0, phLen=1;
-          phases.forEach(ph => {
-            if (!role.hours[String(ph.id)]) return;
-            if (!ph.sm||!ph.sy) return;
-            const si=colOf(ph.sm-1,ph.sy), ei=colOf(ph.em-1,ph.ey);
-            if (si>=0&&ei>=0&&c>=si&&c<=ei) {
-              phHours = role.hours[String(ph.id)];
-              phLen   = Math.max(1, ei-si+1);
-            }
-          });
-          const monthH = phHours / phLen;
-          const fte    = Math.min(1, monthH / 160);
-          const alpha  = Math.max(0.18, fte);
+          // Get per-month hours: prefer actual monthly key, fall back to phase avg
+          const mo   = months[c];
+          const mKey = `${mo.y}-${String(mo.m+1).padStart(2,'0')}`;
+          let monthH = role.monthHours ? (role.monthHours[mKey] || 0) : 0;
+          if (!monthH) {
+            // Estimate from phase hours / phase length
+            phases.forEach(ph => {
+              if (!role.hours[String(ph.id)]) return;
+              if (!ph.sm||!ph.sy) return;
+              const si=colOf(ph.sm-1,ph.sy), ei=colOf(ph.em-1,ph.ey);
+              if (si>=0&&ei>=0&&c>=si&&c<=ei) {
+                monthH = role.hours[String(ph.id)] / Math.max(1, ei-si+1);
+              }
+            });
+          }
+          const fte   = Math.min(1, monthH / 160);
+          const alpha = Math.max(0.18, fte);
 
           let barCls='rg-bar-m';
           if (firstCol===lastCol) barCls='rg-bar-solo';
@@ -1138,9 +1300,9 @@ function updateLogoUI() {
 
     // Role rows
     roles.forEach((role, ri) => {
-      const alt   = ri%2===1;
-      const co    = COMPANIES.find(c=>c.key===role.company)||COMPANIES[3];
-      const altCls= alt?' alt':'';
+      const alt    = ri%2===1;
+      const color  = PHASE_COLORS_G[ri % PHASE_COLORS_G.length];
+      const altCls = alt?' alt':'';
 
       const lbl = mk(`rg-role-lbl${altCls}`,'');
       lbl.textContent = role.name;
@@ -1155,8 +1317,6 @@ function updateLogoUI() {
         }
       });
 
-      const maxPhH = Math.max(...phases.map(ph => role.hours[String(ph.id)]||0), 1);
-
       phases.forEach((ph, pi) => {
         const h = role.hours[String(ph.id)] || 0;
         const cell = mk(`rg-role-cell${altCls}`,'');
@@ -1168,7 +1328,7 @@ function updateLogoUI() {
           else if (pi===firstP) barCls='rg-bar-s';
           else if (pi===lastP)  barCls='rg-bar-e';
           const bar=mk(barCls,'');
-          bar.style.background=co.color;
+          bar.style.background=color;
           bar.style.opacity=String(Math.min(1,alpha));
           cell.appendChild(bar);
           if (pi===Math.round((firstP+lastP)/2)) {
@@ -1213,12 +1373,12 @@ function updateLogoUI() {
 
   // ── collectState / applyState ──
   function collectState() {
-    const phases = getPhases(); // already includes sm/sy/em/ey
-    const roles  = [...document.querySelectorAll('.role-row')].map(tr => ({
-      id:      tr.dataset.id,
-      name:    tr.querySelector('.role-name').value.trim(),
-      rate:    parseFloat(tr.querySelector('.role-rate').value) || 0,
-      hours:   Object.fromEntries([...tr.querySelectorAll('.phase-inp')].map(i=>[i.dataset.phase, parseFloat(i.value)||0])),
+    const phases   = getPhases();
+    const roles    = [...document.querySelectorAll('.role-row')].map(tr => ({
+      id:         tr.dataset.id,
+      name:       tr.querySelector('.role-name').value.trim(),
+      rate:       parseFloat(tr.querySelector('.role-rate').value) || 0,
+      monthHours: _getRowMonthHours(tr),
     }));
     const expenses = [...document.querySelectorAll('.exp-row')].map(tr => ({
       id:     tr.dataset.id,
@@ -1226,10 +1386,13 @@ function updateLogoUI() {
       amount: parseFloat(tr.querySelector('.exp-inp-amt').value) || 0,
     }));
     return {
-      version: '1.0', format: currentFormat,
+      version: '2.0', format: currentFormat,
+      phaseCollapsed,
       projName:  document.getElementById('proj-name').value,
       projId:    document.getElementById('proj-id').value,
       rev:       document.getElementById('proj-rev').value,
+      projSub:   document.getElementById('proj-id').value, // alias
+      projDate:  document.getElementById('proj-date').value,
       date:      document.getElementById('proj-date').value,
       hedgeRate: parseFloat(document.getElementById('hedge-rate').value) || 7.46,
       currency:  document.getElementById('currency-display').value,
@@ -1239,10 +1402,11 @@ function updateLogoUI() {
 
   function applyState(s) {
     if (s.format) setFormat(s.format);
+    phaseCollapsed = s.phaseCollapsed || {};
     document.getElementById('proj-name').value  = s.projName  || '';
     document.getElementById('proj-id').value    = s.projId    || '';
     document.getElementById('proj-rev').value   = s.rev       || '';
-    document.getElementById('proj-date').value  = s.date      || '';
+    document.getElementById('proj-date').value  = s.date || s.projDate || '';
     document.getElementById('hedge-rate').value = s.hedgeRate || 7.46;
     if (s.currency) document.getElementById('currency-display').value = s.currency;
 
@@ -1258,7 +1422,7 @@ function updateLogoUI() {
     expCount = 0;
     (s.expenses||[]).forEach(e => addExpense(e));
 
-    updateTotals();
+    updateMonthlyTotals();
   }
 
   // ── Save / Load / Export ──
@@ -1293,16 +1457,188 @@ function updateLogoUI() {
     URL.revokeObjectURL(a.href);
   }
 
-  function exportPDF() {
-    const state = collectState();
-    const name  = (state.projName||'resourcecast').replace(/[^a-z0-9_-]/gi,'_').toLowerCase();
-    const fmt   = (state.format||'A3').toUpperCase();
-    html2pdf().set({
-      margin: 0, filename: name+'_resourcecast.pdf',
-      image: { type:'jpeg', quality:0.97 },
-      html2canvas: { scale:2, useCORS:true, onclone: d=>d.querySelectorAll('.print-bar,.persist-bar').forEach(el=>el.remove()) },
-      jsPDF: { unit:'mm', format: fmt==='A4'?'a4':'a3', orientation:'landscape' }
-    }).from(document.getElementById('out-page')).save();
+  // ── Excel Import ──
+  function importExcel(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const wb   = XLSX.read(e.target.result, { type:'binary', cellDates:true });
+        const wsName = wb.SheetNames.includes('PM & Common') ? 'PM & Common'
+                     : wb.SheetNames.includes('Workload Histogram') ? 'Workload Histogram'
+                     : wb.SheetNames[0];
+        const ws   = wb.Sheets[wsName];
+        const data = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+        if (!data.length) { alert('Sheet is empty.'); input.value=''; return; }
+
+        // Detect header row: find first row with ≥2 date-like cells
+        let headerRow = -1, monthStartCol = 1;
+        const months = []; // { colIdx, key:'YYYY-MM' }
+
+        for (let r = 0; r < Math.min(15, data.length); r++) {
+          const row = data[r];
+          const found = [];
+          for (let c = 0; c < row.length; c++) {
+            const v = row[c];
+            let key = null;
+            if (v instanceof Date) {
+              key = `${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}`;
+            } else if (typeof v === 'string') {
+              key = _parseMonthStr(v);
+            } else if (typeof v === 'number' && v > 40000) {
+              // Excel serial date
+              const d = new Date(Math.round((v - 25569) * 86400 * 1000));
+              key = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;
+            }
+            if (key) found.push({ colIdx:c, key });
+          }
+          if (found.length >= 2) {
+            headerRow = r;
+            months.push(...found);
+            monthStartCol = found[0].colIdx;
+            break;
+          }
+        }
+
+        if (!months.length) {
+          alert('No month columns detected.\nExpected date headers like "Jul 2022", "Jul-22", or actual date cells.');
+          input.value=''; return;
+        }
+
+        const rateCol = monthStartCol >= 2 ? monthStartCol - 1 : -1;
+
+        // Read role rows
+        const newRoles = [];
+        for (let r = headerRow + 1; r < data.length; r++) {
+          const row  = data[r];
+          const name = String(row[0] || '').trim();
+          if (!name) continue;
+          const lc = name.toLowerCase();
+          if (lc.includes('total') || lc.includes('phase') || lc.includes('sum') || lc === '') continue;
+
+          const rate       = rateCol >= 0 ? (parseFloat(row[rateCol]) || 0) : 0;
+          const monthHours = {};
+          months.forEach(({ colIdx, key }) => {
+            const v = parseFloat(row[colIdx]) || 0;
+            if (v) monthHours[key] = v;
+          });
+          newRoles.push({ name, rate, monthHours });
+        }
+
+        if (!newRoles.length) { alert('No role rows found.'); input.value=''; return; }
+
+        if (!confirm(`Import ${newRoles.length} roles from sheet "${wsName}"?\nThis will replace existing roles.`)) {
+          input.value=''; return;
+        }
+
+        document.getElementById('res-tbody').innerHTML = '';
+        roleCount = 0;
+        newRoles.forEach(r => addRole(r));
+        _scheduleSnap();
+        alert(`✓ Imported ${newRoles.length} roles with monthly hours from "${wsName}".`);
+      } catch(err) {
+        console.error(err);
+        alert('Error reading Excel file: ' + err.message);
+      }
+      input.value = '';
+    };
+    reader.readAsBinaryString(file);
+  }
+
+  function _parseMonthStr(s) {
+    const MN_L = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+    s = s.trim();
+    let m = s.match(/^(\d{4})-(\d{2})$/);
+    if (m) return `${m[1]}-${m[2]}`;
+    m = s.match(/^([A-Za-z]{3})[\s\-'.]+(\d{2,4})$/);
+    if (m) {
+      const mi = MN_L.indexOf(m[1].toLowerCase());
+      if (mi >= 0) { let y = parseInt(m[2]); if (y < 100) y += 2000; return `${y}-${String(mi+1).padStart(2,'0')}`; }
+    }
+    m = s.match(/^(\d{1,2})\/(\d{4})$/);
+    if (m) return `${m[2]}-${m[1].padStart(2,'0')}`;
+    return null;
+  }
+
+  // ── Excel Export ──
+  function exportExcel() {
+    if (typeof XLSX === 'undefined') { alert('SheetJS not loaded.'); return; }
+    const state  = collectState();
+    const phases = getPhases();
+    const cols   = _buildCols(phases);
+    const roles  = getRoleData();
+
+    const wsData = [];
+
+    // Row 0: project header
+    wsData.push([state.projName || 'Resource Plan', '', 'Rev:', state.rev || '', 'Date:', state.date || '', 'Rate:', state.hedgeRate]);
+    wsData.push([]);
+
+    // Row 2: phase group header
+    const phRow = ['Role / Name', 'Rate (€/h)'];
+    phases.forEach(ph => {
+      const pCols = cols.filter(c => c.phaseId === ph.id);
+      phRow.push(ph.name);
+      for (let i = 1; i < pCols.length; i++) phRow.push('');
+    });
+    phRow.push('Total h', 'Cost EUR', 'Cost DKK');
+    wsData.push(phRow);
+
+    // Row 3: month header
+    const moRow = ['', ''];
+    cols.forEach(col => {
+      moRow.push(col.type === 'month' ? `${MN[col.m]} ${col.y}` : (phases.find(p=>p.id===col.phaseId)?.name || 'Phase'));
+    });
+    moRow.push('', '', '');
+    wsData.push(moRow);
+
+    // Role rows
+    const hedgeR = hedgeRate();
+    roles.forEach(r => {
+      const row = [r.name, r.rate];
+      cols.forEach(col => {
+        if (col.type === 'month') {
+          row.push(r.monthHours[col.key] || 0);
+        } else {
+          row.push(r.phaseHours[col.phaseId] || 0);
+        }
+      });
+      row.push(r.totalH, r.totalEur, Math.round(r.totalEur * hedgeR));
+      wsData.push(row);
+    });
+
+    // Totals row
+    const totRow = ['TOTAL', ''];
+    cols.forEach(col => {
+      if (col.type === 'month') {
+        totRow.push(roles.reduce((s, r) => s + (r.monthHours[col.key] || 0), 0));
+      } else {
+        totRow.push(roles.reduce((s, r) => s + (r.phaseHours[col.phaseId] || 0), 0));
+      }
+    });
+    const grandH   = roles.reduce((s, r) => s + r.totalH, 0);
+    const grandEur = roles.reduce((s, r) => s + r.totalEur, 0);
+    totRow.push(grandH, grandEur, Math.round(grandEur * hedgeR));
+    wsData.push(totRow);
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols'] = [{ wch:30 }, { wch:9 }, ...cols.map(() => ({ wch:8 })), { wch:9 }, { wch:12 }, { wch:12 }];
+
+    // Merge phase group header cells
+    const merges = [];
+    let co = 2;
+    phases.forEach(ph => {
+      const pCols = cols.filter(c => c.phaseId === ph.id);
+      if (pCols.length > 1) merges.push({ s:{ r:2, c:co }, e:{ r:2, c:co+pCols.length-1 } });
+      co += pCols.length;
+    });
+    if (merges.length) ws['!merges'] = merges;
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Resource Plan');
+    const fname = (state.projName || 'resourcecast').replace(/[^a-z0-9_-]/gi,'_').toLowerCase();
+    XLSX.writeFile(wb, fname + '_resourcecast.xlsx');
   }
 
   // ── Print helpers ──
