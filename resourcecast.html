@@ -233,10 +233,12 @@
   .mg-agg-col { font-size:9px; font-weight:600; min-width:60px; }
   /* Input cells */
   .mg-cell { padding:1px 1px; }
-  .mg-inp { font-family:'DM Mono',monospace; font-size:11px; width:44px; text-align:right; padding:4px 4px; background:#fafaf8; border:1px solid transparent; border-radius:3px; outline:none; transition:border-color 0.12s; }
+  .mg-inp { font-family:'DM Mono',monospace; font-size:11px; width:52px; min-width:52px; text-align:right; padding:4px 4px; background:#fafaf8; border:1px solid transparent; border-radius:3px; outline:none; transition:border-color 0.12s; -moz-appearance:textfield; }
   .mg-inp:focus { border-color:var(--accent); background:#fff; }
   .mg-inp:not(:placeholder-shown) { border-color:#e8e3dc; }
-  .mg-agg-inp { width:58px; font-weight:600; }
+  .mg-inp::-webkit-inner-spin-button,
+  .mg-inp::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+  .mg-agg-inp { width:68px; min-width:68px; font-weight:600; }
   /* Totals */
   .mg-tot-cell { font-family:'DM Mono',monospace; font-size:10px; text-align:right; padding:4px 3px; color:var(--muted); white-space:nowrap; min-width:44px; }
   .mg-tot-cell.phase-tot { font-weight:700; color:var(--accent); }
