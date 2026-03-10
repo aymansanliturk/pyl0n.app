@@ -1794,25 +1794,12 @@ function suiteRead(sync) {
   try {
     if (!sync || sync._from === 'resourcecast') { _updateSyncBadge(); return; }
     if (sync.phases && sync.phases.length) {
-      const existingChips = new Map([...document.querySelectorAll('.phase-chip')].map(c =>
-        [c.querySelector('input').value.trim().toLowerCase(), c]));
-      const toAdd = [];
+      // Replace all phases with the sorted exec-only phases from TimeCast
+      document.getElementById('phases-wrap').innerHTML = '';
       sync.phases.forEach(p => {
-        if (!p.name) return;
-        const key = p.name.trim().toLowerCase();
-        if (existingChips.has(key)) {
-          // Update date ranges on existing chip (TimeCast is source of truth)
-          const chip = existingChips.get(key);
-          if (p.sm) chip.dataset.sm = p.sm;
-          if (p.sy) chip.dataset.sy = p.sy;
-          if (p.em) chip.dataset.em = p.em;
-          if (p.ey) chip.dataset.ey = p.ey;
-        } else {
-          toAdd.push(p);
-        }
+        if (p.name) addPhase({ name: p.name, sm: p.sm, sy: p.sy, em: p.em, ey: p.ey });
       });
-      toAdd.forEach(p => addPhase({ name: p.name, sm: p.sm, sy: p.sy, em: p.em, ey: p.ey }));
-      if (toAdd.length) updateTotals();
+      rebuildMonthlyGrid();
     }
     _updateSyncBadge();
   } catch(e) {}

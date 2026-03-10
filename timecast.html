@@ -1280,13 +1280,17 @@ function suiteWrite() {
     const state = collectState();
     const proj  = (state.projects || [])[0] || {};
     const seen  = new Set(), phases = [];
-    [...(proj.bidTasks||[]), ...(proj.execTasks||[])].forEach(t => {
+    // Only sync execution tasks — bid phase costs are tracked separately
+    [...(proj.execTasks||[])].forEach(t => {
       if (t.type === 'bar' && t.name && !seen.has(t.name)) {
         seen.add(t.name);
         phases.push({ id: 'tc_' + phases.length, name: t.name,
           sm: t.sm, sy: t.sy, em: t.em, ey: t.ey });
       }
     });
+    // Sort chronologically by start year then month
+    phases.sort((a, b) => a.sy !== b.sy ? a.sy - b.sy : a.sm - b.sm);
+    phases.forEach((p, i) => p.id = 'tc_' + i);
     const prev = JSON.parse(localStorage.getItem('bidcast_suite_sync') || '{}');
     localStorage.setItem('bidcast_suite_sync', JSON.stringify({
       ...prev,
