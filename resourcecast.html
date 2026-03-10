@@ -682,8 +682,11 @@ function updateLogoUI() {
       const color   = PHASE_COLORS[pi % PHASE_COLORS.length];
       const hasDates = ph.sm > 0 && ph.sy > 0 && ph.em > 0 && ph.ey > 0;
       const isCol   = !!phaseCollapsed[ph.id];
+      const singleMonth = hasDates && ph.sm === ph.em && ph.sy === ph.ey;
       const rangeStr = hasDates
-        ? `${MN[ph.sm-1]}'${String(ph.sy).slice(-2)}–${MN[ph.em-1]}'${String(ph.ey).slice(-2)}`
+        ? singleMonth
+          ? `${MN[ph.sm-1]}'${String(ph.sy).slice(-2)}`
+          : `${MN[ph.sm-1]}'${String(ph.sy).slice(-2)}–${MN[ph.em-1]}'${String(ph.ey).slice(-2)}`
         : '';
       const toggleBtn = hasDates
         ? `<button class="mg-toggle-btn" onclick="togglePhase('${ph.id}')" title="${isCol?'Expand months':'Collapse to total'}">${isCol?'▶':'▼'}</button>`
@@ -705,7 +708,13 @@ function updateLogoUI() {
         r2 += `<th class="mg-mo-th${isToday ? ' mg-today' : ''}" style="border-left:1px solid ${color}22;">${MN[col.m].slice(0,3)}<br><span class="mg-yr-lbl">'${String(col.y).slice(-2)}</span></th>`;
       } else {
         const ph = phases.find(p => p.id === col.phaseId);
-        r2 += `<th class="mg-mo-th mg-agg-col" style="color:${color};border-left:2px solid ${color}55;">${ph?.sm > 0 ? '∑ hrs' : 'hrs'}</th>`;
+        const aggLbl = (() => {
+          if (!ph || !(ph.sm > 0 && ph.sy > 0 && ph.em > 0 && ph.ey > 0)) return 'hrs';
+          if (ph.sm === ph.em && ph.sy === ph.ey)
+            return `${MN[ph.sm-1].slice(0,3)}<br><span class="mg-yr-lbl">'${String(ph.sy).slice(-2)}</span>`;
+          return '∑ hrs';
+        })();
+        r2 += `<th class="mg-mo-th mg-agg-col" style="color:${color};border-left:2px solid ${color}55;">${aggLbl}</th>`;
       }
     });
     r2 += '</tr>';
@@ -1612,7 +1621,18 @@ function updateLogoUI() {
     // Row 3: month header
     const moRow = ['', ''];
     cols.forEach(col => {
-      moRow.push(col.type === 'month' ? `${MN[col.m]} ${col.y}` : (phases.find(p=>p.id===col.phaseId)?.name || 'Phase'));
+      if (col.type === 'month') {
+        moRow.push(`${MN[col.m]} ${col.y}`);
+      } else {
+        const ph = phases.find(p => p.id === col.phaseId);
+        if (ph && ph.sm > 0 && ph.sy > 0 && ph.em > 0 && ph.ey > 0) {
+          moRow.push(ph.sm === ph.em && ph.sy === ph.ey
+            ? `${MN[ph.sm-1]} ${ph.sy}`
+            : `${MN[ph.sm-1]}–${MN[ph.em-1]} ${ph.ey}`);
+        } else {
+          moRow.push(ph?.name || 'Phase');
+        }
+      }
     });
     moRow.push('', '', '');
     wsData.push(moRow);
