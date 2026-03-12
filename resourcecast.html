@@ -296,17 +296,6 @@
       <label>Date
         <input type="text" id="proj-date" placeholder="06 Mar 2026">
       </label>
-      <label>EUR / DKK Hedge Rate
-        <input type="number" id="hedge-rate" value="7.46" step="0.01" min="1" max="20"
-          style="font-family:'DM Mono',monospace;" oninput="updateTotals()">
-      </label>
-      <label>Currency in Report
-        <select id="currency-display">
-          <option value="both">EUR + DKK</option>
-          <option value="eur">EUR only</option>
-          <option value="dkk">DKK only</option>
-        </select>
-      </label>
       <div style="display:flex;flex-direction:column;gap:5px;">
         <span style="font-size:11px;font-weight:500;color:var(--muted);">Page Format</span>
         <div style="display:flex;gap:6px;margin-top:2px;">
@@ -343,7 +332,7 @@
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;">
       <button class="btn-add" onclick="addRole({})">+ Add Role</button>
-      <button class="btn-secondary" onclick="loadSETemplate()" style="font-size:11px;padding:5px 12px;" title="Load 17 standard SE roles with correct DKK rates from the hours calculation template">⚙ SE Template</button>
+      <button class="btn-secondary" onclick="loadSETemplate()" style="font-size:11px;padding:5px 12px;" title="Load 17 standard SE roles with EUR rates">⚙ SE Template</button>
       <div class="pb-sep"></div>
       <label class="pb-btn" style="margin:0;cursor:pointer;">
         📥 Import Excel
@@ -363,7 +352,6 @@
         <tr>
           <th style="width:300px;">Description</th>
           <th style="text-align:right;width:130px;">Amount (EUR)</th>
-          <th style="text-align:right;width:120px;">Amount (DKK)</th>
           <th style="width:30px;"></th>
         </tr>
       </thead>
@@ -398,10 +386,6 @@
       <div class="idx-stat">
         <div class="idx-stat-label">Indexed Grand Total (EUR)</div>
         <div class="idx-stat-val hi" id="idx-total">—</div>
-      </div>
-      <div class="idx-stat">
-        <div class="idx-stat-label">Indexed Grand Total (DKK)</div>
-        <div class="idx-stat-val hi" id="idx-total-dkk">—</div>
       </div>
     </div>
   </div>
@@ -521,8 +505,6 @@ function updateLogoUI() {
     return n.toLocaleString('de-DE', { minimumFractionDigits:d, maximumFractionDigits:d });
   }
   function fmtEUR(n) { return n ? fmtN(n) + ' €' : '—'; }
-  function fmtDKK(n) { return n ? fmtN(Math.round(n)) + ' kr' : '—'; }
-  function hedgeRate() { return parseFloat(document.getElementById('hedge-rate').value) || 7.46; }
 
   // ── Format ──
   let currentFormat = 'A3';
@@ -797,7 +779,6 @@ function updateLogoUI() {
   function updateMonthlyTotals() {
     const phases = getPhases();
     const cols   = _buildCols(phases);
-    const rate   = hedgeRate();
 
     const colTotals = {};
     cols.forEach(col => { colTotals[col.key] = 0; });
@@ -852,11 +833,6 @@ function updateLogoUI() {
         <td></td>
       </tr>`;
 
-    // Refresh DKK column in expenses
-    document.querySelectorAll('.exp-row').forEach(tr => {
-      const amt = parseFloat(tr.querySelector('.exp-inp-amt').value) || 0;
-      tr.querySelector('.exp-dkk').textContent = amt ? fmtDKK(amt * rate) : '—';
-    });
     updateExpTotals();
     updateIndexation();
   }
@@ -871,8 +847,6 @@ function updateLogoUI() {
     const id    = data.id ? (expCount = Math.max(expCount, +data.id), +data.id) : ++expCount;
     const label = data.label  || '';
     const amt   = data.amount != null ? data.amount : '';
-    const rate  = hedgeRate();
-    const dkkVal = amt !== '' ? fmtDKK(parseFloat(amt) * rate) : '—';
 
     const tr = document.createElement('tr');
     tr.className  = 'exp-row';
@@ -882,28 +856,18 @@ function updateLogoUI() {
       <td style="text-align:right;">
         <input type="number" class="res-inp exp-inp-amt" value="${amt}" min="0" placeholder="0" step="100" oninput="updateExpTotals()">
       </td>
-      <td class="calc-cell exp-dkk" style="text-align:right;">${dkkVal}</td>
       <td><button class="btn-del-row" onclick="this.closest('tr').remove();updateExpTotals();">×</button></td>`;
-
-    tr.querySelector('.exp-inp-amt').addEventListener('input', function() {
-      const v = parseFloat(this.value) || 0;
-      const r = hedgeRate();
-      this.closest('tr').querySelector('.exp-dkk').textContent = v ? fmtDKK(v * r) : '—';
-      updateExpTotals();
-    });
 
     document.getElementById('exp-tbody').appendChild(tr);
     updateExpTotals();
   }
 
   function updateExpTotals() {
-    const rate = hedgeRate();
-    let total  = 0;
+    let total = 0;
     document.querySelectorAll('.exp-inp-amt').forEach(inp => { total += parseFloat(inp.value) || 0; });
     document.getElementById('exp-tfoot').innerHTML = `<tr class="exp-total-row">
       <td style="font-family:'DM Sans',sans-serif;font-weight:600;color:var(--muted);">Total Additional Costs</td>
       <td style="text-align:right;">${total ? fmtEUR(total) : '—'}</td>
-      <td style="text-align:right;">${total ? fmtDKK(total * rate) : '—'}</td>
       <td></td>
     </tr>`;
     updateIndexation();
@@ -979,7 +943,6 @@ function updateLogoUI() {
     const rateEl = document.getElementById('idx-rate');
     if (!rateEl) return;
     const idxRate = parseFloat(rateEl.value) || 0;
-    const hr = hedgeRate();
 
     // Always compute base total (labor + expenses)
     const roles  = getRoleData();
@@ -987,19 +950,17 @@ function updateLogoUI() {
     document.querySelectorAll('.exp-inp-amt').forEach(inp => { baseEur += parseFloat(inp.value) || 0; });
 
     if (!idxRate) {
-      document.getElementById('idx-years').textContent     = '—';
-      document.getElementById('idx-premium').textContent   = '—';
-      document.getElementById('idx-total').textContent     = baseEur > 0 ? fmtEUR(baseEur) : '—';
-      document.getElementById('idx-total-dkk').textContent = baseEur > 0 ? fmtDKK(baseEur * hr) : '—';
+      document.getElementById('idx-years').textContent   = '—';
+      document.getElementById('idx-premium').textContent = '—';
+      document.getElementById('idx-total').textContent   = baseEur > 0 ? fmtEUR(baseEur) : '—';
       return;
     }
 
     const escData = _computeEscalation(idxRate);
     if (!escData) {
-      document.getElementById('idx-years').textContent     = 'No phase dates set';
-      document.getElementById('idx-premium').textContent   = '—';
-      document.getElementById('idx-total').textContent     = baseEur > 0 ? fmtEUR(baseEur) : '—';
-      document.getElementById('idx-total-dkk').textContent = baseEur > 0 ? fmtDKK(baseEur * hr) : '—';
+      document.getElementById('idx-years').textContent   = 'No phase dates set';
+      document.getElementById('idx-premium').textContent = '—';
+      document.getElementById('idx-total').textContent   = baseEur > 0 ? fmtEUR(baseEur) : '—';
       return;
     }
 
@@ -1008,10 +969,9 @@ function updateLogoUI() {
     const fyLabel = Array.from({ length: numFYs }, (_, i) =>
       `FY${startFY + i}: +${(i * idxRate).toFixed(1)}%`).join(' · ');
 
-    document.getElementById('idx-years').textContent     = `${numFYs} FY · ${fyLabel}`;
-    document.getElementById('idx-premium').textContent   = premiumEur > 0 ? `+ ${fmtEUR(premiumEur)}` : '—';
-    document.getElementById('idx-total').textContent     = fmtEUR(indexedEur);
-    document.getElementById('idx-total-dkk').textContent = fmtDKK(indexedEur * hr);
+    document.getElementById('idx-years').textContent   = `${numFYs} FY · ${fyLabel}`;
+    document.getElementById('idx-premium').textContent = premiumEur > 0 ? `+ ${fmtEUR(premiumEur)}` : '—';
+    document.getElementById('idx-total').textContent   = fmtEUR(indexedEur);
   }
 
   // ── Generate ──
@@ -1048,8 +1008,6 @@ function updateLogoUI() {
     const projId   = document.getElementById('proj-id').value.trim();
     const rev      = document.getElementById('proj-rev').value.trim();
     const date     = document.getElementById('proj-date').value.trim();
-    const curr     = document.getElementById('currency-display').value;
-    const rate     = hedgeRate();
     const phases   = getPhases();
     const roles    = getRoleData();
     const expenses = [...document.querySelectorAll('.exp-row')].map(tr => ({
@@ -1061,19 +1019,15 @@ function updateLogoUI() {
     const expEur   = expenses.reduce((s,e)=>s+e.amount, 0);
     const grandEur = laborEur + expEur;
     const totalH   = roles.reduce((s,r)=>s+r.totalH, 0);
-
-    const showEur = curr !== 'dkk';
-    const showDkk = curr !== 'eur';
-    const xCols   = (showEur?1:0) + (showDkk?1:0);
-    const nPhases = phases.length;
+    const xCols    = 1; // EUR cost column only
+    const nPhases  = phases.length;
 
     // Header
     document.getElementById('out-title').textContent = projName || 'Resource Cost Breakdown';
     document.getElementById('out-sub').textContent   = projId ? `Project: ${projId}` : '';
     document.getElementById('out-meta').innerHTML =
       `${rev ? `<strong>${rev}</strong><br>` : ''}${date||''}`;
-    document.getElementById('out-hedge').textContent =
-      `EUR/DKK hedge rate: ${rate.toFixed(2)} · All DKK amounts rounded to nearest integer`;
+    document.getElementById('out-hedge').textContent = '';
 
     // Build table HTML
     const phHdr = phases.map(p=>`<th>${esc(p.name)}</th>`).join('');
@@ -1082,8 +1036,7 @@ function updateLogoUI() {
       <th>Rate €/h</th>
       ${phHdr}
       <th>Total h</th>
-      ${showEur?'<th>Cost EUR</th>':''}
-      ${showDkk?'<th>Cost DKK</th>':''}
+      <th>Cost EUR</th>
       <th>%</th>
     </tr></thead><tbody>`;
 
@@ -1099,8 +1052,7 @@ function updateLogoUI() {
         <td class="num">${r.rate ? fmtN(r.rate, 2) : '—'}</td>
         ${phCells}
         <td class="num">${r.totalH ? fmtN(r.totalH) + ' h' : '—'}</td>
-        ${showEur ? `<td class="num">${r.totalEur ? fmtEUR(r.totalEur) : '—'}</td>` : ''}
-        ${showDkk ? `<td class="num">${r.totalEur ? fmtDKK(r.totalEur * rate) : '—'}</td>` : ''}
+        <td class="num">${r.totalEur ? fmtEUR(r.totalEur) : '—'}</td>
         <td class="num">${pct}</td>
       </tr>`;
     });
@@ -1124,8 +1076,7 @@ function updateLogoUI() {
       <td colspan="2">Total Labor Cost</td>
       <td colspan="${nPhases}"></td>
       <td class="num">${totalH ? fmtN(totalH) + ' h' : '—'}</td>
-      ${showEur ? `<td class="num">${laborEur ? fmtEUR(laborEur) : '—'}</td>` : ''}
-      ${showDkk ? `<td class="num">${laborEur ? fmtDKK(laborEur * rate) : '—'}</td>` : ''}
+      <td class="num">${laborEur ? fmtEUR(laborEur) : '—'}</td>
       <td class="num">${laborPct}</td>
     </tr>`;
 
@@ -1137,8 +1088,7 @@ function updateLogoUI() {
           <td colspan="2" style="padding-left:16px;">${esc(e.label)}</td>
           <td colspan="${nPhases}"></td>
           <td></td>
-          ${showEur ? `<td class="num">${fmtEUR(e.amount)}</td>` : ''}
-          ${showDkk ? `<td class="num">${fmtDKK(e.amount * rate)}</td>` : ''}
+          <td class="num">${fmtEUR(e.amount)}</td>
           <td class="num">${pct}</td>
         </tr>`;
       });
@@ -1150,8 +1100,7 @@ function updateLogoUI() {
       <td colspan="2">GRAND TOTAL</td>
       <td colspan="${nPhases}"></td>
       <td class="num">${totalH ? fmtN(totalH) + ' h' : '—'}</td>
-      ${showEur ? `<td class="num">${grandEur ? fmtEUR(grandEur) : '—'}</td>` : ''}
-      ${showDkk ? `<td class="num">${grandEur ? fmtDKK(grandEur * rate) : '—'}</td>` : ''}
+      <td class="num">${grandEur ? fmtEUR(grandEur) : '—'}</td>
       <td class="num">100%</td>
     </tr>`;
 
@@ -1171,16 +1120,14 @@ function updateLogoUI() {
         </td>
         <td colspan="${nPhases}"></td>
         <td></td>
-        ${showEur ? `<td class="num">+ ${fmtEUR(premiumEur)}</td>` : ''}
-        ${showDkk ? `<td class="num">+ ${fmtDKK(premiumEur * rate)}</td>` : ''}
+        <td class="num">+ ${fmtEUR(premiumEur)}</td>
         <td class="num">+${((premiumEur / escBase) * 100).toFixed(1)}%</td>
       </tr>`;
       html += `<tr class="idx-grand-row">
         <td colspan="2">ESCALATED GRAND TOTAL</td>
         <td colspan="${nPhases}"></td>
         <td class="num">${totalH ? fmtN(totalH) + ' h' : '—'}</td>
-        ${showEur ? `<td class="num">${fmtEUR(indexedEur)}</td>` : ''}
-        ${showDkk ? `<td class="num">${fmtDKK(indexedEur * rate)}</td>` : ''}
+        <td class="num">${fmtEUR(indexedEur)}</td>
         <td class="num">—</td>
       </tr>`;
     }
@@ -1232,24 +1179,12 @@ function updateLogoUI() {
       mHtml += `<td class="num" style="color:var(--muted);">100%</td></tr>`;
 
       // Total cost EUR row
-      if (showEur) {
-        mHtml += `<tr><td style="font-weight:600;color:var(--accent);">Total cost (EUR)</td>`;
-        monthCols.forEach(c => {
-          const v = moCosts[c.key];
-          mHtml += `<td class="num" style="color:var(--accent);">${v ? fmtEUR(v) : '—'}</td>`;
-        });
-        mHtml += `<td class="num" style="color:var(--accent);font-weight:700;">${moGrandEur ? fmtEUR(moGrandEur) : '—'}</td></tr>`;
-      }
-
-      // Total cost DKK row
-      if (showDkk) {
-        mHtml += `<tr style="background:#faf9f7;"><td style="font-weight:600;color:var(--muted);">Total cost (DKK)</td>`;
-        monthCols.forEach(c => {
-          const v = moCosts[c.key];
-          mHtml += `<td class="num" style="color:var(--muted);">${v ? fmtDKK(v * rate) : '—'}</td>`;
-        });
-        mHtml += `<td class="num" style="color:var(--muted);font-weight:700;">${moGrandEur ? fmtDKK(moGrandEur * rate) : '—'}</td></tr>`;
-      }
+      mHtml += `<tr><td style="font-weight:600;color:var(--accent);">Total cost (EUR)</td>`;
+      monthCols.forEach(c => {
+        const v = moCosts[c.key];
+        mHtml += `<td class="num" style="color:var(--accent);">${v ? fmtEUR(v) : '—'}</td>`;
+      });
+      mHtml += `<td class="num" style="color:var(--accent);font-weight:700;">${moGrandEur ? fmtEUR(moGrandEur) : '—'}</td></tr>`;
 
       mHtml += `</tbody></table>`;
       document.getElementById('out-table').insertAdjacentHTML('afterend', mHtml);
@@ -1290,8 +1225,6 @@ function updateLogoUI() {
       projSub:   document.getElementById('proj-id').value, // alias
       projDate:  document.getElementById('proj-date').value,
       date:      document.getElementById('proj-date').value,
-      hedgeRate: parseFloat(document.getElementById('hedge-rate').value) || 7.46,
-      currency:  document.getElementById('currency-display').value,
       idxRate:   parseFloat(document.getElementById('idx-rate').value) || 0,
       phases, roles, expenses,
     };
@@ -1304,8 +1237,6 @@ function updateLogoUI() {
     document.getElementById('proj-id').value    = s.projId    || '';
     document.getElementById('proj-rev').value   = s.rev       || '';
     document.getElementById('proj-date').value  = s.date || s.projDate || '';
-    document.getElementById('hedge-rate').value = s.hedgeRate || 7.46;
-    if (s.currency) document.getElementById('currency-display').value = s.currency;
     document.getElementById('idx-rate').value = s.idxRate || 0;
 
     document.getElementById('phases-wrap').innerHTML = '';
@@ -1505,7 +1436,6 @@ function updateLogoUI() {
     const state  = collectState();
     const phases = getPhases();
     const roles  = getRoleData();
-    const hedgeR = hedgeRate();
 
     // Build deduplicated month list: union of all phase ranges, each month appearing once.
     // When phases overlap, the month is claimed by the first phase that covers it.
@@ -1526,19 +1456,18 @@ function updateLogoUI() {
     const nMo        = months.length;
     const totalHCol  = 2 + nMo;
     const costEurCol = 2 + nMo + 1;
-    const costDkkCol = 2 + nMo + 2;
-    const totalCols  = 2 + nMo + 3;
+    const totalCols  = 2 + nMo + 2;
 
     const wsData = [];
 
-    // Row 0 (Excel row 1): project header — hedge rate at H1 for formula reference
-    wsData.push([state.projName || 'Resource Plan', '', 'Rev:', state.rev || '', 'Date:', state.date || '', 'Rate:', hedgeR]);
+    // Row 0 (Excel row 1): project header
+    wsData.push([state.projName || 'Resource Plan', '', 'Rev:', state.rev || '', 'Date:', state.date || '']);
     wsData.push([]); // Row 1: empty
 
     // Row 2 (Excel row 3): phase group header
     const phRow = new Array(totalCols).fill('');
     phRow[0] = 'Role / Name'; phRow[1] = 'Rate (€/h)';
-    phRow[totalHCol] = 'Total h'; phRow[costEurCol] = 'Cost EUR'; phRow[costDkkCol] = 'Cost DKK';
+    phRow[totalHCol] = 'Total h'; phRow[costEurCol] = 'Cost EUR';
     phases.forEach(ph => {
       if (!(ph.sm > 0 && ph.sy > 0 && ph.em > 0 && ph.ey > 0)) return;
       // Place phase name at the first column assigned to this phase
@@ -1569,7 +1498,6 @@ function updateLogoUI() {
       const ceC     = XLSX.utils.encode_col(costEurCol);
       row[totalHCol]  = nMo > 0 ? { t:'n', f:`SUM(${moFirst}${er}:${moLast}${er})` } : 0;
       row[costEurCol] = { t:'n', f:`${thC}${er}*B${er}` };
-      row[costDkkCol] = { t:'n', f:`${ceC}${er}*$H$1` };
       wsData.push(row);
     });
 
@@ -1614,13 +1542,6 @@ function updateLogoUI() {
     moCostEurRow[costEurCol] = grandEur;
     wsData.push(moCostEurRow);
 
-    // Monthly Cost DKK row
-    const moCostDkkRow = new Array(totalCols).fill('');
-    moCostDkkRow[0] = 'Monthly Cost (DKK)';
-    months.forEach(mo => { moCostDkkRow[monthColIdx[mo.key]] = Math.round(moTotC[mo.key] * hedgeR); });
-    moCostDkkRow[costDkkCol] = Math.round(grandEur * hedgeR);
-    wsData.push(moCostDkkRow);
-
     // Escalation rows (if rate set)
     const idxRate  = parseFloat(document.getElementById('idx-rate').value) || 0;
     const escData  = idxRate > 0 ? _computeEscalation(idxRate) : null;
@@ -1631,7 +1552,6 @@ function updateLogoUI() {
       const escHdrRow = new Array(totalCols).fill('');
       escHdrRow[0] = `Price Escalation (${idxRate}% / yr · Oct–Sep FY · Year 1 = 0%)`;
       escHdrRow[costEurCol] = `+${fmtEUR(premiumEur)}`;
-      escHdrRow[costDkkCol] = `+${fmtDKK(premiumEur * hedgeR)}`;
       wsData.push(escHdrRow);
       // Per-FY breakdown
       Array.from({ length: numFYs }, (_, i) => {
@@ -1645,13 +1565,12 @@ function updateLogoUI() {
       escTotRow[0] = 'ESCALATED GRAND TOTAL';
       escTotRow[totalHCol]  = grandH;
       escTotRow[costEurCol] = Math.round(indexedEur * 100) / 100;
-      escTotRow[costDkkCol] = Math.round(indexedEur * hedgeR);
       wsData.push(escTotRow);
     }
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(wsData);
-    ws['!cols'] = [{ wch:28 }, { wch:9 }, ...months.map(() => ({ wch:8 })), { wch:9 }, { wch:12 }, { wch:12 }];
+    ws['!cols'] = [{ wch:28 }, { wch:9 }, ...months.map(() => ({ wch:8 })), { wch:9 }, { wch:12 }];
 
     // Merge phase header cells — only over columns exclusively assigned to that phase
     const merges = [];
