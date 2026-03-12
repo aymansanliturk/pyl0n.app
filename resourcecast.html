@@ -147,6 +147,13 @@
   .totals-row td { background: #f0f4fb; border-top: 2px solid #c8d6f0; }
   .totals-row .calc-cell.hi { color: var(--accent); }
   .totals-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); padding: 4px 8px; }
+  .pct-row td { background: #faf9f7; }
+  .mg-pct-cell { font-style: italic; color: #aaa !important; font-size: 9px !important; }
+  .mg-pct-cell.phase-tot { color: #8899bb !important; font-weight: 600 !important; }
+  .idx-stat { display:flex; flex-direction:column; gap:4px; }
+  .idx-stat-label { font-size:10px; font-weight:500; color:var(--muted); text-transform:uppercase; letter-spacing:0.3px; }
+  .idx-stat-val { font-size:15px; font-weight:700; font-family:'DM Mono',monospace; color:var(--text); }
+  .idx-stat-val.hi { color:var(--accent); }
 
   /* Expenses */
   .exp-table { width: 100%; border-collapse: collapse; }
@@ -196,6 +203,16 @@
   .out-table tr.grand-row td { background: var(--accent); color: #fff; font-weight: 700; font-size: 11.5px; border: none; }
   .out-table tr.grand-row td.num { font-family: 'DM Mono', monospace; }
   .out-table tr.sep-row td { background: var(--bg); height: 5px; padding: 0; border: none; }
+  .out-table tr.idx-row td { background: #fffaf0; color: #c47a1e; font-style: italic; font-size: 10px; }
+  .out-table tr.idx-row td.num { font-family: 'DM Mono', monospace; font-weight: 600; font-style: normal; }
+  .out-table tr.idx-grand-row td { background: #1a3a6e; color: #fff; font-weight: 700; font-size: 11.5px; border: none; }
+  .out-table tr.idx-grand-row td.num { font-family: 'DM Mono', monospace; }
+  .out-mo-table { width: 100%; border-collapse: collapse; }
+  .out-mo-table thead th { background: #3a5e97; color: #fff; font-size: 8px; font-weight: 700; padding: 4px 4px; text-align: center; border-right: 1px solid #4a6ea7; }
+  .out-mo-table thead th:first-child { text-align: left; }
+  .out-mo-table tbody tr { border-bottom: 1px solid #f0ede8; }
+  .out-mo-table tbody td { padding: 4px 4px; font-size: 9px; }
+  .out-mo-table td.num { text-align: right; font-family: 'DM Mono', monospace; }
   .out-hedge { margin-top: 4mm; font-size: 8.5px; color: var(--faint); text-align: right; font-style: italic; }
   .out-watermark { margin-top: 6mm; text-align: center; font-size: 9px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--faint); font-family: 'DM Mono', monospace; }
 
@@ -394,6 +411,39 @@
       <tfoot id="exp-tfoot"></tfoot>
     </table>
     <button class="btn-add" onclick="addExpense({})">+ Add Cost</button>
+  </div>
+
+  <!-- Price Indexation -->
+  <div class="section">
+    <div class="section-title">Price Indexation
+      <span style="font-size:10px;font-weight:400;color:var(--faint);text-transform:none;letter-spacing:0;">— compound inflation applied to grand total over the project timeline</span>
+    </div>
+    <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;">
+      <label style="display:flex;flex-direction:column;gap:5px;">
+        <span style="font-size:11px;font-weight:500;color:var(--muted);">Inflation Rate</span>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <input type="number" id="idx-rate" value="0" min="0" max="50" step="0.1"
+            style="width:72px;font-family:'DM Mono',monospace;" oninput="updateIndexation()">
+          <span style="font-size:12px;color:var(--muted);">% / year</span>
+        </div>
+      </label>
+      <div class="idx-stat">
+        <div class="idx-stat-label">Timeline Span</div>
+        <div class="idx-stat-val" id="idx-years">—</div>
+      </div>
+      <div class="idx-stat">
+        <div class="idx-stat-label">Indexation Premium</div>
+        <div class="idx-stat-val" id="idx-premium" style="color:#c47a1e;">—</div>
+      </div>
+      <div class="idx-stat">
+        <div class="idx-stat-label">Indexed Grand Total (EUR)</div>
+        <div class="idx-stat-val hi" id="idx-total">—</div>
+      </div>
+      <div class="idx-stat">
+        <div class="idx-stat-label">Indexed Grand Total (DKK)</div>
+        <div class="idx-stat-val hi" id="idx-total-dkk">—</div>
+      </div>
+    </div>
   </div>
 
   <button class="btn-generate" onclick="generate()">Generate Report →</button>
@@ -825,22 +875,37 @@ function updateLogoUI() {
       if (totEurCell) totEurCell.textContent = totalEur ? fmtEUR(totalEur)     : '—';
     });
 
-    // Build tfoot
+    // Build tfoot — hours row + % weight row
     const colTotCells = cols.map(col => {
-      const v  = colTotals[col.key];
-      const pi = phases.findIndex(p => p.id === col.phaseId);
+      const v     = colTotals[col.key];
       const isTot = col.type === 'agg';
       return `<td class="mg-tot-cell${isTot?' phase-tot':''}">${v ? fmtN(v) : '—'}</td>`;
     }).join('');
 
-    document.getElementById('res-tfoot').innerHTML = `<tr class="totals-row">
-      <td class="totals-label mg-sticky-name">Totals</td>
-      <td class="mg-sticky-rate"></td>
-      ${colTotCells}
-      <td class="calc-cell hi">${grandH   ? fmtN(grandH) + ' h'  : '—'}</td>
-      <td class="calc-cell hi">${grandEur ? fmtEUR(grandEur)      : '—'}</td>
-      <td></td>
-    </tr>`;
+    const colPctCells = cols.map(col => {
+      const v     = colTotals[col.key];
+      const isTot = col.type === 'agg';
+      const pct   = grandH > 0 && v ? (v / grandH * 100).toFixed(0) + '%' : '—';
+      return `<td class="mg-tot-cell mg-pct-cell${isTot?' phase-tot':''}">${pct}</td>`;
+    }).join('');
+
+    document.getElementById('res-tfoot').innerHTML = `
+      <tr class="totals-row">
+        <td class="totals-label mg-sticky-name">Total h</td>
+        <td class="mg-sticky-rate"></td>
+        ${colTotCells}
+        <td class="calc-cell hi">${grandH   ? fmtN(grandH) + ' h'  : '—'}</td>
+        <td class="calc-cell hi">${grandEur ? fmtEUR(grandEur)      : '—'}</td>
+        <td></td>
+      </tr>
+      <tr class="pct-row">
+        <td class="totals-label mg-sticky-name" style="color:var(--muted);font-weight:400;font-style:italic;">% weight</td>
+        <td class="mg-sticky-rate"></td>
+        ${colPctCells}
+        <td class="calc-cell" style="color:var(--muted);font-size:10px;">100%</td>
+        <td></td>
+        <td></td>
+      </tr>`;
 
     // Refresh DKK column in expenses
     document.querySelectorAll('.exp-row').forEach(tr => {
@@ -848,6 +913,7 @@ function updateLogoUI() {
       tr.querySelector('.exp-dkk').textContent = amt ? fmtDKK(amt * rate) : '—';
     });
     updateExpTotals();
+    updateIndexation();
   }
 
   // Alias for compatibility
@@ -895,6 +961,43 @@ function updateLogoUI() {
       <td style="text-align:right;">${total ? fmtDKK(total * rate) : '—'}</td>
       <td></td>
     </tr>`;
+    updateIndexation();
+  }
+
+  // ── Price Indexation ──
+  function updateIndexation() {
+    const rateEl = document.getElementById('idx-rate');
+    if (!rateEl) return;
+    const idxRate = parseFloat(rateEl.value) || 0;
+    const phases  = getPhases();
+
+    // Timeline span: max end year − min start year (integer, per user spec)
+    let minY = Infinity, maxY = -Infinity;
+    phases.forEach(p => {
+      if (p.sy > 0) minY = Math.min(minY, p.sy);
+      if (p.ey > 0) maxY = Math.max(maxY, p.ey);
+    });
+    const years = (minY < Infinity && maxY > -Infinity) ? Math.max(0, maxY - minY) : 0;
+
+    // Base cost = labor + expenses
+    const roles   = getRoleData();
+    const laborEur = roles.reduce((s, r) => s + r.totalEur, 0);
+    let   expEur   = 0;
+    document.querySelectorAll('.exp-inp-amt').forEach(inp => { expEur += parseFloat(inp.value) || 0; });
+    const baseEur = laborEur + expEur;
+    const hr      = hedgeRate();
+
+    const indexedEur = idxRate > 0 && years > 0 ? baseEur * Math.pow(1 + idxRate / 100, years) : baseEur;
+    const premiumEur = indexedEur - baseEur;
+
+    document.getElementById('idx-years').textContent =
+      years > 0 ? `${years} year${years !== 1 ? 's' : ''}` : '—';
+    document.getElementById('idx-premium').textContent =
+      (idxRate > 0 && years > 0 && premiumEur > 0) ? `+ ${fmtEUR(premiumEur)}` : '—';
+    document.getElementById('idx-total').textContent =
+      indexedEur > 0 ? fmtEUR(indexedEur) : '—';
+    document.getElementById('idx-total-dkk').textContent =
+      indexedEur > 0 ? fmtDKK(indexedEur * hr) : '—';
   }
 
   // ── Generate ──
@@ -1038,8 +1141,82 @@ function updateLogoUI() {
       <td class="num">100%</td>
     </tr>`;
 
+    // Price indexation rows
+    const idxRate = parseFloat(document.getElementById('idx-rate').value) || 0;
+    let idxYears = 0;
+    { let minY = Infinity, maxY = -Infinity;
+      phases.forEach(p => { if (p.sy>0) minY=Math.min(minY,p.sy); if (p.ey>0) maxY=Math.max(maxY,p.ey); });
+      idxYears = (minY<Infinity && maxY>-Infinity) ? Math.max(0, maxY-minY) : 0; }
+    if (idxRate > 0 && idxYears > 0) {
+      const indexedEur  = grandEur * Math.pow(1 + idxRate / 100, idxYears);
+      const premiumEur  = indexedEur - grandEur;
+      const totalCols   = 3 + nPhases + xCols + 1;
+      html += `<tr class="sep-row"><td colspan="${totalCols}"></td></tr>`;
+      html += `<tr class="idx-row">
+        <td colspan="2" style="font-style:italic;padding-left:10px;">
+          Price Indexation <span style="font-weight:400;font-size:9px;color:#aaa;">${idxRate}% / yr × ${idxYears} yr${idxYears!==1?'s':''} · compound</span>
+        </td>
+        <td colspan="${nPhases}"></td>
+        <td></td>
+        ${showEur ? `<td class="num">+ ${fmtEUR(premiumEur)}</td>` : ''}
+        ${showDkk ? `<td class="num">+ ${fmtDKK(premiumEur * rate)}</td>` : ''}
+        <td class="num">+${((premiumEur/grandEur)*100).toFixed(1)}%</td>
+      </tr>`;
+      html += `<tr class="idx-grand-row">
+        <td colspan="2">INDEXED GRAND TOTAL</td>
+        <td colspan="${nPhases}"></td>
+        <td class="num">${totalH ? fmtN(totalH) + ' h' : '—'}</td>
+        ${showEur ? `<td class="num">${fmtEUR(indexedEur)}</td>` : ''}
+        ${showDkk ? `<td class="num">${fmtDKK(indexedEur * rate)}</td>` : ''}
+        <td class="num">—</td>
+      </tr>`;
+    }
+
     html += '</tbody>';
     document.getElementById('out-table').innerHTML = html;
+
+    // Monthly distribution table
+    const cols     = _buildCols(phases);
+    const monthCols = cols.filter(c => c.type === 'month');
+    if (monthCols.length > 0) {
+      const MN_S = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      // Sum hours per month across all roles
+      const moTotals = {};
+      monthCols.forEach(c => { moTotals[c.key] = 0; });
+      roles.forEach(r => {
+        monthCols.forEach(c => { moTotals[c.key] += r.monthHours[c.key] || 0; });
+      });
+      const moGrandH = Object.values(moTotals).reduce((s,v) => s+v, 0);
+
+      let mHtml = `<table class="out-table out-mo-table" style="margin-top:10mm;font-size:9px;">
+        <thead><tr>
+          <th style="text-align:left;min-width:80px;">Month</th>`;
+      monthCols.forEach(c => {
+        mHtml += `<th>${MN_S[c.m]}<br><span style="font-weight:400;font-size:8px;">'${String(c.y).slice(-2)}</span></th>`;
+      });
+      mHtml += `<th>Total</th></tr></thead><tbody>`;
+
+      // Hours row
+      mHtml += `<tr><td style="font-weight:600;">Total hours</td>`;
+      monthCols.forEach(c => {
+        const v = moTotals[c.key];
+        mHtml += `<td class="num">${v ? fmtN(v) : '—'}</td>`;
+      });
+      mHtml += `<td class="num">${moGrandH ? fmtN(moGrandH)+' h' : '—'}</td></tr>`;
+
+      // % row
+      mHtml += `<tr style="background:#faf9f7;"><td style="color:var(--muted);font-style:italic;">% weight</td>`;
+      monthCols.forEach(c => {
+        const v   = moTotals[c.key];
+        const pct = moGrandH > 0 && v ? (v / moGrandH * 100).toFixed(0) + '%' : '—';
+        mHtml += `<td class="num" style="color:#aaa;font-size:8px;">${pct}</td>`;
+      });
+      mHtml += `<td class="num" style="color:var(--muted);">100%</td></tr>`;
+
+      mHtml += `</tbody></table>`;
+      document.getElementById('out-table').insertAdjacentHTML('afterend', mHtml);
+    }
+
     renderGantt();
 
     document.getElementById('editor').style.display = 'none';
@@ -1284,9 +1461,7 @@ function updateLogoUI() {
       return `<div class="gantt-legend-item"><div class="gantt-legend-dot" style="background:${col}"></div>${esc(role.name)}</div>`;
     }).join('');
     legend.innerHTML = `<span style="font-weight:600;color:#555;">Roles:</span>${roleDots}`
-      + `<span style="margin-left:12px;font-weight:600;color:#555;">FTE loading:</span>`
-      + `<div class="gantt-fte-scale"><span>low</span><div class="gantt-fte-grad"></div><span>full</span></div>`
-      + `<span style="color:#bbb;">(bar opacity = FTE fraction, 160h/month = 1.0 FTE)</span>`;
+      + `<span style="margin-left:12px;color:#bbb;">(bar opacity = resource loading intensity)</span>`;
   }
 
   // Phase-index Gantt (fallback when no calendar dates)
@@ -1377,10 +1552,7 @@ function updateLogoUI() {
     grandTot.textContent=grandH.toLocaleString()+'h';
     gantt.appendChild(grandTot);
 
-    legend.innerHTML = `<span style="font-weight:600;color:#555;">FTE loading:</span>`
-      + `<div class="gantt-fte-scale"><span>low</span><div class="gantt-fte-grad"></div><span>full</span></div>`
-      + `<span style="color:#bbb;">(bar opacity = FTE fraction, 160h/month = 1.0 FTE)</span>`
-      + `<span style="margin-left:12px;color:#bbb;">· Enter phase dates in TimeCast for calendar timeline view</span>`;
+    legend.innerHTML = `<span style="color:#bbb;">(bar opacity = resource loading intensity · enter phase dates in TimeCast for calendar timeline view)</span>`;
   }
 
   function goBack() {
@@ -1414,6 +1586,7 @@ function updateLogoUI() {
       date:      document.getElementById('proj-date').value,
       hedgeRate: parseFloat(document.getElementById('hedge-rate').value) || 7.46,
       currency:  document.getElementById('currency-display').value,
+      idxRate:   parseFloat(document.getElementById('idx-rate').value) || 0,
       phases, roles, expenses,
     };
   }
@@ -1427,6 +1600,7 @@ function updateLogoUI() {
     document.getElementById('proj-date').value  = s.date || s.projDate || '';
     document.getElementById('hedge-rate').value = s.hedgeRate || 7.46;
     if (s.currency) document.getElementById('currency-display').value = s.currency;
+    document.getElementById('idx-rate').value = s.idxRate || 0;
 
     document.getElementById('phases-wrap').innerHTML = '';
     phaseCount = 0;
