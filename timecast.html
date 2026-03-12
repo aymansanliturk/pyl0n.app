@@ -262,6 +262,33 @@
 
   .milestone { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%) rotate(45deg); width: 12px; height: 12px; border-radius: 2px; z-index: 5; }
 
+  /* ── Interactive drag handles on Gantt bars ── */
+  .bar-handle {
+    position: absolute; top: 0; bottom: 0; width: 11px;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 20; opacity: 0.3; transition: opacity 0.12s;
+  }
+  .bar-handle-s { left: 0; cursor: w-resize; border-radius: 4px 0 0 4px; }
+  .bar-handle-e { right: 0; cursor: e-resize; border-radius: 0 4px 4px 0; }
+  .bar-handle::after {
+    content: ''; width: 2px; height: 9px;
+    background: rgba(255,255,255,0.85); border-radius: 1px;
+    box-shadow: 3px 0 0 rgba(255,255,255,0.85);
+  }
+  .bar-handle-e::after { box-shadow: -3px 0 0 rgba(255,255,255,0.85); }
+  .bar:hover .bar-handle,
+  .bar-current:hover .bar-handle { opacity: 1; }
+  .gantt-outer.gantt-dragging,
+  .gantt-outer.gantt-dragging * { cursor: ew-resize !important; user-select: none !important; }
+  /* Drag tooltip */
+  #gantt-drag-tip {
+    position: fixed; background: var(--accent); color: #fff;
+    font-size: 11px; font-family: 'DM Mono', monospace;
+    padding: 4px 9px; border-radius: 5px; pointer-events: none;
+    z-index: 9999; display: none; white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+
   .legend { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; }
   .li { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--muted); }
   .ld { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
@@ -428,8 +455,11 @@
         <span class="sb-name">Timecast</span>
       </div>
 
-      <div style="font-size:10px;color:var(--faint);margin-bottom:12px;line-height:1.5;">
+      <div style="font-size:10px;color:var(--faint);margin-bottom:8px;line-height:1.5;">
         Drag rows to reorder, then hit <strong style="color:var(--accent)">Refresh</strong> to update the chart.
+      </div>
+      <div style="font-size:9.5px;color:var(--faint);margin-bottom:14px;line-height:1.5;padding:7px 8px;background:#f5f7fc;border-radius:6px;border:1px solid #dde8f7;">
+        ↔ Hover a bar and drag its <strong style="color:var(--accent)">edge handles</strong> to adjust start or end dates directly on the chart.
       </div>
 
       <div id="sidebar-lists"></div>
@@ -456,9 +486,10 @@
           <div class="chart-meta" id="out-meta"></div>
         </div>
       </div>
-      <div class="gantt-outer">
+      <div class="gantt-outer" id="gantt-outer">
         <div class="gantt-inner" id="gantt"></div>
       </div>
+      <div id="gantt-drag-tip"></div>
       <div class="legend" id="legend"></div>
       <div class="chart-watermark">Generated with Timecast · Bid Timeline Intelligence</div>
     </div>
@@ -977,7 +1008,8 @@ function updateLogoUI() {
     const hasNotes   = allTasks.some(t => t.notes);
     const hasBase    = allTasks.some(t => t.baseline);
 
-    chartState.multiProj = multiProj;
+    chartState.multiProj  = multiProj;
+    chartState._hasNotes  = hasNotes;
 
     // Header
     document.getElementById('out-title').textContent = title;
@@ -1013,8 +1045,9 @@ function updateLogoUI() {
     });
 
     // Render group
-    function renderGroup(tasks, isBid, showHeader) {
+    function renderGroup(tasks, isBid, showHeader, projIdx) {
       if (tasks.length === 0) return;
+      const lane = isBid ? 'bid' : 'exec';
       if (showHeader) {
         const hColor = isBid ? '#2c4e87' : '#3a7a52';
         const hBg    = isBid ? '#e8eef7' : '#e8f4ed';
@@ -1046,6 +1079,11 @@ function updateLogoUI() {
 
         for (let c=0; c<n; c++) {
           const cell=el('div',`row-cell${bgCls}${altCls}`);
+          // Data attrs for drag interaction
+          cell.dataset.proj = projIdx;
+          cell.dataset.lane = lane;
+          cell.dataset.task = i;
+          cell.dataset.col  = c;
           if (c===todayIdx) cell.appendChild(el('div','today-marker'));
           if (t.type==='milestone') {
             if (c===si) { const d=el('div','milestone'); d.style.background=t.color; cell.appendChild(d); }
@@ -1057,7 +1095,28 @@ function updateLogoUI() {
             if (si!==-1 && ei!==-1 && c>=si && c<=ei) {
               const cls=useB?'bar-current':'bar';
               let p='m'; if(si===ei)p='solo'; else if(c===si)p='s'; else if(c===ei)p='e';
-              const bar=el('div',`${cls} ${p}`); bar.style.background=t.color; cell.appendChild(bar);
+              const bar=el('div',`${cls} ${p}`); bar.style.background=t.color;
+              // Start handle
+              if (c===si) {
+                const hs = document.createElement('span');
+                hs.className = 'bar-handle bar-handle-s';
+                hs.addEventListener('mousedown', ev => {
+                  ev.preventDefault(); ev.stopPropagation();
+                  _ganttDragStart(ev, projIdx, lane, i, 'start');
+                });
+                bar.appendChild(hs);
+              }
+              // End handle
+              if (c===ei) {
+                const he = document.createElement('span');
+                he.className = 'bar-handle bar-handle-e';
+                he.addEventListener('mousedown', ev => {
+                  ev.preventDefault(); ev.stopPropagation();
+                  _ganttDragStart(ev, projIdx, lane, i, 'end');
+                });
+                bar.appendChild(he);
+              }
+              cell.appendChild(bar);
             }
           }
           gantt.appendChild(cell);
@@ -1065,7 +1124,7 @@ function updateLogoUI() {
       });
     }
 
-    projects.forEach(proj => {
+    projects.forEach((proj, pi) => {
       if (multiProj) {
         const phLbl=el('div','proj-hdr-lbl',`● ${proj.name.toUpperCase()}`);
         phLbl.style.background=proj.color;
@@ -1078,8 +1137,8 @@ function updateLogoUI() {
         }
       }
       const showPhaseHeaders = proj.bidTasks.length > 0 && proj.execTasks.length > 0;
-      renderGroup(proj.bidTasks,  true,  showPhaseHeaders);
-      renderGroup(proj.execTasks, false, showPhaseHeaders);
+      renderGroup(proj.bidTasks,  true,  showPhaseHeaders, pi);
+      renderGroup(proj.execTasks, false, showPhaseHeaders, pi);
     });
 
     // Legend
@@ -1106,6 +1165,169 @@ function updateLogoUI() {
 
     // Rebuild sidebar
     buildSidebar(chartState);
+  }
+
+  /* ══ INTERACTIVE GANTT BAR DRAG ═════════════════════════════════
+     Drag the start or end handle of any Gantt bar to adjust dates
+     directly on the chart canvas. On release the editor form and
+     localStorage are updated and SuiteManager broadcasts the change.
+  ═══════════════════════════════════════════════════════════════ */
+  let _gDrag = null; // active drag state
+
+  // Map a clientX coordinate to a month column index in the gantt grid.
+  function _colFromMouseX(clientX) {
+    const ganttEl = document.getElementById('gantt');
+    if (!ganttEl || !chartState) return -1;
+    const rect  = ganttEl.getBoundingClientRect();
+    const { sm, sy, em, ey } = chartState;
+    const months = buildMonths(sm, sy, em, ey);
+    const labelW = 155 + (chartState._hasNotes ? 64 : 0);
+    const availW = rect.width - labelW;
+    if (availW <= 0 || months.length === 0) return -1;
+    const colW  = availW / months.length;
+    const relX  = clientX - rect.left - labelW;
+    return Math.max(0, Math.min(months.length - 1, Math.floor(relX / colW)));
+  }
+
+  function _ganttDragStart(ev, projIdx, lane, taskIdx, edge) {
+    const tasks = lane === 'bid'
+      ? chartState.projects[projIdx].bidTasks
+      : chartState.projects[projIdx].execTasks;
+    const task = tasks[taskIdx];
+    if (!task || task.type === 'milestone') return;
+    _gDrag = { projIdx, lane, taskIdx, edge, lastCol: -1 };
+    document.getElementById('gantt-outer')?.classList.add('gantt-dragging');
+    document.addEventListener('mousemove', _ganttDragMove);
+    document.addEventListener('mouseup',   _ganttDragEnd, { once: true });
+  }
+
+  function _ganttDragMove(ev) {
+    if (!_gDrag || !chartState) return;
+    const { projIdx, lane, taskIdx, edge } = _gDrag;
+    const colIdx = _colFromMouseX(ev.clientX);
+    if (colIdx < 0 || colIdx === _gDrag.lastCol) return;
+    _gDrag.lastCol = colIdx;
+
+    const months = buildMonths(chartState.sm, chartState.sy, chartState.em, chartState.ey);
+    const tasks  = lane === 'bid'
+      ? chartState.projects[projIdx].bidTasks
+      : chartState.projects[projIdx].execTasks;
+    const task = tasks[taskIdx];
+    const mo   = months[colIdx];
+
+    if (edge === 'start') {
+      const eiCur = colOf(months, task.em, task.ey);
+      const clamped = months[Math.min(colIdx, eiCur)];
+      task.sm = clamped.m; task.sy = clamped.y;
+    } else {
+      const siCur = colOf(months, task.sm, task.sy);
+      const clamped = months[Math.max(colIdx, siCur)];
+      task.em = clamped.m; task.ey = clamped.y;
+    }
+
+    // Tooltip
+    const tip = document.getElementById('gantt-drag-tip');
+    if (tip) {
+      tip.textContent = MN[mo.m] + ' ' + mo.y;
+      tip.style.left    = (ev.clientX + 14) + 'px';
+      tip.style.top     = (ev.clientY - 34) + 'px';
+      tip.style.display = 'block';
+    }
+
+    // Live partial re-render of just this task's bars
+    _refreshTaskBars(projIdx, lane, taskIdx);
+  }
+
+  function _ganttDragEnd() {
+    if (!_gDrag) return;
+    const { projIdx, lane, taskIdx } = _gDrag;
+
+    document.removeEventListener('mousemove', _ganttDragMove);
+    document.getElementById('gantt-outer')?.classList.remove('gantt-dragging');
+    const tip = document.getElementById('gantt-drag-tip');
+    if (tip) tip.style.display = 'none';
+    _gDrag = null;
+
+    // Sync the updated dates back into the editor form inputs
+    const tasks = lane === 'bid'
+      ? chartState.projects[projIdx].bidTasks
+      : chartState.projects[projIdx].execTasks;
+    _syncTaskToEditor(projIdx, lane, taskIdx, tasks[taskIdx]);
+
+    // Full re-render cleans up the partial bar state
+    renderChart();
+
+    // Persist and broadcast
+    clearTimeout(_histTimer);
+    _snapshot(); // saves to localStorage + calls suiteWrite()
+  }
+
+  // Efficiently re-draw just the bar elements for one task row,
+  // keeping today-marker and baseline bars intact.
+  function _refreshTaskBars(projIdx, lane, taskIdx) {
+    if (!chartState) return;
+    const tasks  = lane === 'bid'
+      ? chartState.projects[projIdx].bidTasks
+      : chartState.projects[projIdx].execTasks;
+    const task   = tasks[taskIdx];
+    const months = buildMonths(chartState.sm, chartState.sy, chartState.em, chartState.ey);
+    const si = colOf(months, task.sm, task.sy);
+    const ei = colOf(months, task.em, task.ey);
+    const useB = !!task.baseline;
+
+    const cells = document.querySelectorAll(
+      `.row-cell[data-proj="${projIdx}"][data-lane="${lane}"][data-task="${taskIdx}"]`
+    );
+    cells.forEach(cell => {
+      const c = parseInt(cell.dataset.col);
+      // Remove only current/bar elements; keep today-marker and baseline
+      cell.querySelectorAll('.bar, .bar-current').forEach(b => b.remove());
+
+      if (si !== -1 && ei !== -1 && c >= si && c <= ei) {
+        const cls = useB ? 'bar-current' : 'bar';
+        let p = 'm';
+        if (si === ei) p = 'solo'; else if (c === si) p = 's'; else if (c === ei) p = 'e';
+        const bar = document.createElement('div');
+        bar.className = `${cls} ${p}`;
+        bar.style.background = task.color;
+        if (c === si) {
+          const hs = document.createElement('span');
+          hs.className = 'bar-handle bar-handle-s';
+          hs.addEventListener('mousedown', ev => {
+            ev.preventDefault(); ev.stopPropagation();
+            _ganttDragStart(ev, projIdx, lane, taskIdx, 'start');
+          });
+          bar.appendChild(hs);
+        }
+        if (c === ei) {
+          const he = document.createElement('span');
+          he.className = 'bar-handle bar-handle-e';
+          he.addEventListener('mousedown', ev => {
+            ev.preventDefault(); ev.stopPropagation();
+            _ganttDragStart(ev, projIdx, lane, taskIdx, 'end');
+          });
+          bar.appendChild(he);
+        }
+        cell.appendChild(bar);
+      }
+    });
+  }
+
+  // Write dragged dates back into the editor form so collectState() sees them.
+  function _syncTaskToEditor(projIdx, lane, taskIdx, task) {
+    const projId = chartState.projects[projIdx].id;
+    const bodyId = `${lane}-body-${projId}`;
+    const rows = [...(document.getElementById(bodyId)?.querySelectorAll('.task-row') || [])];
+    const row  = rows[taskIdx];
+    if (!row) return;
+    const smSel = row.querySelector('.t-sm');
+    const sySel = row.querySelector('.t-sy');
+    const emSel = row.querySelector('.t-em');
+    const eySel = row.querySelector('.t-ey');
+    if (smSel) smSel.value = task.sm;
+    if (sySel) sySel.value = task.sy;
+    if (emSel) emSel.value = task.em;
+    if (eySel) eySel.value = task.ey;
   }
 
   function togglePhase(sectionId, btn) {
