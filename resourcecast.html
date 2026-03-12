@@ -1278,15 +1278,15 @@ function updateLogoUI() {
       gantt.appendChild(tot);
     });
 
-    // Legend
-    legend.innerHTML = '<span style="font-weight:600;color:#555;">Roles:</span>';
-    roles.forEach((role, ri) => {
-      const co = { color: PHASE_COLORS_G[ri % PHASE_COLORS_G.length] };
-      legend.innerHTML += `<div class="gantt-legend-item"><div class="gantt-legend-dot" style="background:${co.color}"></div>${esc(role.name)}</div>`;
-    });
-    legend.innerHTML += `<span style="margin-left:8px;font-weight:600;color:#555;">FTE loading:</span>
-      <div class="gantt-fte-scale"><span>low</span><div class="gantt-fte-grad"></div><span>full</span></div>
-      <span style="color:#bbb;">(bar opacity = FTE fraction, 160h/month = 1.0 FTE)</span>`;
+    // Legend — build full HTML in one pass then set once (avoids innerHTML += re-parse corruption)
+    const roleDots = roles.map((role, ri) => {
+      const col = PHASE_COLORS_G[ri % PHASE_COLORS_G.length];
+      return `<div class="gantt-legend-item"><div class="gantt-legend-dot" style="background:${col}"></div>${esc(role.name)}</div>`;
+    }).join('');
+    legend.innerHTML = `<span style="font-weight:600;color:#555;">Roles:</span>${roleDots}`
+      + `<span style="margin-left:12px;font-weight:600;color:#555;">FTE loading:</span>`
+      + `<div class="gantt-fte-scale"><span>low</span><div class="gantt-fte-grad"></div><span>full</span></div>`
+      + `<span style="color:#bbb;">(bar opacity = FTE fraction, 160h/month = 1.0 FTE)</span>`;
   }
 
   // Phase-index Gantt (fallback when no calendar dates)
@@ -1377,7 +1377,10 @@ function updateLogoUI() {
     grandTot.textContent=grandH.toLocaleString()+'h';
     gantt.appendChild(grandTot);
 
-    legend.innerHTML='<span style="font-weight:600;color:#555;">Bar opacity = FTE loading · Enter phase dates in TimeCast for calendar timeline view</span>';
+    legend.innerHTML = `<span style="font-weight:600;color:#555;">FTE loading:</span>`
+      + `<div class="gantt-fte-scale"><span>low</span><div class="gantt-fte-grad"></div><span>full</span></div>`
+      + `<span style="color:#bbb;">(bar opacity = FTE fraction, 160h/month = 1.0 FTE)</span>`
+      + `<span style="margin-left:12px;color:#bbb;">· Enter phase dates in TimeCast for calendar timeline view</span>`;
   }
 
   function goBack() {
