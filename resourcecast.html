@@ -1599,84 +1599,105 @@ function updateLogoUI() {
     if (typeof XLSX === 'undefined') { alert('SheetJS not loaded.'); return; }
     const state  = collectState();
     const phases = getPhases();
-    const cols   = _buildCols(phases);
     const roles  = getRoleData();
+    const hedgeR = hedgeRate();
+
+    // Build deduplicated month list: union of all phase ranges, each month appearing once.
+    // When phases overlap, the month is claimed by the first phase that covers it.
+    const monthMap = new Map(); // key -> { m (0-based), y, key, phaseId }
+    phases.forEach(ph => {
+      if (!(ph.sm > 0 && ph.sy > 0 && ph.em > 0 && ph.ey > 0)) return;
+      let m = ph.sm - 1, y = ph.sy, em0 = ph.em - 1, ey = ph.ey;
+      while (y < ey || (y === ey && m <= em0)) {
+        const key = `${y}-${String(m+1).padStart(2,'0')}`;
+        if (!monthMap.has(key)) monthMap.set(key, { m, y, key, phaseId: ph.id });
+        m++; if (m > 11) { m = 0; y++; }
+      }
+    });
+    const months = [...monthMap.values()].sort((a, b) => a.y !== b.y ? a.y - b.y : a.m - b.m);
+    const monthColIdx = {}; // key -> 0-based column index in the row
+    months.forEach((mo, i) => { monthColIdx[mo.key] = 2 + i; });
+
+    const nMo        = months.length;
+    const totalHCol  = 2 + nMo;
+    const costEurCol = 2 + nMo + 1;
+    const costDkkCol = 2 + nMo + 2;
+    const totalCols  = 2 + nMo + 3;
 
     const wsData = [];
 
-    // Row 0: project header
-    wsData.push([state.projName || 'Resource Plan', '', 'Rev:', state.rev || '', 'Date:', state.date || '', 'Rate:', state.hedgeRate]);
-    wsData.push([]);
+    // Row 0 (Excel row 1): project header — hedge rate at H1 for formula reference
+    wsData.push([state.projName || 'Resource Plan', '', 'Rev:', state.rev || '', 'Date:', state.date || '', 'Rate:', hedgeR]);
+    wsData.push([]); // Row 1: empty
 
-    // Row 2: phase group header
-    const phRow = ['Role / Name', 'Rate (€/h)'];
+    // Row 2 (Excel row 3): phase group header
+    const phRow = new Array(totalCols).fill('');
+    phRow[0] = 'Role / Name'; phRow[1] = 'Rate (€/h)';
+    phRow[totalHCol] = 'Total h'; phRow[costEurCol] = 'Cost EUR'; phRow[costDkkCol] = 'Cost DKK';
     phases.forEach(ph => {
-      const pCols = cols.filter(c => c.phaseId === ph.id);
-      phRow.push(ph.name);
-      for (let i = 1; i < pCols.length; i++) phRow.push('');
-    });
-    phRow.push('Total h', 'Cost EUR', 'Cost DKK');
-    wsData.push(phRow);
-
-    // Row 3: month header
-    const moRow = ['', ''];
-    cols.forEach(col => {
-      if (col.type === 'month') {
-        moRow.push(`${MN[col.m]} ${col.y}`);
-      } else {
-        const ph = phases.find(p => p.id === col.phaseId);
-        if (ph && ph.sm > 0 && ph.sy > 0 && ph.em > 0 && ph.ey > 0) {
-          moRow.push(ph.sm === ph.em && ph.sy === ph.ey
-            ? `${MN[ph.sm-1]} ${ph.sy}`
-            : `${MN[ph.sm-1]}–${MN[ph.em-1]} ${ph.ey}`);
-        } else {
-          moRow.push(ph?.name || 'Phase');
-        }
+      if (!(ph.sm > 0 && ph.sy > 0 && ph.em > 0 && ph.ey > 0)) return;
+      // Place phase name at the first column assigned to this phase
+      let m = ph.sm - 1, y = ph.sy, em0 = ph.em - 1, ey = ph.ey;
+      while (y < ey || (y === ey && m <= em0)) {
+        const key = `${y}-${String(m+1).padStart(2,'0')}`;
+        if (monthMap.get(key)?.phaseId === ph.id) { phRow[monthColIdx[key]] = ph.name; break; }
+        m++; if (m > 11) { m = 0; y++; }
       }
     });
-    moRow.push('', '', '');
+    wsData.push(phRow);
+
+    // Row 3 (Excel row 4): month names
+    const moRow = new Array(totalCols).fill('');
+    months.forEach((mo, i) => { moRow[2 + i] = `${MN[mo.m]} ${mo.y}`; });
     wsData.push(moRow);
 
-    // Role rows
-    const hedgeR = hedgeRate();
-    roles.forEach(r => {
-      const row = [r.name, r.rate];
-      cols.forEach(col => {
-        if (col.type === 'month') {
-          row.push(r.monthHours[col.key] || 0);
-        } else {
-          row.push(r.phaseHours[col.phaseId] || 0);
-        }
-      });
-      row.push(r.totalH, r.totalEur, Math.round(r.totalEur * hedgeR));
+    // Role rows (Excel rows 5+)
+    const dataStart = 5; // 1-indexed Excel row
+    roles.forEach((r, ri) => {
+      const er  = dataStart + ri;
+      const row = new Array(totalCols).fill(0);
+      row[0] = r.name; row[1] = r.rate;
+      months.forEach(mo => { row[monthColIdx[mo.key]] = r.monthHours[mo.key] || 0; });
+      const moFirst = XLSX.utils.encode_col(2);
+      const moLast  = XLSX.utils.encode_col(2 + nMo - 1);
+      const thC     = XLSX.utils.encode_col(totalHCol);
+      const ceC     = XLSX.utils.encode_col(costEurCol);
+      row[totalHCol]  = nMo > 0 ? { t:'n', f:`SUM(${moFirst}${er}:${moLast}${er})` } : 0;
+      row[costEurCol] = { t:'n', f:`${thC}${er}*B${er}` };
+      row[costDkkCol] = { t:'n', f:`${ceC}${er}*$H$1` };
       wsData.push(row);
     });
 
     // Totals row
-    const totRow = ['TOTAL', ''];
-    cols.forEach(col => {
-      if (col.type === 'month') {
-        totRow.push(roles.reduce((s, r) => s + (r.monthHours[col.key] || 0), 0));
-      } else {
-        totRow.push(roles.reduce((s, r) => s + (r.phaseHours[col.phaseId] || 0), 0));
-      }
-    });
-    const grandH   = roles.reduce((s, r) => s + r.totalH, 0);
-    const grandEur = roles.reduce((s, r) => s + r.totalEur, 0);
-    totRow.push(grandH, grandEur, Math.round(grandEur * hedgeR));
+    const dataEnd = dataStart + roles.length - 1;
+    const totRow  = new Array(totalCols).fill('');
+    totRow[0] = 'TOTAL';
+    for (let c = 2; c < totalCols; c++) {
+      const col = XLSX.utils.encode_col(c);
+      totRow[c] = { t:'n', f:`SUM(${col}${dataStart}:${col}${dataEnd})` };
+    }
     wsData.push(totRow);
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(wsData);
-    ws['!cols'] = [{ wch:30 }, { wch:9 }, ...cols.map(() => ({ wch:8 })), { wch:9 }, { wch:12 }, { wch:12 }];
+    ws['!cols'] = [{ wch:28 }, { wch:9 }, ...months.map(() => ({ wch:8 })), { wch:9 }, { wch:12 }, { wch:12 }];
 
-    // Merge phase group header cells
+    // Merge phase header cells — only over columns exclusively assigned to that phase
     const merges = [];
-    let co = 2;
     phases.forEach(ph => {
-      const pCols = cols.filter(c => c.phaseId === ph.id);
-      if (pCols.length > 1) merges.push({ s:{ r:2, c:co }, e:{ r:2, c:co+pCols.length-1 } });
-      co += pCols.length;
+      if (!(ph.sm > 0 && ph.sy > 0 && ph.em > 0 && ph.ey > 0)) return;
+      let m = ph.sm - 1, y = ph.sy, em0 = ph.em - 1, ey = ph.ey, first = null, last = null;
+      while (y < ey || (y === ey && m <= em0)) {
+        const key = `${y}-${String(m+1).padStart(2,'0')}`;
+        if (monthMap.get(key)?.phaseId === ph.id) {
+          const ci = monthColIdx[key];
+          if (first === null) first = ci;
+          last = ci;
+        }
+        m++; if (m > 11) { m = 0; y++; }
+      }
+      if (first !== null && last !== null && last > first)
+        merges.push({ s:{ r:2, c:first }, e:{ r:2, c:last } });
     });
     if (merges.length) ws['!merges'] = merges;
 
