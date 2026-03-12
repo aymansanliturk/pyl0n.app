@@ -214,16 +214,13 @@
   <!-- Chart info -->
   <div class="section">
     <div class="section-title">Chart Information</div>
-    <div class="fields f2">
-      <label>Chart Title   <input type="text" id="chart-title" value="Project Organisation Chart"
+    <div class="fields f1">
+      <label>Chart Title <input type="text" id="chart-title" value="Project Organisation Chart"
         oninput="SuiteManager.write({ projectName: this.value }, 'orgcast')"></label>
-      <label>Subtitle      <input type="text" id="chart-sub"   value="Bid &amp; Execution Team Structure"></label>
     </div>
-    <div class="fields f3" style="margin-top:12px;">
-      <label>Project Reference <input type="text" id="chart-ref"  value=""
-        oninput="SuiteManager.write({ projectId: this.value }, 'orgcast')"></label>
-      <label>Revision          <input type="text" id="chart-rev"  value="Rev. 1.0"></label>
-      <label>Date              <input type="text" id="chart-date" value=""></label>
+    <div class="fields f2" style="margin-top:12px;">
+      <label>Revision <input type="text" id="chart-rev"  value="Rev. 1.0"></label>
+      <label>Date     <input type="text" id="chart-date" value=""></label>
     </div>
   </div>
 
@@ -692,16 +689,14 @@ function updateLogoUI() {
   // ── Generate ──
   function generate() {
     const title  = document.getElementById('chart-title').value.trim();
-    const sub    = document.getElementById('chart-sub').value.trim();
-    const ref    = document.getElementById('chart-ref').value.trim();
     const rev    = document.getElementById('chart-rev').value.trim();
     const date   = document.getElementById('chart-date').value.trim();
     const people = getPeople();
     const roots  = buildTree(people);
 
     document.getElementById('out-title').textContent = title;
-    document.getElementById('out-sub').textContent   = sub;
-    document.getElementById('out-meta').innerHTML    = `${ref?ref+'<br>':''}${rev}${date?'<br>'+date:''}`;
+    document.getElementById('out-sub').textContent   = '';
+    document.getElementById('out-meta').innerHTML    = `${rev}${date?'<br>'+date:''}`;
 
     renderChart(roots, people);
 
@@ -736,8 +731,6 @@ function updateLogoUI() {
     return {
       version: '1.2', format: currentFormat, compact: compactMode,
       title:  document.getElementById('chart-title').value,
-      sub:    document.getElementById('chart-sub').value,
-      ref:    document.getElementById('chart-ref').value,
       rev:    document.getElementById('chart-rev').value,
       date:   document.getElementById('chart-date').value,
       people: getPeople(),
@@ -786,8 +779,6 @@ function updateLogoUI() {
 
   function applyState(s) {
     document.getElementById('chart-title').value = s.title||'';
-    document.getElementById('chart-sub').value   = s.sub  ||'';
-    document.getElementById('chart-ref').value   = s.ref  ||'';
     document.getElementById('chart-rev').value   = s.rev  ||'';
     document.getElementById('chart-date').value  = s.date ||'';
     if (s.format) setFormat(s.format);
@@ -965,7 +956,6 @@ function suiteWrite() {
     const prev = SuiteManager.read();
     SuiteManager.write({
       projectName: document.getElementById('chart-title')?.value || prev.projectName || '',
-      projectId:   document.getElementById('chart-ref')?.value   || prev.projectId   || '',
       team: team.length ? team : (prev.team || []),
     }, 'orgcast');
     SuiteManager.updateBadge(document.getElementById('suite-sync-badge'));
@@ -975,7 +965,7 @@ function suiteWrite() {
 /**
  * React to sync updates from other tools.
  * - Adds team members from ResourceCast that aren't already present.
- * - Reads projectName/projectId if local fields are empty.
+ * - Writes project name from sync (index page is source of truth).
  */
 function suiteRead(sync) {
   try {
@@ -996,11 +986,10 @@ function suiteRead(sync) {
         }
       });
     }
-    // Populate chart title / ref if currently empty
+    // Always apply project name from sync (index is source of truth)
     const titleEl = document.getElementById('chart-title');
-    const refEl   = document.getElementById('chart-ref');
-    if (titleEl && !titleEl.value.trim() && sync.projectName) titleEl.value = sync.projectName;
-    if (refEl   && !refEl.value.trim()   && sync.projectId)   refEl.value   = sync.projectId;
+    if (titleEl && sync.projectName != null && document.activeElement !== titleEl)
+      titleEl.value = sync.projectName;
     SuiteManager.updateBadge(document.getElementById('suite-sync-badge'));
   } catch(e) {}
 }

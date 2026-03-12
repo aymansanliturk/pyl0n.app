@@ -307,12 +307,10 @@ input:focus, select:focus { border-color:var(--accent); background:#fff; }
 
   <div class="section">
     <div class="section-title">Document Information</div>
-    <div class="fields f2">
+    <div class="fields f1">
       <label>Title <input type="text" id="doc-title" value="Division of Responsibilities" oninput="SuiteManager.write({ projectName: this.value }, 'dorcast')"></label>
-      <label>Subtitle <input type="text" id="doc-sub" value=""></label>
     </div>
-    <div class="fields f3" style="margin-top:12px;">
-      <label>Project Reference <input type="text" id="doc-ref" value="" oninput="SuiteManager.write({ projectId: this.value }, 'dorcast')"></label>
+    <div class="fields f2" style="margin-top:12px;">
       <label>Revision <input type="text" id="doc-rev" value="Rev. 0"></label>
       <label>Date <input type="text" id="doc-date" value=""></label>
     </div>
@@ -429,15 +427,13 @@ function suiteWrite() {
   const prev = SuiteManager.read();
   SuiteManager.write({
     projectName: document.getElementById('doc-title')?.value || prev.projectName || '',
-    projectId:   document.getElementById('doc-ref')?.value   || prev.projectId   || '',
   }, 'dorcast');
 }
 function suiteRead(sync) {
   if (!sync || sync._src === 'dorcast') return;
   const dt = document.getElementById('doc-title');
-  const dr = document.getElementById('doc-ref');
-  if (dt && !dt.value && sync.projectName) dt.value = sync.projectName;
-  if (dr && !dr.value && sync.projectId)   dr.value = sync.projectId;
+  if (dt && sync.projectName != null && document.activeElement !== dt)
+    dt.value = sync.projectName;
   updateLogoUI();
   SuiteManager.updateBadge(document.getElementById('suite-sync-badge'));
 }
@@ -683,8 +679,6 @@ function collectState() {
     version: '1.0',
     format:  currentFormat,
     title:   document.getElementById('doc-title').value,
-    sub:     document.getElementById('doc-sub').value,
-    ref:     document.getElementById('doc-ref').value,
     rev:     document.getElementById('doc-rev').value,
     date:    document.getElementById('doc-date').value,
     parties: getParties(),
@@ -694,8 +688,6 @@ function collectState() {
 
 function applyState(s) {
   document.getElementById('doc-title').value = s.title||'';
-  document.getElementById('doc-sub').value   = s.sub  ||'';
-  document.getElementById('doc-ref').value   = s.ref  ||'';
   document.getElementById('doc-rev').value   = s.rev  ||'';
   document.getElementById('doc-date').value  = s.date ||'';
   if (s.format) setFormat(s.format);
@@ -711,8 +703,8 @@ function applyState(s) {
 function generate() {
   const state = collectState();
   document.getElementById('out-title').textContent = state.title;
-  document.getElementById('out-sub').textContent   = state.sub;
-  document.getElementById('out-meta').innerHTML    = `${state.ref?state.ref+'<br>':''}${state.rev}${state.date?'<br>'+state.date:''}`;
+  document.getElementById('out-sub').textContent   = '';
+  document.getElementById('out-meta').innerHTML    = `${state.rev}${state.date?'<br>'+state.date:''}`;
 
   const table = document.getElementById('out-table');
   const hasComment = state.rows.some(r => r.type==='item' && r.comment);

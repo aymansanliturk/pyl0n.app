@@ -105,8 +105,7 @@
     outline: none; transition: border-color 0.15s;
   }
   .pp-input:focus { border-color: var(--accent); background: #fff; }
-  .pp-input.name  { width: 200px; font-weight: 600; }
-  .pp-input.id    { width: 130px; font-family: 'DM Mono', monospace; font-size: 12px; }
+  .pp-input.name  { width: 260px; font-weight: 600; }
   .pp-sep { width: 1px; height: 26px; background: var(--border); flex-shrink: 0; }
   .pp-logo-wrap { display: flex; align-items: center; gap: 8px; }
   .pp-logo-preview {
@@ -223,7 +222,7 @@
     .cards-wrap { padding: 0 16px 32px; }
     .hero-title { font-size: 36px; }
     .dash-stats { grid-template-columns: 1fr; }
-    .pp-input.name { width: 160px; }
+    .pp-input.name { width: 180px; }
   }
 
   .card {
@@ -310,7 +309,6 @@
       <select id="pp-select" class="pp-select" onchange="ppSelectChange()" title="Switch saved project"></select>
       <div class="pp-sep"></div>
       <input id="pp-name" class="pp-input name" type="text" placeholder="Project name…" title="Project name — syncs to all tools instantly">
-      <input id="pp-id"   class="pp-input id"   type="text" placeholder="ID / Ref…"     title="Project ID or reference number">
       <div class="pp-sep"></div>
       <button class="pp-btn" onclick="ppSave()" title="Save current project">Save</button>
       <button class="pp-btn" onclick="ppNew()"  title="Create new blank project">New</button>
@@ -619,9 +617,7 @@ function ppSelectChange() {
   const proj = ppGetProjects().find(p => p.id === id);
   if (!proj) return;
   const nameEl = document.getElementById('pp-name');
-  const idEl   = document.getElementById('pp-id');
   if (nameEl) nameEl.value = proj.name;
-  if (idEl)   idEl.value   = proj.projectId || '';
   if (proj.syncSnapshot) {
     try {
       const next = { ...proj.syncSnapshot, _ts: Date.now(), _src: 'index' };
@@ -644,13 +640,12 @@ function ppSave() {
   }
   const projects   = ppGetProjects();
   const activeId   = ppGetActiveId();
-  const projectId  = document.getElementById('pp-id')?.value.trim() || '';
   const syncSnapshot = SuiteManager.read();
 
   if (activeId) {
     const idx = projects.findIndex(p => p.id === activeId);
     if (idx >= 0) {
-      projects[idx] = { ...projects[idx], name, projectId, savedAt: Date.now(), syncSnapshot };
+      projects[idx] = { ...projects[idx], name, savedAt: Date.now(), syncSnapshot };
       ppPutProjects(projects);
       ppPopulateSelect();
       ppFlashSync();
@@ -663,7 +658,7 @@ function ppSave() {
     return;
   }
   const id = 'proj_' + Date.now();
-  projects.push({ id, name, projectId, savedAt: Date.now(), syncSnapshot });
+  projects.push({ id, name, savedAt: Date.now(), syncSnapshot });
   ppPutProjects(projects);
   ppSetActiveId(id);
   ppPopulateSelect();
@@ -678,10 +673,8 @@ function ppNew() {
   }
   ppSetActiveId('');
   const nameEl = document.getElementById('pp-name');
-  const idEl   = document.getElementById('pp-id');
   if (nameEl) nameEl.value = '';
-  if (idEl)   idEl.value   = '';
-  SuiteManager.write({ projectName: '', projectId: '', phases: [], team: [] }, 'index');
+  SuiteManager.write({ projectName: '', phases: [], team: [] }, 'index');
   ppPopulateSelect();
   ppFlashSync();
   refreshStats();
@@ -699,9 +692,7 @@ function ppDelete() {
   if (remaining.length) {
     ppSetActiveId(remaining[0].id);
     const nameEl = document.getElementById('pp-name');
-    const idEl   = document.getElementById('pp-id');
     if (nameEl) nameEl.value = remaining[0].name;
-    if (idEl)   idEl.value   = remaining[0].projectId || '';
     if (remaining[0].syncSnapshot) SuiteManager.write(remaining[0].syncSnapshot, 'index');
   } else {
     ppSetActiveId('');
@@ -761,12 +752,6 @@ function ppOnName() {
   ppFlashSync();
 }
 
-function ppOnId() {
-  const v = document.getElementById('pp-id')?.value || '';
-  SuiteManager.write({ projectId: v }, 'index');
-  ppFlashSync();
-}
-
 /* ── Dashboard stats ── */
 function _fmtEUR(n) {
   return '€' + Math.round(n).toLocaleString('de-DE');
@@ -819,9 +804,7 @@ function ppLoad() {
   const activeId = ppGetActiveId();
   const proj     = activeId ? ppGetProjects().find(p => p.id === activeId) : null;
   const nameEl   = document.getElementById('pp-name');
-  const idEl     = document.getElementById('pp-id');
-  if (nameEl) nameEl.value = proj?.name      ?? sync.projectName ?? '';
-  if (idEl)   idEl.value   = proj?.projectId ?? sync.projectId   ?? '';
+  if (nameEl) nameEl.value = proj?.name ?? sync.projectName ?? '';
   ppUpdateLogo();
 }
 
@@ -832,19 +815,14 @@ document.addEventListener('DOMContentLoaded', () => {
   refreshStats();
 
   const nameEl = document.getElementById('pp-name');
-  const idEl   = document.getElementById('pp-id');
   if (nameEl) nameEl.addEventListener('input', ppOnName);
-  if (idEl)   idEl.addEventListener('input',   ppOnId);
 
   /* React to changes made in other tools or tabs. */
   SuiteManager.onUpdate((sync, changedKey) => {
     if (changedKey === 'bidcast_logo') { ppUpdateLogo(); return; }
     const nameInput = document.getElementById('pp-name');
-    const idInput   = document.getElementById('pp-id');
     if (nameInput && document.activeElement !== nameInput && sync.projectName != null)
       nameInput.value = sync.projectName;
-    if (idInput && document.activeElement !== idInput && sync.projectId != null)
-      idInput.value = sync.projectId;
     ppFlashSync();
     refreshStats();
   });

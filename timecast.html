@@ -391,12 +391,9 @@
   <!-- Chart Info -->
   <div class="section">
     <div class="section-title">Chart Information</div>
-    <div class="fields f1" style="gap:10px">
+    <div class="fields f1">
       <label>Chart Title
         <input type="text" id="proj-title" value="" placeholder="Auto-synced with project name">
-      </label>
-      <label>Subtitle
-        <input type="text" id="proj-sub" value="Project Timeline — Phase Schedule Overview">
       </label>
     </div>
     <div class="fields f3" style="margin-top:12px;">
@@ -1358,7 +1355,6 @@ function updateLogoUI() {
       format:       currentFormat,
       projCount:    projIds.length,
       chartTitle:   document.getElementById('proj-title')?.value    || '',
-      chartSubtitle:document.getElementById('proj-sub')?.value      || '',
       status:       document.getElementById('bid-status')?.value    || '',
       statusColor:  document.getElementById('status-color')?.value  || '#2c4e87',
       rev:          document.getElementById('proj-rev')?.value      || '',
@@ -1374,7 +1370,6 @@ function updateLogoUI() {
   function applyState(s) {
     if (s.format) setFormat(s.format);
     if (s.chartTitle)      { const el = document.getElementById('proj-title');   if(el) { el.value = s.chartTitle; el._manuallyEdited = true; } }
-    if (s.chartSubtitle)   { const el = document.getElementById('proj-sub');     if(el) el.value = s.chartSubtitle; }
     if (s.status)          { const el = document.getElementById('bid-status');   if(el) el.value = s.status; }
     if (s.statusColor)     { const el = document.getElementById('status-color'); if(el) el.value = s.statusColor; }
     if (s.rev)             { const el = document.getElementById('proj-rev');     if(el) el.value = s.rev; }
@@ -1583,7 +1578,6 @@ function suiteWrite() {
     const prev = SuiteManager.read();
     SuiteManager.write({
       projectName: proj.title || state.chartTitle || prev.projectName || '',
-      projectId:   state.chartSubtitle            || prev.projectId   || '',
       phases: phases.length ? phases : (prev.phases || []),
     }, 'timecast');
     SuiteManager.updateBadge(document.getElementById('suite-sync-badge'));
@@ -1602,7 +1596,7 @@ function suiteRead(sync) {
       return;
     }
     const titleInp = document.getElementById('proj-title') || document.querySelector('.proj-name-inp');
-    if (sync.projectName && titleInp && !titleInp.value.trim())
+    if (sync.projectName != null && titleInp && document.activeElement !== titleInp)
       titleInp.value = sync.projectName;
     SuiteManager.updateBadge(document.getElementById('suite-sync-badge'));
   } catch(e) {}

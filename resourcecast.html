@@ -297,18 +297,14 @@
         <input type="text" id="proj-name" placeholder="e.g. Offshore Substation — Package 3"
           oninput="SuiteManager.write({ projectName: this.value }, 'resourcecast')">
       </label>
-      <label>Project ID / Reference
-        <input type="text" id="proj-id" placeholder="e.g. PRJ-2025-042"
-          oninput="SuiteManager.write({ projectId: this.value }, 'resourcecast')">
-      </label>
       <label>Revision
         <input type="text" id="proj-rev" value="Rev. 1.0">
       </label>
-    </div>
-    <div class="fields f5" style="margin-top:12px;">
       <label>Date
         <input type="text" id="proj-date" placeholder="06 Mar 2026" oninput="this.style.outline=(!this.value||/^\d{1,2}\s+[A-Za-z]{3}\s+\d{4}$/.test(this.value.trim()))?'':'2px solid #c0392b'">
       </label>
+    </div>
+    <div style="margin-top:12px;">
       <div style="display:flex;flex-direction:column;gap:5px;">
         <span style="font-size:11px;font-weight:500;color:var(--muted);">Page Format</span>
         <div style="display:flex;gap:6px;margin-top:2px;">
@@ -316,7 +312,6 @@
           <button class="format-btn active" onclick="setFormat('A3')" data-fmt="A3">A3</button>
         </div>
       </div>
-      <div></div>
     </div>
   </div>
 
@@ -1089,7 +1084,6 @@ function updateLogoUI() {
 
   function generate() {
     const projName = document.getElementById('proj-name').value.trim();
-    const projId   = document.getElementById('proj-id').value.trim();
     const rev      = document.getElementById('proj-rev').value.trim();
     const date     = document.getElementById('proj-date').value.trim();
     const phases   = getPhases();
@@ -1108,7 +1102,7 @@ function updateLogoUI() {
 
     // Header
     document.getElementById('out-title').textContent = projName || 'Resource Cost Breakdown';
-    document.getElementById('out-sub').textContent   = projId ? `Project: ${projId}` : '';
+    document.getElementById('out-sub').textContent   = '';
     document.getElementById('out-meta').innerHTML =
       `${rev ? `<strong>${rev}</strong><br>` : ''}${date||''}`;
     document.getElementById('out-hedge').textContent = '';
@@ -1304,9 +1298,7 @@ function updateLogoUI() {
       version: '2.0', format: currentFormat,
       phaseCollapsed,
       projName:  document.getElementById('proj-name').value,
-      projId:    document.getElementById('proj-id').value,
       rev:       document.getElementById('proj-rev').value,
-      projSub:   document.getElementById('proj-id').value, // alias
       projDate:  document.getElementById('proj-date').value,
       date:      document.getElementById('proj-date').value,
       idxRate:   parseFloat(document.getElementById('idx-rate').value) || 0,
@@ -1318,7 +1310,6 @@ function updateLogoUI() {
     if (s.format) setFormat(s.format);
     phaseCollapsed = s.phaseCollapsed || {};
     document.getElementById('proj-name').value  = s.projName  || '';
-    document.getElementById('proj-id').value    = s.projId    || '';
     document.getElementById('proj-rev').value   = s.rev       || '';
     document.getElementById('proj-date').value  = s.date || s.projDate || '';
     document.getElementById('idx-rate').value = s.idxRate || 0;
@@ -1784,7 +1775,6 @@ function suiteWrite() {
     const prev = SuiteManager.read();
     SuiteManager.write({
       projectName: state.projName || prev.projectName || '',
-      projectId:   state.projId   || prev.projectId   || '',
       team: team.length ? team : (prev.team || []),
     }, 'resourcecast');
     SuiteManager.updateBadge(document.getElementById('suite-sync-badge'));
@@ -1794,7 +1784,7 @@ function suiteWrite() {
 /**
  * React to sync updates from other tools.
  * - Applies phases from Timecast into the phase chips.
- * - Reads projectName/projectId if local fields are empty.
+ * - Writes project name from sync (index page is source of truth).
  */
 function suiteRead(sync) {
   try {
@@ -1810,11 +1800,10 @@ function suiteRead(sync) {
       });
       rebuildMonthlyGrid();
     }
-    // Populate project name / ID if currently empty
+    // Always apply project name from sync (index is source of truth)
     const nameEl = document.getElementById('proj-name');
-    const idEl   = document.getElementById('proj-id');
-    if (nameEl && !nameEl.value.trim() && sync.projectName) nameEl.value = sync.projectName;
-    if (idEl   && !idEl.value.trim()   && sync.projectId)   idEl.value   = sync.projectId;
+    if (nameEl && sync.projectName != null && document.activeElement !== nameEl)
+      nameEl.value = sync.projectName;
     SuiteManager.updateBadge(document.getElementById('suite-sync-badge'));
   } catch(e) {}
 }

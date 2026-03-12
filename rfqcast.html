@@ -292,9 +292,8 @@ input:focus, select:focus { border-color:var(--accent); background:#fff; }
 
   <div class="section">
     <div class="section-title">Project Information</div>
-    <div class="fields f2">
+    <div class="fields f1">
       <label>Project Name <input type="text" id="proj-name" value="" placeholder="e.g. Bidstrup 132kV Substation" oninput="SuiteManager.write({ projectName: this.value }, 'rfqcast')"></label>
-      <label>Project ID / SF Reference <input type="text" id="proj-id" value="" placeholder="e.g. SE-DK-2026-001" oninput="SuiteManager.write({ projectId: this.value }, 'rfqcast')"></label>
     </div>
     <div class="fields f4" style="margin-top:12px;">
       <label>Offer Due Date <input type="date" id="offer-due"></label>
@@ -439,15 +438,13 @@ function suiteWrite() {
   const prev = SuiteManager.read();
   SuiteManager.write({
     projectName: document.getElementById('proj-name')?.value || prev.projectName || '',
-    projectId:   document.getElementById('proj-id')?.value   || prev.projectId   || '',
   }, 'rfqcast');
 }
 function suiteRead(sync) {
   if (!sync || sync._src === 'rfqcast') return;
   const pn = document.getElementById('proj-name');
-  const pi = document.getElementById('proj-id');
-  if (pn && !pn.value && sync.projectName) pn.value = sync.projectName;
-  if (pi && !pi.value && sync.projectId)   pi.value = sync.projectId;
+  if (pn && sync.projectName != null && document.activeElement !== pn)
+    pn.value = sync.projectName;
   updateLogoUI();
   SuiteManager.updateBadge(document.getElementById('suite-sync-badge'));
 }
@@ -890,7 +887,6 @@ function collectState() {
     version:  '1.2',
     format:   currentFormat,
     projName: document.getElementById('proj-name').value,
-    projId:   document.getElementById('proj-id').value,
     offerDue: document.getElementById('offer-due').value,
     validityMonths: document.getElementById('validity-months').value,
     rev:      document.getElementById('doc-rev').value,
@@ -902,7 +898,6 @@ function collectState() {
 
 function applyState(s) {
   document.getElementById('proj-name').value       = s.projName || '';
-  document.getElementById('proj-id').value         = s.projId   || '';
   document.getElementById('offer-due').value       = s.offerDue || '';
   document.getElementById('validity-months').value = s.validityMonths || '3';
   document.getElementById('doc-rev').value         = s.rev  || '';
@@ -937,7 +932,7 @@ function generate() {
   const requiredMonths = parseInt(state.validityMonths) || 3;
 
   document.getElementById('out-title').textContent = state.projName || 'Supplier RFQ Overview';
-  document.getElementById('out-sub').textContent   = state.projId   || '';
+  document.getElementById('out-sub').textContent   = '';
   document.getElementById('out-meta').innerHTML    =
     `${state.offerDue ? 'Offer Due: ' + state.offerDue + '<br>' : ''}Validity: ${requiredMonths} months<br>${state.rev}${state.date ? '<br>'+state.date : ''}`;
 
@@ -1231,7 +1226,7 @@ function exportExcel() {
   const wb=XLSX.utils.book_new();
   const wsData=[];
   wsData.push([state.projName, '', 'Offer Due Date:', state.offerDue]);
-  wsData.push([state.projId,   '', 'Validity Required (Months):', state.validityMonths]);
+  wsData.push(['', '', 'Validity Required (Months):', state.validityMonths]);
   wsData.push([]);
   wsData.push(['Type','Description','Qty','Tech Resp.','Proc Resp.','RFQ Doc','',
     'In House','External','Detailed Design','Transport','Installation','Commissioning','',
