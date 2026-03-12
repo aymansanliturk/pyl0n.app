@@ -1309,7 +1309,7 @@ function suiteWrite() {
       if (t.type === 'bar' && t.name && !seen.has(t.name)) {
         seen.add(t.name);
         phases.push({ id: 'tc_' + phases.length, name: t.name,
-          sm: t.sm, sy: t.sy, em: t.em, ey: t.ey });
+          sm: t.sm + 1, sy: t.sy, em: t.em + 1, ey: t.ey });
       }
     });
     // Sort chronologically by start year then month
