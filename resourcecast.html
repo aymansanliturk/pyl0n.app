@@ -565,7 +565,8 @@ function updateLogoUI() {
   }
 
   // ── Phase collapse state ──
-  let phaseCollapsed = {}; // phaseId (string) → boolean
+  let phaseCollapsed  = {}; // phaseId (string) → boolean
+  let _applyingState  = false; // suppresses rebuildMonthlyGrid during bulk applyState
 
   function togglePhase(phaseId) {
     const pid = String(phaseId);
@@ -575,14 +576,16 @@ function updateLogoUI() {
       const ph = getPhases().find(p => p.id === pid);
       if (ph && ph.sm > 0 && ph.sy > 0) {
         document.querySelectorAll('.role-row').forEach(tr => {
-          const mh = _getRowMonthHours(tr);
+          // Snapshot all current hours (DOM + prior stored) before the grid is rebuilt
+          const snapshot = _getRowMonthHours(tr);
+          tr.dataset.fullMonthHours = JSON.stringify(snapshot);
+          // Compute phase aggregate for the collapsed agg cell
           let sum = 0;
           let m = ph.sm - 1, y = ph.sy, em0 = ph.em - 1, ey = ph.ey;
           while (y < ey || (y === ey && m <= em0)) {
-            sum += mh[`${y}-${String(m+1).padStart(2,'0')}`] || 0;
+            sum += snapshot[`${y}-${String(m+1).padStart(2,'0')}`] || 0;
             m++; if (m > 11) { m = 0; y++; }
           }
-          // Store in a dataset attribute for transfer
           tr.dataset['agg_' + pid] = sum;
         });
       }
@@ -615,10 +618,13 @@ function updateLogoUI() {
   }
 
   function _getRowMonthHours(tr) {
-    const h = {};
+    // Seed with stored snapshot — preserves data for currently-collapsed phases
+    const h = Object.assign({}, JSON.parse(tr.dataset.fullMonthHours || '{}'));
+    // Override with live DOM values (always authoritative for visible columns)
     tr.querySelectorAll('.month-inp').forEach(inp => {
       const v = parseFloat(inp.value) || 0;
       if (v) h[inp.dataset.key] = v;
+      else delete h[inp.dataset.key];
     });
     return h;
   }
@@ -677,6 +683,7 @@ function updateLogoUI() {
 
   // ── Monthly Grid Rebuild ──
   function rebuildMonthlyGrid() {
+    if (_applyingState) return; // deferred until applyState finishes all phases
     const phases = getPhases();
     const cols   = _buildCols(phases);
 
@@ -785,7 +792,22 @@ function updateLogoUI() {
     const monthCells = cols.map(col => {
       const pi    = phases.findIndex(p => p.id === col.phaseId);
       const color = PHASE_COLORS[pi % PHASE_COLORS.length];
-      const v     = monthHours[col.key] != null ? monthHours[col.key] : '';
+      // For collapsed-phase (agg) columns: if no explicit agg key is stored, sum the
+      // individual monthly hours so the cell is correct even on first collapse or reload.
+      let v;
+      if (col.type === 'agg' && col.hasDates && monthHours[col.key] == null) {
+        const ph2 = phases.find(p => p.id === col.phaseId);
+        if (ph2 && ph2.sm > 0 && ph2.sy > 0) {
+          let sum = 0, m2 = ph2.sm - 1, y2 = ph2.sy, em2 = ph2.em - 1, ey2 = ph2.ey;
+          while (y2 < ey2 || (y2 === ey2 && m2 <= em2)) {
+            sum += monthHours[`${y2}-${String(m2+1).padStart(2,'0')}`] || 0;
+            m2++; if (m2 > 11) { m2 = 0; y2++; }
+          }
+          v = sum || '';
+        } else { v = ''; }
+      } else {
+        v = monthHours[col.key] != null ? monthHours[col.key] : '';
+      }
       const borderStyle = col.type === 'agg'
         ? `border-left:2px solid ${color}44;`
         : `border-left:1px solid ${color}11;`;
@@ -808,6 +830,8 @@ function updateLogoUI() {
 
     const tbody = document.getElementById('res-tbody');
     tbody.appendChild(tr);
+    // Persist the full monthHours map so collapsed-phase data survives save/rebuild cycles
+    tr.dataset.fullMonthHours = JSON.stringify(monthHours);
 
     tr.addEventListener('dragstart', e => { roleDragSrc=tr; tr.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; });
     tr.addEventListener('dragend',   () => { roleDragSrc=null; document.querySelectorAll('.role-row').forEach(r=>r.classList.remove('dragging','drag-over')); });
@@ -1314,12 +1338,18 @@ function updateLogoUI() {
     document.getElementById('proj-date').value  = s.date || s.projDate || '';
     document.getElementById('idx-rate').value = s.idxRate || 0;
 
+    // Build all phase chips without triggering a grid rebuild on each addition.
+    // One clean rebuild is performed afterwards so the full column structure is
+    // in place before any role data is injected (prevents column/data mismatch).
     document.getElementById('phases-wrap').innerHTML = '';
     phaseCount = 0;
+    _applyingState = true;
     (s.phases||[]).forEach(p => addPhase(p));
+    _applyingState = false;
 
     document.getElementById('res-tbody').innerHTML = '';
     roleCount = 0;
+    rebuildMonthlyGrid(); // one authoritative rebuild: header + empty tbody
     (s.roles||[]).forEach(r => addRole(r));
 
     document.getElementById('exp-tbody').innerHTML = '';
