@@ -337,7 +337,6 @@
     .no-print           { display: none !important; }
     .reorder-sidebar    { display: none !important; }
     .sidebar-actions    { display: none !important; }
-    #time-window-ctrl   { display: none !important; }
     /* Chart area fills 100% once sidebar is gone */
     .chart-area         { width: 100% !important; padding: 0 !important; }
     .gantt-outer        { page-break-inside: avoid; }
@@ -1062,10 +1061,7 @@ function updateLogoUI() {
     const bands  = yearBands(months);
     const now    = new Date();
     const todayIdx   = showToday ? months.findIndex(mo => mo.m===now.getMonth() && mo.y===now.getFullYear()) : -1;
-    // Keep the time-window slider in sync with the actual number of visible months
-    { const sl = document.getElementById('window-slider'), lb = document.getElementById('window-label');
-      if (sl) { sl.value = n; sl.min = 3; sl.max = 48; }
-      if (lb)   lb.textContent = n + ' month' + (n !== 1 ? 's' : ''); }
+    _syncWindowSlider(n);
     const multiProj  = projects.length > 1;
     const allTasks   = projects.flatMap(p => [...p.bidTasks, ...p.execTasks]);
     const hasNotes   = allTasks.some(t => t.notes);
@@ -1149,16 +1145,7 @@ function updateLogoUI() {
           cell.dataset.col  = c;
           if (c===todayIdx) cell.appendChild(el('div','today-marker'));
           if (t.type==='milestone') {
-            if (c===si) {
-              const d=el('div','milestone'); d.style.background=t.color;
-              // Allow dragging the milestone diamond to a new month
-              d.addEventListener('mousedown', ev => {
-                if (ev.button !== 0) return;
-                ev.preventDefault(); ev.stopPropagation();
-                _ganttDragStart(ev, projIdx, lane, i, 'move');
-              });
-              cell.appendChild(d);
-            }
+            if (c===si) cell.appendChild(_makeMilestoneDot(t, projIdx, lane, i));
           } else {
             if (useB && bsi!==-1 && bei!==-1 && c>=bsi && c<=bei) {
               let p='m'; if(bsi===bei)p='solo'; else if(c===bsi)p='s'; else if(c===bei)p='e';
@@ -1167,34 +1154,7 @@ function updateLogoUI() {
             if (si!==-1 && ei!==-1 && c>=si && c<=ei) {
               const cls=useB?'bar-current':'bar';
               let p='m'; if(si===ei)p='solo'; else if(c===si)p='s'; else if(c===ei)p='e';
-              const bar=el('div',`${cls} ${p}`); bar.style.background=t.color;
-              // Mousedown on bar body = drag entire bar to a new position
-              bar.addEventListener('mousedown', ev => {
-                if (ev.button !== 0 || ev.target.closest('.bar-handle')) return;
-                ev.preventDefault(); ev.stopPropagation();
-                _ganttDragStart(ev, projIdx, lane, i, 'move');
-              });
-              // Start handle
-              if (c===si) {
-                const hs = document.createElement('span');
-                hs.className = 'bar-handle bar-handle-s';
-                hs.addEventListener('mousedown', ev => {
-                  ev.preventDefault(); ev.stopPropagation();
-                  _ganttDragStart(ev, projIdx, lane, i, 'start');
-                });
-                bar.appendChild(hs);
-              }
-              // End handle
-              if (c===ei) {
-                const he = document.createElement('span');
-                he.className = 'bar-handle bar-handle-e';
-                he.addEventListener('mousedown', ev => {
-                  ev.preventDefault(); ev.stopPropagation();
-                  _ganttDragStart(ev, projIdx, lane, i, 'end');
-                });
-                bar.appendChild(he);
-              }
-              cell.appendChild(bar);
+              cell.appendChild(_makeBarSegment(t, cls, p, projIdx, lane, i, c, si, ei));
             }
           }
           gantt.appendChild(cell);
@@ -1252,6 +1212,51 @@ function updateLogoUI() {
   ═══════════════════════════════════════════════════════════════ */
   let _gDrag = null; // active drag state
 
+  // ── Bar / milestone element factories ────────────────────────────────────
+  // Create a draggable milestone diamond element.
+  function _makeMilestoneDot(task, projIdx, lane, idx) {
+    const d = document.createElement('div');
+    d.className = 'milestone';
+    d.style.background = task.color;
+    d.addEventListener('mousedown', ev => {
+      if (ev.button !== 0) return;
+      ev.preventDefault(); ev.stopPropagation();
+      _ganttDragStart(ev, projIdx, lane, idx, 'move');
+    });
+    return d;
+  }
+
+  // Create a bar segment element with optional start/end resize handles.
+  function _makeBarSegment(task, cls, p, projIdx, lane, idx, c, si, ei) {
+    const bar = document.createElement('div');
+    bar.className = `${cls} ${p}`;
+    bar.style.background = task.color;
+    bar.addEventListener('mousedown', ev => {
+      if (ev.button !== 0 || ev.target.closest('.bar-handle')) return;
+      ev.preventDefault(); ev.stopPropagation();
+      _ganttDragStart(ev, projIdx, lane, idx, 'move');
+    });
+    if (c === si) {
+      const hs = document.createElement('span');
+      hs.className = 'bar-handle bar-handle-s';
+      hs.addEventListener('mousedown', ev => {
+        ev.preventDefault(); ev.stopPropagation();
+        _ganttDragStart(ev, projIdx, lane, idx, 'start');
+      });
+      bar.appendChild(hs);
+    }
+    if (c === ei) {
+      const he = document.createElement('span');
+      he.className = 'bar-handle bar-handle-e';
+      he.addEventListener('mousedown', ev => {
+        ev.preventDefault(); ev.stopPropagation();
+        _ganttDragStart(ev, projIdx, lane, idx, 'end');
+      });
+      bar.appendChild(he);
+    }
+    return bar;
+  }
+
   // Map a clientX coordinate to a month column index in the gantt grid.
   function _colFromMouseX(clientX) {
     const ganttEl = document.getElementById('gantt');
@@ -1276,17 +1281,13 @@ function updateLogoUI() {
     // Milestones only support 'move'; edge handles are for tasks only
     if (task.type === 'milestone' && edge !== 'move') return;
 
-    const months  = buildMonths(chartState.sm, chartState.sy, chartState.em, chartState.ey);
-    const origSi  = colOf(months, task.sm, task.sy);
-    const origEi  = colOf(months, task.em, task.ey);
+    const months   = buildMonths(chartState.sm, chartState.sy, chartState.em, chartState.ey);
+    const origSi   = colOf(months, task.sm, task.sy);
+    const origEi   = colOf(months, task.em, task.ey);
     const startCol = _colFromMouseX(ev.clientX);
 
-    _gDrag = {
-      projIdx, lane, taskIdx, edge, lastCol: -1,
-      origSm: task.sm, origSy: task.sy,
-      origEm: task.em, origEy: task.ey,
-      origSi, origEi, startCol
-    };
+    // Cache months array so _ganttDragMove / _refreshTaskBars don't rebuild it per event.
+    _gDrag = { projIdx, lane, taskIdx, edge, lastCol: -1, origSi, origEi, startCol, months };
     document.getElementById('gantt-outer')?.classList.add('gantt-dragging');
     document.addEventListener('mousemove', _ganttDragMove);
     document.addEventListener('mouseup',   _ganttDragEnd, { once: true });
@@ -1299,7 +1300,7 @@ function updateLogoUI() {
     if (colIdx < 0 || colIdx === _gDrag.lastCol) return;
     _gDrag.lastCol = colIdx;
 
-    const months = buildMonths(chartState.sm, chartState.sy, chartState.em, chartState.ey);
+    const months = _gDrag.months; // cached at drag-start; no rebuild per event
     const tasks  = lane === 'bid'
       ? chartState.projects[projIdx].bidTasks
       : chartState.projects[projIdx].execTasks;
@@ -1372,7 +1373,8 @@ function updateLogoUI() {
       ? chartState.projects[projIdx].bidTasks
       : chartState.projects[projIdx].execTasks;
     const task   = tasks[taskIdx];
-    const months = buildMonths(chartState.sm, chartState.sy, chartState.em, chartState.ey);
+    // Reuse cached months from drag state if available (avoids rebuild during mousemove).
+    const months = (_gDrag && _gDrag.months) || buildMonths(chartState.sm, chartState.sy, chartState.em, chartState.ey);
     const si = colOf(months, task.sm, task.sy);
     const ei = colOf(months, task.em, task.ey);
     const useB = !!task.baseline;
@@ -1383,53 +1385,15 @@ function updateLogoUI() {
     cells.forEach(cell => {
       const c = parseInt(cell.dataset.col);
       if (task.type === 'milestone') {
-        // For milestones: move the diamond to the new column
         cell.querySelectorAll('.milestone').forEach(m => m.remove());
-        if (c === si) {
-          const d = document.createElement('div');
-          d.className = 'milestone';
-          d.style.background = task.color;
-          d.addEventListener('mousedown', ev => {
-            if (ev.button !== 0) return;
-            ev.preventDefault(); ev.stopPropagation();
-            _ganttDragStart(ev, projIdx, lane, taskIdx, 'move');
-          });
-          cell.appendChild(d);
-        }
+        if (c === si) cell.appendChild(_makeMilestoneDot(task, projIdx, lane, taskIdx));
       } else {
-        // Remove only current/bar elements; keep today-marker and baseline bars
         cell.querySelectorAll('.bar, .bar-current').forEach(b => b.remove());
         if (si !== -1 && ei !== -1 && c >= si && c <= ei) {
           const cls = useB ? 'bar-current' : 'bar';
           let p = 'm';
           if (si === ei) p = 'solo'; else if (c === si) p = 's'; else if (c === ei) p = 'e';
-          const bar = document.createElement('div');
-          bar.className = `${cls} ${p}`;
-          bar.style.background = task.color;
-          bar.addEventListener('mousedown', ev => {
-            if (ev.button !== 0 || ev.target.closest('.bar-handle')) return;
-            ev.preventDefault(); ev.stopPropagation();
-            _ganttDragStart(ev, projIdx, lane, taskIdx, 'move');
-          });
-          if (c === si) {
-            const hs = document.createElement('span');
-            hs.className = 'bar-handle bar-handle-s';
-            hs.addEventListener('mousedown', ev => {
-              ev.preventDefault(); ev.stopPropagation();
-              _ganttDragStart(ev, projIdx, lane, taskIdx, 'start');
-            });
-            bar.appendChild(hs);
-          }
-          if (c === ei) {
-            const he = document.createElement('span');
-            he.className = 'bar-handle bar-handle-e';
-            he.addEventListener('mousedown', ev => {
-              ev.preventDefault(); ev.stopPropagation();
-              _ganttDragStart(ev, projIdx, lane, taskIdx, 'end');
-            });
-            bar.appendChild(he);
-          }
-          cell.appendChild(bar);
+          cell.appendChild(_makeBarSegment(task, cls, p, projIdx, lane, taskIdx, c, si, ei));
         }
       }
     });
@@ -1460,6 +1424,14 @@ function updateLogoUI() {
   }
 
   // ── Dynamic time-window controls ──────────────────────────────────────────
+  // Keep the slider and label in sync with the rendered month count.
+  function _syncWindowSlider(n) {
+    const sl = document.getElementById('window-slider');
+    const lb = document.getElementById('window-label');
+    if (sl) { sl.value = n; sl.min = 3; sl.max = 48; }
+    if (lb) lb.textContent = n + ' month' + (n !== 1 ? 's' : '');
+  }
+
   // Shift the visible window forward or back by `delta` months.
   function _shiftWindow(delta) {
     if (!chartState) return;
@@ -1476,6 +1448,8 @@ function updateLogoUI() {
   function _resizeWindow(nMonths) {
     if (!chartState) return;
     nMonths = Math.max(3, Math.min(48, nMonths));
+    const cur = chartState.ey * 12 + chartState.em - (chartState.sy * 12 + chartState.sm) + 1;
+    if (nMonths === cur) return; // no change, skip re-render
     const endTotal   = chartState.sy * 12 + chartState.sm + nMonths - 1;
     chartState.em    = ((endTotal % 12) + 12) % 12;
     chartState.ey    = Math.floor(endTotal / 12);
@@ -1705,7 +1679,7 @@ function updateLogoUI() {
           // Remove every interactive / non-data element from the cloned DOM
           d.querySelectorAll(
             '.no-print, .print-bar, .persist-bar, .suite-nav, .config-bar, ' +
-            '.reorder-sidebar, .sidebar-actions, #time-window-ctrl'
+            '.reorder-sidebar, .sidebar-actions'
           ).forEach(el => el.remove());
           // Rebalance layout: make the chart fill the full page width
           const shell = d.querySelector('.output-shell');
