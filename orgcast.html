@@ -12,7 +12,7 @@
   :root {
     --bg:      #f5f4f0; --surface: #ffffff; --border: #e0ddd6;
     --text:    #1a1916; --muted:   #6b6860; --faint:  #a8a49e;
-    --accent:  #2c4e87; --accent2: #1e3a6b; --brand:  #2c4e87; --green: #107c41;
+    --accent:  #2c4e87; --accent2: #1e3a6b; --brand:  #2c4e87; --green: #107c41; --red: #c0392b;
   }
   body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; -webkit-font-smoothing:antialiased; }
 
@@ -95,6 +95,10 @@
   .btn-generate:hover { background:var(--accent2); }
   .btn-secondary { background:var(--surface); color:var(--muted); border:1px solid var(--border); border-radius:7px; padding:12px 18px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:500; cursor:pointer; transition:all 0.15s; }
   .btn-secondary:hover { border-color:var(--text); color:var(--text); }
+  .btn-primary { font-family:'DM Sans',sans-serif; background:var(--accent); color:#fff; border:none; border-radius:7px; padding:9px 20px; font-size:13px; font-weight:600; cursor:pointer; transition:background 0.15s; }
+  .btn-primary:hover { background:var(--accent2); }
+  .btn-green   { font-family:'DM Sans',sans-serif; background:var(--green); color:#fff; border:none; border-radius:7px; padding:9px 20px; font-size:13px; font-weight:600; cursor:pointer; transition:filter 0.15s; }
+  .btn-green:hover { filter:brightness(0.9); }
 
   /* ── OUTPUT ── */
   #output { display:none; padding:28px 36px; }
@@ -214,11 +218,11 @@
   <!-- Chart info -->
   <div class="section">
     <div class="section-title">Chart Information</div>
-    <div class="fields f1">
-      <label>Chart Title <input type="text" id="chart-title" value="Project Organisation Chart"
-        oninput="const _v=this.value.trim();if(_v&&_v!=='Project Name'&&_v!=='Project Organisation Chart')SuiteManager.write({projectName:_v},'orgcast')"></label>
-    </div>
-    <div class="fields f2" style="margin-top:12px;">
+    <div class="fields f3">
+      <label>Chart Title
+        <input type="text" id="chart-title" value="Project Organisation Chart"
+          oninput="const _v=this.value.trim();if(_v&&_v!=='Project Name'&&_v!=='Project Organisation Chart')SuiteManager.write({projectName:_v},'orgcast')">
+      </label>
       <label>Revision <input type="text" id="chart-rev"  value="Rev. 1.0"></label>
       <label>Date     <input type="text" id="chart-date" value=""></label>
     </div>

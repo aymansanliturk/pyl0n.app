@@ -23,6 +23,8 @@
     --today:    #e05555;
     --exec-hdr: #3a7a52;
     --brand:    #2c4e87;
+    --green:    #107c41;
+    --red:      #c0392b;
   }
 
   body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; -webkit-font-smoothing: antialiased; }
@@ -152,6 +154,10 @@
   .btn-generate:hover { background: var(--accent2); }
   .btn-secondary { background: var(--surface); color: var(--muted); border: 1px solid var(--border); border-radius: 7px; padding: 12px 18px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
   .btn-secondary:hover { border-color: var(--text); color: var(--text); }
+  .btn-primary { font-family:'DM Sans',sans-serif; background:var(--accent); color:#fff; border:none; border-radius:7px; padding:9px 20px; font-size:13px; font-weight:600; cursor:pointer; transition:background 0.15s; }
+  .btn-primary:hover { background:var(--accent2); }
+  .btn-green   { font-family:'DM Sans',sans-serif; background:var(--green); color:#fff; border:none; border-radius:7px; padding:9px 20px; font-size:13px; font-weight:600; cursor:pointer; transition:filter 0.15s; }
+  .btn-green:hover { filter:brightness(0.9); }
 
   /* ══════════════════════════════════════
      OUTPUT
@@ -279,6 +285,9 @@
   .bar-handle-e::after { box-shadow: -3px 0 0 rgba(255,255,255,0.85); }
   .bar:hover .bar-handle,
   .bar-current:hover .bar-handle { opacity: 1; }
+  /* Allow bar body + milestones to be grabbed for full-bar move */
+  .bar, .bar-current { cursor: grab; }
+  .milestone { cursor: grab; }
   .gantt-outer.gantt-dragging,
   .gantt-outer.gantt-dragging * { cursor: ew-resize !important; user-select: none !important; }
   /* Drag tooltip */
@@ -298,6 +307,21 @@
   .today-legend { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--today); font-weight: 500; }
   .today-line-legend { width: 2px; height: 12px; background: var(--today); border-radius: 1px; }
 
+  /* Dynamic time-window control bar (below legend, hidden on print) */
+  .time-window-ctrl {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin-top: 12px; padding: 8px 14px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 7px;
+  }
+  .tw-btn {
+    padding: 4px 10px; border: 1.5px solid var(--border); border-radius: 5px;
+    background: none; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    font-size: 11px; font-weight: 600; color: var(--muted); transition: all 0.12s;
+  }
+  .tw-btn:hover { border-color: var(--accent); color: var(--accent); }
+  #window-slider { flex: 1; min-width: 100px; max-width: 200px; accent-color: var(--accent); cursor: pointer; }
+  #window-label  { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--faint); min-width: 66px; text-align: right; }
+
   /* Watermark on printed chart */
   .chart-watermark {
     text-align: right; margin-top: 10px;
@@ -306,12 +330,13 @@
   }
 
   @media print {
-    #editor          { display: none !important; }
-    #output          { display: block !important; }
-    .output-shell    { display: block; }
-    .reorder-sidebar { display: none !important; }
-    .chart-area      { padding: 0; }
-    .sidebar-actions { display: none !important; }
+    #editor             { display: none !important; }
+    #output             { display: block !important; }
+    .output-shell       { display: block; }
+    .reorder-sidebar    { display: none !important; }
+    .chart-area         { padding: 0; }
+    .sidebar-actions    { display: none !important; }
+    #time-window-ctrl   { display: none !important; }
     body { background: #fff; }
   }
 </style>
@@ -396,8 +421,7 @@
         <input type="text" id="proj-title" value="" placeholder="Auto-synced with project name">
       </label>
     </div>
-    <div class="fields f3" style="margin-top:12px;">
-
+    <div class="fields f4" style="margin-top:12px;">
       <label>Bid Status
         <input type="text" id="bid-status" value="ITB Received" placeholder="e.g. Awarded">
       </label>
@@ -406,6 +430,9 @@
       </label>
       <label>Revision
         <input type="text" id="proj-rev" value="Rev. 1.0">
+      </label>
+      <label>Date
+        <input type="text" id="proj-date" placeholder="e.g. 2025-06-01">
       </label>
     </div>
   </div>
@@ -489,6 +516,17 @@
       </div>
       <div id="gantt-drag-tip"></div>
       <div class="legend" id="legend"></div>
+      <!-- Dynamic time-window control: shift or resize the visible date range -->
+      <div id="time-window-ctrl" class="time-window-ctrl no-print">
+        <span style="font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--faint);flex-shrink:0;">Visible Window</span>
+        <button class="tw-btn" onclick="_shiftWindow(-3)" title="Shift window 3 months earlier">← 3m</button>
+        <button class="tw-btn" onclick="_shiftWindow(-1)" title="Shift window 1 month earlier">← 1m</button>
+        <input type="range" id="window-slider" min="3" max="48" value="12" step="1"
+               oninput="_resizeWindow(parseInt(this.value))" title="Drag to resize visible window (months)">
+        <span id="window-label">12 months</span>
+        <button class="tw-btn" onclick="_shiftWindow(1)" title="Shift window 1 month later">1m →</button>
+        <button class="tw-btn" onclick="_shiftWindow(3)" title="Shift window 3 months later">3m →</button>
+      </div>
       <div class="chart-watermark">Generated with Timecast · Bid Timeline Intelligence</div>
     </div>
 
@@ -1020,6 +1058,10 @@ function updateLogoUI() {
     const bands  = yearBands(months);
     const now    = new Date();
     const todayIdx   = showToday ? months.findIndex(mo => mo.m===now.getMonth() && mo.y===now.getFullYear()) : -1;
+    // Keep the time-window slider in sync with the actual number of visible months
+    { const sl = document.getElementById('window-slider'), lb = document.getElementById('window-label');
+      if (sl) { sl.value = n; sl.min = 3; sl.max = 48; }
+      if (lb)   lb.textContent = n + ' month' + (n !== 1 ? 's' : ''); }
     const multiProj  = projects.length > 1;
     const allTasks   = projects.flatMap(p => [...p.bidTasks, ...p.execTasks]);
     const hasNotes   = allTasks.some(t => t.notes);
@@ -1103,7 +1145,16 @@ function updateLogoUI() {
           cell.dataset.col  = c;
           if (c===todayIdx) cell.appendChild(el('div','today-marker'));
           if (t.type==='milestone') {
-            if (c===si) { const d=el('div','milestone'); d.style.background=t.color; cell.appendChild(d); }
+            if (c===si) {
+              const d=el('div','milestone'); d.style.background=t.color;
+              // Allow dragging the milestone diamond to a new month
+              d.addEventListener('mousedown', ev => {
+                if (ev.button !== 0) return;
+                ev.preventDefault(); ev.stopPropagation();
+                _ganttDragStart(ev, projIdx, lane, i, 'move');
+              });
+              cell.appendChild(d);
+            }
           } else {
             if (useB && bsi!==-1 && bei!==-1 && c>=bsi && c<=bei) {
               let p='m'; if(bsi===bei)p='solo'; else if(c===bsi)p='s'; else if(c===bei)p='e';
@@ -1113,6 +1164,12 @@ function updateLogoUI() {
               const cls=useB?'bar-current':'bar';
               let p='m'; if(si===ei)p='solo'; else if(c===si)p='s'; else if(c===ei)p='e';
               const bar=el('div',`${cls} ${p}`); bar.style.background=t.color;
+              // Mousedown on bar body = drag entire bar to a new position
+              bar.addEventListener('mousedown', ev => {
+                if (ev.button !== 0 || ev.target.closest('.bar-handle')) return;
+                ev.preventDefault(); ev.stopPropagation();
+                _ganttDragStart(ev, projIdx, lane, i, 'move');
+              });
               // Start handle
               if (c===si) {
                 const hs = document.createElement('span');
@@ -1211,8 +1268,21 @@ function updateLogoUI() {
       ? chartState.projects[projIdx].bidTasks
       : chartState.projects[projIdx].execTasks;
     const task = tasks[taskIdx];
-    if (!task || task.type === 'milestone') return;
-    _gDrag = { projIdx, lane, taskIdx, edge, lastCol: -1 };
+    if (!task) return;
+    // Milestones only support 'move'; edge handles are for tasks only
+    if (task.type === 'milestone' && edge !== 'move') return;
+
+    const months  = buildMonths(chartState.sm, chartState.sy, chartState.em, chartState.ey);
+    const origSi  = colOf(months, task.sm, task.sy);
+    const origEi  = colOf(months, task.em, task.ey);
+    const startCol = _colFromMouseX(ev.clientX);
+
+    _gDrag = {
+      projIdx, lane, taskIdx, edge, lastCol: -1,
+      origSm: task.sm, origSy: task.sy,
+      origEm: task.em, origEy: task.ey,
+      origSi, origEi, startCol
+    };
     document.getElementById('gantt-outer')?.classList.add('gantt-dragging');
     document.addEventListener('mousemove', _ganttDragMove);
     document.addEventListener('mouseup',   _ganttDragEnd, { once: true });
@@ -1230,24 +1300,35 @@ function updateLogoUI() {
       ? chartState.projects[projIdx].bidTasks
       : chartState.projects[projIdx].execTasks;
     const task = tasks[taskIdx];
-    const mo   = months[colIdx];
 
     if (edge === 'start') {
-      const eiCur = colOf(months, task.em, task.ey);
+      const eiCur   = colOf(months, task.em, task.ey);
       const clamped = months[Math.min(colIdx, eiCur)];
       task.sm = clamped.m; task.sy = clamped.y;
-    } else {
-      const siCur = colOf(months, task.sm, task.sy);
+    } else if (edge === 'end') {
+      const siCur   = colOf(months, task.sm, task.sy);
       const clamped = months[Math.max(colIdx, siCur)];
       task.em = clamped.m; task.ey = clamped.y;
+    } else {
+      // 'move' — shift the entire bar (or milestone) while preserving its duration
+      const delta   = colIdx - _gDrag.startCol;
+      const dur     = _gDrag.origEi - _gDrag.origSi;          // 0 for milestones
+      const maxSi   = months.length - 1 - Math.max(0, dur);
+      const newSi   = Math.max(0, Math.min(maxSi, _gDrag.origSi + delta));
+      const newEi   = Math.min(months.length - 1, newSi + dur);
+      task.sm = months[newSi].m; task.sy = months[newSi].y;
+      task.em = months[newEi].m; task.ey = months[newEi].y;
     }
 
-    // Tooltip
+    // Tooltip — show full range for move, single date for resize
     const tip = document.getElementById('gantt-drag-tip');
     if (tip) {
-      tip.textContent = MN[mo.m] + ' ' + mo.y;
-      tip.style.left    = (ev.clientX + 14) + 'px';
-      tip.style.top     = (ev.clientY - 34) + 'px';
+      const tipText = edge === 'move'
+        ? `${MN[task.sm]} ${task.sy}${task.em !== task.sm || task.ey !== task.sy ? ' → ' + MN[task.em] + ' ' + task.ey : ''}`
+        : edge === 'start' ? `Start: ${MN[task.sm]} ${task.sy}` : `End: ${MN[task.em]} ${task.ey}`;
+      tip.textContent  = tipText;
+      tip.style.left   = (ev.clientX + 14) + 'px';
+      tip.style.top    = (ev.clientY - 34) + 'px';
       tip.style.display = 'block';
     }
 
@@ -1297,35 +1378,55 @@ function updateLogoUI() {
     );
     cells.forEach(cell => {
       const c = parseInt(cell.dataset.col);
-      // Remove only current/bar elements; keep today-marker and baseline
-      cell.querySelectorAll('.bar, .bar-current').forEach(b => b.remove());
-
-      if (si !== -1 && ei !== -1 && c >= si && c <= ei) {
-        const cls = useB ? 'bar-current' : 'bar';
-        let p = 'm';
-        if (si === ei) p = 'solo'; else if (c === si) p = 's'; else if (c === ei) p = 'e';
-        const bar = document.createElement('div');
-        bar.className = `${cls} ${p}`;
-        bar.style.background = task.color;
+      if (task.type === 'milestone') {
+        // For milestones: move the diamond to the new column
+        cell.querySelectorAll('.milestone').forEach(m => m.remove());
         if (c === si) {
-          const hs = document.createElement('span');
-          hs.className = 'bar-handle bar-handle-s';
-          hs.addEventListener('mousedown', ev => {
+          const d = document.createElement('div');
+          d.className = 'milestone';
+          d.style.background = task.color;
+          d.addEventListener('mousedown', ev => {
+            if (ev.button !== 0) return;
             ev.preventDefault(); ev.stopPropagation();
-            _ganttDragStart(ev, projIdx, lane, taskIdx, 'start');
+            _ganttDragStart(ev, projIdx, lane, taskIdx, 'move');
           });
-          bar.appendChild(hs);
+          cell.appendChild(d);
         }
-        if (c === ei) {
-          const he = document.createElement('span');
-          he.className = 'bar-handle bar-handle-e';
-          he.addEventListener('mousedown', ev => {
+      } else {
+        // Remove only current/bar elements; keep today-marker and baseline bars
+        cell.querySelectorAll('.bar, .bar-current').forEach(b => b.remove());
+        if (si !== -1 && ei !== -1 && c >= si && c <= ei) {
+          const cls = useB ? 'bar-current' : 'bar';
+          let p = 'm';
+          if (si === ei) p = 'solo'; else if (c === si) p = 's'; else if (c === ei) p = 'e';
+          const bar = document.createElement('div');
+          bar.className = `${cls} ${p}`;
+          bar.style.background = task.color;
+          bar.addEventListener('mousedown', ev => {
+            if (ev.button !== 0 || ev.target.closest('.bar-handle')) return;
             ev.preventDefault(); ev.stopPropagation();
-            _ganttDragStart(ev, projIdx, lane, taskIdx, 'end');
+            _ganttDragStart(ev, projIdx, lane, taskIdx, 'move');
           });
-          bar.appendChild(he);
+          if (c === si) {
+            const hs = document.createElement('span');
+            hs.className = 'bar-handle bar-handle-s';
+            hs.addEventListener('mousedown', ev => {
+              ev.preventDefault(); ev.stopPropagation();
+              _ganttDragStart(ev, projIdx, lane, taskIdx, 'start');
+            });
+            bar.appendChild(hs);
+          }
+          if (c === ei) {
+            const he = document.createElement('span');
+            he.className = 'bar-handle bar-handle-e';
+            he.addEventListener('mousedown', ev => {
+              ev.preventDefault(); ev.stopPropagation();
+              _ganttDragStart(ev, projIdx, lane, taskIdx, 'end');
+            });
+            bar.appendChild(he);
+          }
+          cell.appendChild(bar);
         }
-        cell.appendChild(bar);
       }
     });
   }
@@ -1354,6 +1455,29 @@ function updateLogoUI() {
     btn.classList.toggle('off', collapsed);
   }
 
+  // ── Dynamic time-window controls ──────────────────────────────────────────
+  // Shift the visible window forward or back by `delta` months.
+  function _shiftWindow(delta) {
+    if (!chartState) return;
+    const startTotal = chartState.sy * 12 + chartState.sm + delta;
+    const endTotal   = chartState.ey * 12 + chartState.em + delta;
+    chartState.sm = ((startTotal % 12) + 12) % 12;
+    chartState.sy = Math.floor(startTotal / 12);
+    chartState.em = ((endTotal % 12) + 12) % 12;
+    chartState.ey = Math.floor(endTotal / 12);
+    renderChart();
+  }
+
+  // Resize the visible window to exactly `nMonths` months (start stays fixed).
+  function _resizeWindow(nMonths) {
+    if (!chartState) return;
+    nMonths = Math.max(3, Math.min(48, nMonths));
+    const endTotal   = chartState.sy * 12 + chartState.sm + nMonths - 1;
+    chartState.em    = ((endTotal % 12) + 12) % 12;
+    chartState.ey    = Math.floor(endTotal / 12);
+    renderChart();
+  }
+
   // ── Save / Load / Export ──
   function collectState() {
     const projects = projIds.map(id => {
@@ -1377,6 +1501,7 @@ function updateLogoUI() {
       status:       document.getElementById('bid-status')?.value    || '',
       statusColor:  document.getElementById('status-color')?.value  || '#2c4e87',
       rev:          document.getElementById('proj-rev')?.value      || '',
+      chartDate:    document.getElementById('proj-date')?.value     || '',
       startMonth:   parseInt(document.getElementById('start-month')?.value) || 0,
       startYear:    parseInt(document.getElementById('start-year')?.value)  || 2025,
       endMonth:     parseInt(document.getElementById('end-month')?.value)   || 11,
@@ -1392,6 +1517,7 @@ function updateLogoUI() {
     if (s.status)          { const el = document.getElementById('bid-status');   if(el) el.value = s.status; }
     if (s.statusColor)     { const el = document.getElementById('status-color'); if(el) el.value = s.statusColor; }
     if (s.rev)             { const el = document.getElementById('proj-rev');     if(el) el.value = s.rev; }
+    if (s.chartDate)       { const el = document.getElementById('proj-date');    if(el) el.value = s.chartDate; }
     if (s.startMonth != null) { const el = document.getElementById('start-month'); if(el) el.value = s.startMonth; }
     if (s.startYear)       { const el = document.getElementById('start-year');   if(el) el.value = s.startYear; }
     if (s.endMonth != null)   { const el = document.getElementById('end-month');   if(el) el.value = s.endMonth; }

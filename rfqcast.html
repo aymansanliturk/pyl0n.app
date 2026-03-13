@@ -14,7 +14,7 @@
   --bg: #f5f4f0; --surface: #fff; --border: #e0ddd6;
   --text: #1a1916; --muted: #6b6860; --faint: #a8a49e;
   --accent: #2c4e87; --accent2: #1e3a6b;
-  --green: #2e7d32; --amber: #b36a00; --red: #c0392b; --purple: #7b4fa6;
+  --green: #107c41; --amber: #b36a00; --red: #c0392b; --purple: #7b4fa6;
   --s-none:    #f0ede8; --s-none-txt:    #a8a49e;
   --s-enquiry: #dde8f7; --s-enquiry-txt: #2c4e87;
   --s-waiting: #fff3cd; --s-waiting-txt: #856404;
@@ -128,6 +128,10 @@ input:focus, select:focus { border-color:var(--accent); background:#fff; }
 .btn-generate:hover { background:var(--accent2); }
 .btn-secondary { background:var(--surface); color:var(--muted); border:1px solid var(--border); border-radius:7px; padding:12px 18px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:500; cursor:pointer; transition:all 0.15s; }
 .btn-secondary:hover { border-color:var(--text); color:var(--text); }
+.btn-primary { font-family:'DM Sans',sans-serif; background:var(--accent); color:#fff; border:none; border-radius:7px; padding:9px 20px; font-size:13px; font-weight:600; cursor:pointer; transition:background 0.15s; }
+.btn-primary:hover { background:#1e3a6b; }
+.btn-green   { font-family:'DM Sans',sans-serif; background:var(--green); color:#fff; border:none; border-radius:7px; padding:9px 20px; font-size:13px; font-weight:600; cursor:pointer; transition:filter 0.15s; }
+.btn-green:hover { filter:brightness(0.9); }
 
 /* Drag */
 .drag-handle { cursor:grab; color:#ccc; font-size:13px; user-select:none; }
