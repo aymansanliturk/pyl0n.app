@@ -1838,9 +1838,10 @@ function suiteRead(sync) {
       _applyingState = false;
       rebuildMonthlyGrid(); // one clean rebuild; rolesData is preserved in memory
     }
-    // Always apply project name from sync (index is source of truth)
+    // Always apply project name from sync (index is source of truth).
+    // Ignore the generic sentinel "Project Name" so it never overwrites a real value.
     const nameEl = document.getElementById('proj-name');
-    if (nameEl && sync.projectName != null && document.activeElement !== nameEl)
+    if (nameEl && sync.projectName && sync.projectName !== 'Project Name' && document.activeElement !== nameEl)
       nameEl.value = sync.projectName;
     SuiteManager.updateBadge(document.getElementById('suite-sync-badge'));
   } catch(e) {}

@@ -441,7 +441,8 @@ function suiteWrite() {
 function suiteRead(sync) {
   if (!sync || sync._src === 'rfqcast') return;
   const pn = document.getElementById('proj-name');
-  if (pn && sync.projectName != null && document.activeElement !== pn)
+  // Ignore the generic sentinel "Project Name" so it never overwrites a real value.
+  if (pn && sync.projectName && sync.projectName !== 'Project Name' && document.activeElement !== pn)
     pn.value = sync.projectName;
   updateLogoUI();
   SuiteManager.updateBadge(document.getElementById('suite-sync-badge'));

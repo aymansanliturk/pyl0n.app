@@ -430,7 +430,8 @@ function suiteWrite() {
 function suiteRead(sync) {
   if (!sync || sync._src === 'dorcast') return;
   const dt = document.getElementById('doc-title');
-  if (dt && sync.projectName != null && document.activeElement !== dt)
+  // Ignore the generic sentinel "Project Name" so it never overwrites a real value.
+  if (dt && sync.projectName && sync.projectName !== 'Project Name' && document.activeElement !== dt)
     dt.value = sync.projectName;
   updateLogoUI();
   SuiteManager.updateBadge(document.getElementById('suite-sync-badge'));

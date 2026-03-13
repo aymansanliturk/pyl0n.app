@@ -985,9 +985,10 @@ function suiteRead(sync) {
         }
       });
     }
-    // Always apply project name from sync (index is source of truth)
+    // Always apply project name from sync (index is source of truth).
+    // Ignore the generic sentinel "Project Name" so it never overwrites a real value.
     const titleEl = document.getElementById('chart-title');
-    if (titleEl && sync.projectName != null && document.activeElement !== titleEl)
+    if (titleEl && sync.projectName && sync.projectName !== 'Project Name' && document.activeElement !== titleEl)
       titleEl.value = sync.projectName;
     SuiteManager.updateBadge(document.getElementById('suite-sync-badge'));
   } catch(e) {}
