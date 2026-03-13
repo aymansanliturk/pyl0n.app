@@ -216,7 +216,7 @@
     <div class="section-title">Chart Information</div>
     <div class="fields f1">
       <label>Chart Title <input type="text" id="chart-title" value="Project Organisation Chart"
-        oninput="SuiteManager.write({ projectName: this.value }, 'orgcast')"></label>
+        oninput="const _v=this.value.trim();if(_v&&_v!=='Project Name'&&_v!=='Project Organisation Chart')SuiteManager.write({projectName:_v},'orgcast')"></label>
     </div>
     <div class="fields f2" style="margin-top:12px;">
       <label>Revision <input type="text" id="chart-rev"  value="Rev. 1.0"></label>

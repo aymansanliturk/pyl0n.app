@@ -308,7 +308,7 @@ input:focus, select:focus { border-color:var(--accent); background:#fff; }
   <div class="section">
     <div class="section-title">Document Information</div>
     <div class="fields f1">
-      <label>Title <input type="text" id="doc-title" value="Division of Responsibilities" oninput="SuiteManager.write({ projectName: this.value }, 'dorcast')"></label>
+      <label>Title <input type="text" id="doc-title" value="Division of Responsibilities" oninput="const _v=this.value.trim();if(_v&&_v!=='Project Name'&&_v!=='Division of Responsibilities')SuiteManager.write({projectName:_v},'dorcast')"></label>
     </div>
     <div class="fields f2" style="margin-top:12px;">
       <label>Revision <input type="text" id="doc-rev" value="Rev. 0"></label>

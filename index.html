@@ -816,8 +816,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Assert master dashboard dominance: broadcast stored project name to all
   // open tools immediately so they align with the dashboard on startup.
-  const _bootName = document.getElementById('pp-name')?.value;
-  if (_bootName) SuiteManager.write({ projectName: _bootName }, 'index');
+  const _bootName = (document.getElementById('pp-name')?.value || '').trim();
+  if (_bootName && _bootName !== 'Project Name') SuiteManager.write({ projectName: _bootName }, 'index');
 
   const nameEl = document.getElementById('pp-name');
   if (nameEl) nameEl.addEventListener('input', ppOnName);

@@ -602,8 +602,8 @@ function updateLogoUI() {
   }
   document.getElementById('proj-title').addEventListener('input', function() {
     this._manuallyEdited = true;
-    // Broadcast updated project name to all other tools instantly
-    SuiteManager.write({ projectName: this.value }, 'timecast');
+    const v = this.value.trim();
+    if (v && v !== 'Project Name') SuiteManager.write({ projectName: v }, 'timecast');
   });
 
   // ── Task rows ──
@@ -1597,9 +1597,10 @@ function suiteWrite() {
     phases.forEach((p, i) => p.id = 'tc_' + i);
 
     const prev = SuiteManager.read();
-    SuiteManager.write({
-      phases: phases.length ? phases : (prev.phases || []),
-    }, 'timecast');
+    const candidateName = (state.chartTitle || proj.title || '').trim();
+    const payload = { phases: phases.length ? phases : (prev.phases || []) };
+    if (candidateName && candidateName !== 'Project Name') payload.projectName = candidateName;
+    SuiteManager.write(payload, 'timecast');
     SuiteManager.updateBadge(document.getElementById('suite-sync-badge'));
   } catch(e) {}
 }

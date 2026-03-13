@@ -295,7 +295,7 @@
     <div class="fields f3">
       <label>Project Name
         <input type="text" id="proj-name" placeholder="e.g. Offshore Substation — Package 3"
-          oninput="SuiteManager.write({ projectName: this.value }, 'resourcecast')">
+          oninput="const _v=this.value.trim();if(_v&&_v!=='Project Name')SuiteManager.write({projectName:_v},'resourcecast')">
       </label>
       <label>Revision
         <input type="text" id="proj-rev" value="Rev. 1.0">
