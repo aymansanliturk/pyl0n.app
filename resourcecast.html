@@ -542,6 +542,7 @@ function updateLogoUI() {
     if (!confirm('This will replace all current roles with the SE standard template (17 roles). Monthly hours will be cleared. Continue?')) return;
     document.getElementById('res-tbody').innerHTML = '';
     roleCount = 0;
+    rolesData = []; // reset source of truth before loading template
     SE_TEMPLATE_ROLES.forEach(r => addRole(r));
     _scheduleSnap();
   }
@@ -567,29 +568,12 @@ function updateLogoUI() {
   // ── Phase collapse state ──
   let phaseCollapsed  = {}; // phaseId (string) → boolean
   let _applyingState  = false; // suppresses rebuildMonthlyGrid during bulk applyState
+  let rolesData       = []; // ── single source of truth for all role data ──
 
   function togglePhase(phaseId) {
-    const pid = String(phaseId);
-    phaseCollapsed[pid] = !phaseCollapsed[pid];
-    // When collapsing: aggregate monthly hours into ph:ID key per role
-    if (phaseCollapsed[pid]) {
-      const ph = getPhases().find(p => p.id === pid);
-      if (ph && ph.sm > 0 && ph.sy > 0) {
-        document.querySelectorAll('.role-row').forEach(tr => {
-          // Snapshot all current hours (DOM + prior stored) before the grid is rebuilt
-          const snapshot = _getRowMonthHours(tr);
-          tr.dataset.fullMonthHours = JSON.stringify(snapshot);
-          // Compute phase aggregate for the collapsed agg cell
-          let sum = 0;
-          let m = ph.sm - 1, y = ph.sy, em0 = ph.em - 1, ey = ph.ey;
-          while (y < ey || (y === ey && m <= em0)) {
-            sum += snapshot[`${y}-${String(m+1).padStart(2,'0')}`] || 0;
-            m++; if (m > 11) { m = 0; y++; }
-          }
-          tr.dataset['agg_' + pid] = sum;
-        });
-      }
-    }
+    // rolesData holds the complete monthly breakdown in memory — no DOM
+    // snapshot needed before collapsing. Just toggle the flag and re-render.
+    phaseCollapsed[String(phaseId)] = !phaseCollapsed[String(phaseId)];
     rebuildMonthlyGrid();
   }
 
@@ -618,13 +602,10 @@ function updateLogoUI() {
   }
 
   function _getRowMonthHours(tr) {
-    // Seed with stored snapshot — preserves data for currently-collapsed phases
-    const h = Object.assign({}, JSON.parse(tr.dataset.fullMonthHours || '{}'));
-    // Override with live DOM values (always authoritative for visible columns)
+    const h = {};
     tr.querySelectorAll('.month-inp').forEach(inp => {
       const v = parseFloat(inp.value) || 0;
       if (v) h[inp.dataset.key] = v;
-      else delete h[inp.dataset.key];
     });
     return h;
   }
@@ -687,26 +668,7 @@ function updateLogoUI() {
     const phases = getPhases();
     const cols   = _buildCols(phases);
 
-    // 1. Save existing role data before clearing
-    const existingRoles = [...document.querySelectorAll('.role-row')].map(tr => {
-      const monthHours = _getRowMonthHours(tr);
-      // Pull in any aggregated sums stored during collapse
-      Object.keys(tr.dataset).forEach(k => {
-        if (k.startsWith('agg_')) {
-          const v = parseFloat(tr.dataset[k]) || 0;
-          const pid = k.slice(4);
-          if (v) monthHours[`ph:${pid}`] = v;
-        }
-      });
-      return {
-        id:   tr.dataset.id,
-        name: tr.querySelector('.role-name').value.trim(),
-        rate: parseFloat(tr.querySelector('.role-rate').value) || 0,
-        monthHours,
-      };
-    });
-
-    // 2. Build thead (2 rows: phase groups + month labels)
+    // ── Build thead (2 rows: phase groups + month labels) ──
     const thead = document.getElementById('res-thead');
     const now   = new Date();
 
@@ -760,11 +722,10 @@ function updateLogoUI() {
 
     thead.innerHTML = r1 + r2;
 
-    // 3. Rebuild tbody
+    // ── Re-render tbody from rolesData — no DOM reads, no data loss ──
     const tbody = document.getElementById('res-tbody');
     tbody.innerHTML = '';
-    roleCount = 0;
-    existingRoles.forEach(r => addRole(r, cols));
+    rolesData.forEach(r => _renderRoleRow(r, cols));
 
     updateMonthlyTotals();
   }
@@ -773,27 +734,20 @@ function updateLogoUI() {
   let roleCount   = 0;
   let roleDragSrc = null;
 
-  function addRole(data = {}, cols) {
-    if (!cols) cols = _buildCols(getPhases());
-    const phases = getPhases();
-    const id     = data.id ? (roleCount = Math.max(roleCount, +data.id), +data.id) : ++roleCount;
-    const name   = data.name || '';
-    const rate   = data.rate != null ? data.rate : '';
-
-    // Merge monthHours + legacy hours (phase-id keyed) into unified map
-    const monthHours = Object.assign({}, data.monthHours || {});
-    if (data.hours) {
-      Object.entries(data.hours).forEach(([k, v]) => {
-        const aggKey = `ph:${k}`;
-        if (v && !monthHours[aggKey]) monthHours[aggKey] = v;
-      });
-    }
+  /**
+   * _renderRoleRow — pure DOM renderer.
+   * Takes a rolesData entry and the current column list and appends a table row.
+   * Never touches rolesData itself.
+   */
+  function _renderRoleRow(r, cols) {
+    const phases     = getPhases();
+    const id         = +r.id;
+    const monthHours = r.monthHours || {};
 
     const monthCells = cols.map(col => {
       const pi    = phases.findIndex(p => p.id === col.phaseId);
       const color = PHASE_COLORS[pi % PHASE_COLORS.length];
-      // For collapsed-phase (agg) columns: if no explicit agg key is stored, sum the
-      // individual monthly hours so the cell is correct even on first collapse or reload.
+      // Agg column: compute sum from monthly breakdown when no explicit agg key stored.
       let v;
       if (col.type === 'agg' && col.hasDates && monthHours[col.key] == null) {
         const ph2 = phases.find(p => p.id === col.phaseId);
@@ -821,8 +775,8 @@ function updateLogoUI() {
     tr.draggable  = true;
 
     tr.innerHTML = `
-      <td class="mg-sticky-name"><span class="drag-handle">⠿</span><input type="text" class="res-inp res-inp-name role-name" value="${esc(name)}" placeholder="Name / role" oninput="updateMonthlyTotals()"></td>
-      <td class="mg-sticky-rate"><input type="number" class="res-inp res-inp-rate role-rate" value="${rate}" min="0" max="9999" step="1" placeholder="0" oninput="updateMonthlyTotals()"></td>
+      <td class="mg-sticky-name"><span class="drag-handle">⠿</span><input type="text" class="res-inp res-inp-name role-name" value="${esc(r.name || '')}" placeholder="Name / role" oninput="updateMonthlyTotals()"></td>
+      <td class="mg-sticky-rate"><input type="number" class="res-inp res-inp-rate role-rate" value="${r.rate != null ? r.rate : ''}" min="0" max="9999" step="1" placeholder="0" oninput="updateMonthlyTotals()"></td>
       ${monthCells}
       <td class="calc-cell role-total-h" data-role="${id}">—</td>
       <td class="calc-cell hi role-total-eur" data-role="${id}">—</td>
@@ -830,24 +784,71 @@ function updateLogoUI() {
 
     const tbody = document.getElementById('res-tbody');
     tbody.appendChild(tr);
-    // Persist the full monthHours map so collapsed-phase data survives save/rebuild cycles
-    tr.dataset.fullMonthHours = JSON.stringify(monthHours);
 
     tr.addEventListener('dragstart', e => { roleDragSrc=tr; tr.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; });
-    tr.addEventListener('dragend',   () => { roleDragSrc=null; document.querySelectorAll('.role-row').forEach(r=>r.classList.remove('dragging','drag-over')); });
+    tr.addEventListener('dragend',   () => { roleDragSrc=null; document.querySelectorAll('.role-row').forEach(rx=>rx.classList.remove('dragging','drag-over')); });
     tr.addEventListener('dragover',  e => { e.preventDefault(); if(roleDragSrc&&roleDragSrc!==tr) tr.classList.add('drag-over'); });
     tr.addEventListener('drop', e => {
       e.preventDefault();
       if (!roleDragSrc||roleDragSrc===tr) return;
       tbody.insertBefore(roleDragSrc, tr);
       tr.classList.remove('drag-over');
+      _syncRolesDataOrder(); // keep rolesData order in sync after drag
       updateMonthlyTotals();
     });
+  }
 
+  /**
+   * addRole — public API.
+   * Creates a rolesData entry and delegates DOM rendering to _renderRoleRow.
+   */
+  function addRole(data = {}) {
+    const id = data.id ? (roleCount = Math.max(roleCount, +data.id), +data.id) : ++roleCount;
+    // Merge monthHours + legacy hours (phase-id keyed) into unified map
+    const monthHours = Object.assign({}, data.monthHours || {});
+    if (data.hours) {
+      Object.entries(data.hours).forEach(([k, v]) => {
+        const aggKey = `ph:${k}`;
+        if (v && !monthHours[aggKey]) monthHours[aggKey] = v;
+      });
+    }
+    const entry = { id: String(id), name: data.name || '', rate: parseFloat(data.rate) || 0, monthHours };
+    rolesData.push(entry);
+    _renderRoleRow(entry, _buildCols(getPhases()));
     updateMonthlyTotals();
   }
 
-  function removeRole(btn) { btn.closest('tr').remove(); updateMonthlyTotals(); }
+  function removeRole(btn) {
+    const tr = btn.closest('tr');
+    const id = String(tr.dataset.id);
+    rolesData = rolesData.filter(r => String(r.id) !== id);
+    tr.remove();
+    updateMonthlyTotals();
+  }
+
+  // Re-order rolesData to match the current DOM row order (called after drag-drop).
+  function _syncRolesDataOrder() {
+    const order = [...document.querySelectorAll('.role-row')].map(tr => String(tr.dataset.id));
+    rolesData.sort((a, b) => order.indexOf(String(a.id)) - order.indexOf(String(b.id)));
+  }
+
+  // Delegated input handler — syncs every keystroke into rolesData immediately.
+  // Attached to #res-tbody once in DOMContentLoaded so it covers all present
+  // and future rows without touching the HTML template strings.
+  function _syncRoleDatumFromEvent(e) {
+    const tr = e.target.closest('tr.role-row');
+    if (!tr) return;
+    const role = rolesData.find(r => String(r.id) === String(tr.dataset.id));
+    if (!role) return;
+    const inp = e.target;
+    if      (inp.classList.contains('role-name'))  role.name = inp.value;
+    else if (inp.classList.contains('role-rate'))  role.rate = parseFloat(inp.value) || 0;
+    else if (inp.classList.contains('month-inp')) {
+      const v = parseFloat(inp.value) || 0;
+      if (v) role.monthHours[inp.dataset.key] = v;
+      else   delete role.monthHours[inp.dataset.key];
+    }
+  }
 
   // ── Totals ──
   function updateMonthlyTotals() {
@@ -1082,25 +1083,27 @@ function updateLogoUI() {
     const phases = getPhases();
     const cols   = _buildCols(phases); // deduplicated: each month belongs to exactly one phase
 
-    return [...document.querySelectorAll('.role-row')].map(tr => {
-      const rRate      = parseFloat(tr.querySelector('.role-rate').value) || 0;
-      const monthHours = _getRowMonthHours(tr);
+    // Read from rolesData — guaranteed complete even when phases are collapsed.
+    return rolesData.map(r => {
+      const monthHours = r.monthHours || {};
 
-      // Sum hours per phase using only the columns assigned to each phase (no double-counting)
+      // Sum hours per phase using only the columns assigned to each phase (no double-counting).
+      // Always use the monthly breakdown from rolesData regardless of collapsed state.
       const phaseHours = {};
       phases.forEach(ph => {
-        let sum = monthHours[`ph:${ph.id}`] || 0; // collapsed agg cell
+        let sum = 0;
         cols.filter(c => c.phaseId === ph.id && c.type === 'month')
             .forEach(c => { sum += monthHours[c.key] || 0; });
+        if (!sum) sum = monthHours[`ph:${ph.id}`] || 0; // fall back to stored agg key
         phaseHours[ph.id] = sum;
       });
 
       const totalH   = Object.values(phaseHours).reduce((s, v) => s + v, 0);
-      const totalEur = totalH * rRate;
+      const totalEur = totalH * r.rate;
       return {
-        id: tr.dataset.id,
-        name: tr.querySelector('.role-name').value.trim() || '—',
-        rate: rRate,
+        id: r.id,
+        name: r.name || '—',
+        rate: r.rate,
         monthHours, phaseHours, totalH, totalEur,
       };
     });
@@ -1306,12 +1309,15 @@ function updateLogoUI() {
 
   // ── collectState / applyState ──
   function collectState() {
-    const phases   = getPhases();
-    const roles    = [...document.querySelectorAll('.role-row')].map(tr => ({
-      id:         tr.dataset.id,
-      name:       tr.querySelector('.role-name').value.trim(),
-      rate:       parseFloat(tr.querySelector('.role-rate').value) || 0,
-      monthHours: _getRowMonthHours(tr),
+    const phases = getPhases();
+    // Read roles from rolesData — the in-memory source of truth.
+    // This guarantees all monthly hours are captured regardless of whether
+    // any phase is currently collapsed (and its month columns hidden).
+    const roles = rolesData.map(r => ({
+      id:         r.id,
+      name:       r.name,
+      rate:       r.rate,
+      monthHours: Object.assign({}, r.monthHours),
     }));
     const expenses = [...document.querySelectorAll('.exp-row')].map(tr => ({
       id:     tr.dataset.id,
@@ -1349,6 +1355,7 @@ function updateLogoUI() {
 
     document.getElementById('res-tbody').innerHTML = '';
     roleCount = 0;
+    rolesData = []; // reset in-memory store before populating from saved state
     rebuildMonthlyGrid(); // one authoritative rebuild: header + empty tbody
     (s.roles||[]).forEach(r => addRole(r));
 
@@ -1824,10 +1831,12 @@ function suiteRead(sync) {
     // Apply phases broadcast by Timecast
     if (sync.phases && sync.phases.length) {
       document.getElementById('phases-wrap').innerHTML = '';
+      _applyingState = true; // suppress per-addPhase grid rebuilds
       sync.phases.forEach(p => {
         if (p.name) addPhase({ name: p.name, sm: p.sm, sy: p.sy, em: p.em, ey: p.ey });
       });
-      rebuildMonthlyGrid();
+      _applyingState = false;
+      rebuildMonthlyGrid(); // one clean rebuild; rolesData is preserved in memory
     }
     // Always apply project name from sync (index is source of truth)
     const nameEl = document.getElementById('proj-name');
@@ -1845,6 +1854,9 @@ SuiteManager.onUpdate((sync, key) => {
 
 document.addEventListener('DOMContentLoaded', () => {
   updateLogoUI();
+  // Attach the delegated input listener that keeps rolesData in sync with every
+  // user keystroke. A single listener on the tbody covers all rows — present and future.
+  document.getElementById('res-tbody').addEventListener('input', _syncRoleDatumFromEvent);
   const _saved = localStorage.getItem('bidcast_state_resourcecast');
   if (_saved) { try { applyState(JSON.parse(_saved)); } catch(e) {} }
   suiteRead(SuiteManager.read());

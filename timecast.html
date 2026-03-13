@@ -966,10 +966,22 @@ function updateLogoUI() {
     const rev    = document.getElementById('proj-rev').value.trim();
     const status = document.getElementById('bid-status').value.trim();
     const sColor = document.getElementById('status-color').value;
-    const sm = parseInt(document.getElementById('start-month').value);
-    const sy = parseInt(document.getElementById('start-year').value);
-    const em = parseInt(document.getElementById('end-month').value);
-    const ey = parseInt(document.getElementById('end-year').value);
+    let sm = parseInt(document.getElementById('start-month').value);
+    let sy = parseInt(document.getElementById('start-year').value);
+    let em = parseInt(document.getElementById('end-month').value);
+    let ey = parseInt(document.getElementById('end-year').value);
+    // Safety: if the date range is invalid (NaN, reversed, or zero-length)
+    // default to a standard 12-month window starting from the current month.
+    if (isNaN(sm) || isNaN(sy) || isNaN(em) || isNaN(ey) ||
+        ey < sy || (ey === sy && em < sm)) {
+      const _now = new Date(), _end = new Date(_now.getFullYear(), _now.getMonth() + 12, 1);
+      sm = _now.getMonth(); sy = _now.getFullYear();
+      em = _end.getMonth(); ey = _end.getFullYear();
+      document.getElementById('start-month').value = sm;
+      document.getElementById('start-year').value  = sy;
+      document.getElementById('end-month').value   = em;
+      document.getElementById('end-year').value    = ey;
+    }
 
     const projects = projIds.map(id => ({
       id,
@@ -996,7 +1008,14 @@ function updateLogoUI() {
 
   function renderChart() {
     const { title, sub, rev, status, sColor, sm, sy, em, ey, projects, showToday = true } = chartState;
-    const months = buildMonths(sm, sy, em, ey);
+    let months = buildMonths(sm, sy, em, ey);
+    // If the stored range is invalid, fall back to a 12-month window rather than
+    // throwing or rendering a blank chart.
+    if (!months || !months.length) {
+      const _n = new Date(), _e = new Date(_n.getFullYear(), _n.getMonth() + 12, 1);
+      months = buildMonths(_n.getMonth(), _n.getFullYear(), _e.getMonth(), _e.getFullYear());
+      if (!months.length) return; // still empty — nothing to render
+    }
     const n      = months.length;
     const bands  = yearBands(months);
     const now    = new Date();
@@ -1393,6 +1412,8 @@ function updateLogoUI() {
     if (inp) inp.value = projIds.length;
     updateProjWarn();
     updateDelBtns();
+    // Always render the Gantt after state is restored so the canvas is never blank.
+    generate();
   }
 
   function _suiteBundle(ownState) {
@@ -1595,8 +1616,15 @@ function suiteRead(sync) {
       return;
     }
     const titleInp = document.getElementById('proj-title') || document.querySelector('.proj-name-inp');
-    if (sync.projectName != null && titleInp && document.activeElement !== titleInp)
+    if (sync.projectName != null && titleInp && document.activeElement !== titleInp) {
       titleInp.value = sync.projectName;
+      // If the chart is currently visible, propagate the new name to the canvas
+      // immediately without requiring the user to click Generate again.
+      if (chartState && document.getElementById('output')?.style.display !== 'none') {
+        chartState.title = sync.projectName;
+        renderChart();
+      }
+    }
     SuiteManager.updateBadge(document.getElementById('suite-sync-badge'));
   } catch(e) {}
 }
