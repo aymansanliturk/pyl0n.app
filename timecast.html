@@ -962,7 +962,7 @@ function updateLogoUI() {
   // ── Generate ──
   function generate() {
     const title  = document.getElementById('proj-title').value.trim();
-    const sub    = document.getElementById('proj-sub').value.trim();
+    const sub    = document.getElementById('proj-sub')?.value.trim() || '';
     const rev    = document.getElementById('proj-rev').value.trim();
     const status = document.getElementById('bid-status').value.trim();
     const sColor = document.getElementById('status-color').value;
@@ -1617,12 +1617,16 @@ function suiteRead(sync) {
       return;
     }
     const titleInp = document.getElementById('proj-title') || document.querySelector('.proj-name-inp');
-    if (sync.projectName != null && titleInp && document.activeElement !== titleInp) {
-      titleInp.value = sync.projectName;
-      // If the chart is currently visible, propagate the new name to the canvas
-      // immediately without requiring the user to click Generate again.
-      if (chartState && document.getElementById('output')?.style.display !== 'none') {
-        chartState.title = sync.projectName;
+    const newName = sync.projectName;
+    // Treat empty or generic sentinel "Project Name" as invalid — never let it overwrite
+    // a real name that was set by the user or the Master Dashboard.
+    if (newName && newName !== 'Project Name' && titleInp && document.activeElement !== titleInp) {
+      titleInp.value = newName;
+      // Propagate to the canvas whenever a chartState exists, regardless of which
+      // panel (editor vs. output) is currently visible, so the rendered chart stays
+      // in sync with the Dashboard value at all times.
+      if (chartState) {
+        chartState.title = newName;
         renderChart();
       }
     }
