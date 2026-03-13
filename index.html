@@ -10,14 +10,17 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg:      #f8f9fa;
+    --bg:      #f5f4f0;
     --surface: #ffffff;
-    --border:  #e8e8e4;
+    --border:  #e0ddd6;
     --text:    #1a1916;
     --muted:   #6b6860;
     --faint:   #a8a49e;
-    --accent:  #3b82f6;
-    --navy:    #1e3a5f;
+    --accent:  #2c4e87;
+    --accent2: #1e3a6b;
+    --navy:    #1e3a6b;
+    --green:   #107c41;
+    --red:     #c0392b;
   }
 
   body {
@@ -121,6 +124,11 @@
   .pp-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: #fff; }
   .pp-btn.danger:hover:not(:disabled) { border-color: #c0392b; color: #c0392b; background: #fff; }
   .pp-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  /* Standard suite button classes */
+  .btn-primary { font-family:'DM Sans',sans-serif; background:var(--accent); color:#fff; border:none; border-radius:7px; padding:9px 20px; font-size:13px; font-weight:600; cursor:pointer; transition:background 0.15s; }
+  .btn-primary:hover { background:var(--accent2); }
+  .btn-green   { font-family:'DM Sans',sans-serif; background:var(--green); color:#fff; border:none; border-radius:7px; padding:9px 20px; font-size:13px; font-weight:600; cursor:pointer; transition:filter 0.15s; }
+  .btn-green:hover { filter:brightness(0.9); }
   .pp-proj-count {
     font-family: 'DM Mono', monospace; font-size: 9px; color: var(--faint);
     white-space: nowrap;
