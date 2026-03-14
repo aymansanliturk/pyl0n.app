@@ -199,7 +199,38 @@
     color: var(--faint); letter-spacing: -0.5px; line-height: 1.1;
   }
   .stat-value.has-data { color: var(--text); }
+  /* Smaller text for longer strings (dates, ranges) */
+  .stat-value.sm { font-size: 12px; letter-spacing: 0; }
   .stat-source { font-size: 8px; color: var(--faint); margin-top: 2px; }
+
+  /* ── Progress Bar ── */
+  .progress-wrap {
+    margin-top: 18px;
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: 12px; padding: 14px 18px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.07);
+  }
+  .progress-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .progress-hd-edge {
+    font-family: 'DM Mono', monospace; font-size: 9px;
+    color: var(--faint); text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .progress-hd-pct {
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    font-weight: 700; color: var(--accent);
+  }
+  .progress-track {
+    height: 6px; background: var(--border);
+    border-radius: 99px; overflow: hidden; position: relative;
+  }
+  .progress-fill {
+    height: 100%; background: var(--accent);
+    border-radius: 99px; transition: width 0.4s ease;
+    min-width: 4px;
+  }
 
   /* ── Cards ── */
   .cards-wrap {
@@ -391,7 +422,67 @@
         <div class="stat-source">TimeCast</div>
       </div>
 
+      <!-- Row 2 ── -->
+
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#f5f3ff;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="5" width="20" height="15" rx="2"/>
+            <line x1="2" y1="10" x2="22" y2="10"/>
+            <line x1="7" y1="5" x2="7" y2="10"/>
+            <line x1="17" y1="5" x2="17" y2="10"/>
+            <line x1="6" y1="14" x2="10" y2="14"/>
+          </svg>
+        </div>
+        <div class="stat-label">Project Timeline</div>
+        <div class="stat-value sm" id="stat-timeline">—</div>
+        <div class="stat-source">TimeCast</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#fff7f0;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+            <rect x="9" y="3" width="6" height="4" rx="1"/>
+            <line x1="9" y1="12" x2="15" y2="12"/>
+            <line x1="9" y1="16" x2="13" y2="16"/>
+          </svg>
+        </div>
+        <div class="stat-label">RFQ Status</div>
+        <div class="stat-value sm" id="stat-rfq">—</div>
+        <div class="stat-source">RFQCast</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#f0fdf8;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="5" r="2.5"/>
+            <line x1="12" y1="7.5" x2="12" y2="12"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+            <line x1="5" y1="12" x2="5" y2="15.5"/>
+            <line x1="12" y1="12" x2="12" y2="15.5"/>
+            <line x1="19" y1="12" x2="19" y2="15.5"/>
+          </svg>
+        </div>
+        <div class="stat-label">Org Composition</div>
+        <div class="stat-value sm" id="stat-org">—</div>
+        <div class="stat-source">OrgCast</div>
+      </div>
+
     </div>
+
+    <!-- ── Progress bar (shown when Timecast has data) ── -->
+    <div class="progress-wrap" id="progress-wrap" style="display:none;">
+      <div class="progress-header">
+        <span class="progress-hd-edge" id="progress-start">—</span>
+        <span class="progress-hd-pct" id="progress-pct">—% complete</span>
+        <span class="progress-hd-edge" id="progress-end">—</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill" style="width:0%;"></div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -420,7 +511,7 @@
     <div class="card-tagline">Timeline Intelligence</div>
     <div class="card-desc">Multi-project Gantt charts with baseline tracking and A3-ready PDF output. Start here — phases flow to ResourceCast automatically.</div>
     <div class="card-footer">
-      <span class="feat-tag">Gantt · Baseline</span>
+      <span class="feat-tag" id="badge-timecast">Gantt · Baseline</span>
       <span class="sync-pill">↻ Suite</span>
       <span class="card-arrow">→</span>
     </div>
@@ -439,7 +530,7 @@
     <div class="card-tagline">Cost Intelligence</div>
     <div class="card-desc">Plan team hours and calculate EUR costs per phase. Phases sync in from Timecast, team roles flow out to Orgcast.</div>
     <div class="card-footer">
-      <span class="feat-tag">Rates · Cost Planning</span>
+      <span class="feat-tag" id="badge-resourcecast">Rates · Cost Planning</span>
       <span class="sync-pill">↻ Suite</span>
       <span class="card-arrow">→</span>
     </div>
@@ -463,7 +554,7 @@
     <div class="card-tagline">Org Charts</div>
     <div class="card-desc">Dynamic project organisation charts with SVG connectors. Team roles sync in from ResourceCast.</div>
     <div class="card-footer">
-      <span class="feat-tag">SVG · Print</span>
+      <span class="feat-tag" id="badge-orgcast">SVG · Print</span>
       <span class="sync-pill">↻ Suite</span>
       <span class="card-arrow">→</span>
     </div>
@@ -487,7 +578,7 @@
     <div class="card-tagline">Responsibility Matrix</div>
     <div class="card-desc">Build multi-party responsibility matrices (DOR/RAC) for complex project scopes.</div>
     <div class="card-footer">
-      <span class="feat-tag">Excel · PDF · JSON</span>
+      <span class="feat-tag" id="badge-dorcast">Excel · PDF · JSON</span>
       <span class="card-arrow">→</span>
     </div>
   </a>
@@ -505,7 +596,7 @@
     <div class="card-tagline">Supplier Tracking</div>
     <div class="card-desc">Track supplier enquiries, offer validity status, and high-volume RFQ package timelines.</div>
     <div class="card-footer">
-      <span class="feat-tag">Alerts · Dashboard</span>
+      <span class="feat-tag" id="badge-rfqcast">Alerts · Dashboard</span>
       <span class="card-arrow">→</span>
     </div>
   </a>
@@ -765,45 +856,165 @@ function _fmtEUR(n) {
   return '€' + Math.round(n).toLocaleString('de-DE');
 }
 
+const _MN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
 function refreshStats() {
-  // Total Budget: computed from ResourceCast tool state
-  let budget = null;
-  try {
-    const raw = localStorage.getItem('bidcast_state_resourcecast');
-    if (raw) {
-      const state = JSON.parse(raw);
-      let total = 0;
-      (state.roles || []).forEach(r => {
-        const hours = Object.values(r.monthHours || {}).reduce((a, b) => a + (b || 0), 0);
-        total += (r.rate || 0) * hours;
-      });
-      (state.expenses || []).forEach(e => { total += (e.amount || 0); });
-      budget = total;
+  // ── Read all tool states ───────────────────────────────────────────
+  function _load(key) {
+    try { return JSON.parse(localStorage.getItem('bidcast_state_' + key) || 'null'); }
+    catch { return null; }
+  }
+  const tc = _load('timecast');
+  const rc = _load('resourcecast');
+  const oc = _load('orgcast');
+  const rq = _load('rfqcast');
+  const dc = _load('dorcast');
+
+  // ── ResourceCast: budget, role count ──────────────────────────────
+  let budget = null, roleCount = 0;
+  if (rc) {
+    let total = 0;
+    (rc.roles || []).forEach(r => {
+      const hours = Object.values(r.monthHours || {}).reduce((a, b) => a + (+b || 0), 0);
+      total += (+r.rate || 0) * hours;
+      roleCount++;
+    });
+    (rc.expenses || []).forEach(e => { total += +e.amount || 0; });
+    if (total > 0 || roleCount) budget = total;
+  }
+
+  // ── Timecast: dates, task/milestone counts, progress ─────────────
+  let tcStart = null, tcEnd = null, tcProgress = null, taskCount = 0, milestoneCount = 0;
+  if (tc) {
+    const sm = tc.startMonth ?? 0, sy = tc.startYear  ?? new Date().getFullYear();
+    const em = tc.endMonth   ?? 11, ey = tc.endYear    ?? sy + 3;
+    tcStart = _MN[sm] + ' ' + sy;
+    tcEnd   = _MN[em] + ' ' + ey;
+
+    const startTotal = sy * 12 + sm;
+    const endTotal   = ey * 12 + em;
+    const now        = new Date();
+    const todayTotal = now.getFullYear() * 12 + now.getMonth();
+    if (endTotal > startTotal) {
+      tcProgress = Math.max(0, Math.min(100,
+        Math.round((todayTotal - startTotal) / (endTotal - startTotal) * 100)));
     }
-  } catch {}
+    (tc.projects || []).forEach(p => {
+      (p.bidTasks || []).concat(p.execTasks || []).forEach(t => {
+        if (t.type === 'milestone') milestoneCount++; else taskCount++;
+      });
+    });
+  }
 
-  // Team Size and Key Phases: from suite sync
+  // ── Orgcast: person & org counts ─────────────────────────────────
+  let personCount = 0, orgCount = 0;
+  if (oc) {
+    const people = (oc.people || []).filter(p => !p.vacancy);
+    personCount  = people.length;
+    orgCount     = new Set(people.map(p => p.company).filter(Boolean)).size;
+  }
+
+  // ── RFQCast: item count, received vs pending vendors ─────────────
+  let rfqItems = 0, rfqReceived = 0, rfqPending = 0;
+  if (rq) {
+    rfqItems = (rq.items || []).length;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    (rq.items || []).forEach(item => {
+      (item.vendors || []).forEach(v => {
+        if (!v.name) return;
+        if (v.validity) {
+          const exp = new Date(v.validity);
+          if (!isNaN(exp) && exp < today) return; // expired — skip
+        }
+        if (v.binding === 'Yes' || v.offerRec) rfqReceived++;
+        else rfqPending++;
+      });
+    });
+  }
+
+  // ── DORcast: data-row count ───────────────────────────────────────
+  const dorRows = dc ? (dc.rows || []).filter(r => r.type !== 'header').length : 0;
+
+  // ── Helpers ───────────────────────────────────────────────────────
+  function _set(id, text, active) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle('has-data', !!active);
+  }
+  // Update a card badge: show live text when available, fall back to staticDefault
+  function _badge(id, liveText, staticDefault) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (liveText) {
+      el.textContent = liveText;
+      el.style.color = 'var(--green)';
+    } else {
+      el.textContent = staticDefault;
+      el.style.color = '';
+    }
+  }
+
+  // ── Stat cards ────────────────────────────────────────────────────
+  const hasBudget = budget !== null && budget > 0;
+  _set('stat-budget', hasBudget ? _fmtEUR(budget) : '—', hasBudget);
+
+  // Team: prefer Orgcast people; fall back to ResourceCast role count
+  const teamN = personCount > 0 ? personCount : roleCount;
+  _set('stat-team',
+    teamN > 0 ? teamN + (personCount > 0 ? (teamN === 1 ? ' person' : ' people') : (teamN === 1 ? ' role' : ' roles')) : '—',
+    teamN > 0);
+
+  // Key phases: from suite sync phases array; fall back to task count
   const sync   = SuiteManager.read();
-  const team   = (sync.team   || []).length;
-  const phases = (sync.phases || []).length;
+  const phaseN = (sync.phases || []).length;
+  _set('stat-phases',
+    phaseN > 0 ? phaseN + (phaseN === 1 ? ' phase' : ' phases')
+    : taskCount > 0 ? taskCount + (taskCount === 1 ? ' task' : ' tasks') : '—',
+    phaseN > 0 || taskCount > 0);
 
-  const budgetEl = document.getElementById('stat-budget');
-  const teamEl   = document.getElementById('stat-team');
-  const phasesEl = document.getElementById('stat-phases');
+  // Project Timeline
+  _set('stat-timeline', tcStart && tcEnd ? tcStart + ' → ' + tcEnd : '—', !!(tcStart && tcEnd));
 
-  if (budgetEl) {
-    const hasBudget = budget !== null && budget > 0;
-    budgetEl.textContent = hasBudget ? _fmtEUR(budget) : '—';
-    budgetEl.classList.toggle('has-data', hasBudget);
+  // RFQ Status
+  _set('stat-rfq',
+    rfqItems > 0 ? rfqReceived + ' rec · ' + rfqPending + ' pend' : '—',
+    rfqItems > 0);
+
+  // Org Composition
+  _set('stat-org',
+    personCount > 0
+      ? personCount + (personCount === 1 ? ' person' : ' people') + (orgCount > 1 ? ' · ' + orgCount + ' orgs' : '')
+      : '—',
+    personCount > 0);
+
+  // ── Progress bar ──────────────────────────────────────────────────
+  const progressWrap = document.getElementById('progress-wrap');
+  if (progressWrap) {
+    if (tcProgress !== null) {
+      progressWrap.style.display = 'block';
+      const fill = document.getElementById('progress-fill');
+      if (fill) fill.style.width = tcProgress + '%';
+      const pct = document.getElementById('progress-pct');
+      if (pct) pct.textContent = tcProgress + '% complete';
+      const ps = document.getElementById('progress-start');
+      if (ps) ps.textContent = tcStart;
+      const pe = document.getElementById('progress-end');
+      if (pe) pe.textContent = tcEnd;
+    } else {
+      progressWrap.style.display = 'none';
+    }
   }
-  if (teamEl) {
-    teamEl.textContent = team > 0 ? team + (team === 1 ? ' role' : ' roles') : '—';
-    teamEl.classList.toggle('has-data', team > 0);
-  }
-  if (phasesEl) {
-    phasesEl.textContent = phases > 0 ? phases + (phases === 1 ? ' phase' : ' phases') : '—';
-    phasesEl.classList.toggle('has-data', phases > 0);
-  }
+
+  // ── Tool card live badges ─────────────────────────────────────────
+  const tcParts = [];
+  if (taskCount      > 0) tcParts.push(taskCount + (taskCount === 1 ? ' task' : ' tasks'));
+  if (milestoneCount > 0) tcParts.push(milestoneCount + (milestoneCount === 1 ? ' milestone' : ' milestones'));
+  _badge('badge-timecast',    tcParts.length ? tcParts.join(' · ') : '',     'Gantt · Baseline');
+  _badge('badge-resourcecast', roleCount > 0 ? roleCount + (roleCount === 1 ? ' role' : ' roles') + ' defined' : '', 'Rates · Cost Planning');
+  _badge('badge-orgcast',      personCount > 0 ? personCount + (personCount === 1 ? ' person' : ' people') : '',      'SVG · Print');
+  _badge('badge-rfqcast',      rfqItems > 0 ? rfqItems + (rfqItems === 1 ? ' item' : ' items') + (rfqReceived > 0 ? ' · ' + rfqReceived + ' received' : '') : '', 'Alerts · Dashboard');
+  _badge('badge-dorcast',      dorRows > 0 ? dorRows + (dorRows === 1 ? ' row' : ' rows') + ' defined' : '',          'Excel · PDF · JSON');
 }
 
 /* ── Load panel state on start ── */
@@ -840,9 +1051,13 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshStats();
   });
 
-  /* Refresh stats when ResourceCast data changes in another tab. */
+  /* Refresh stats when any tool data changes in another tab. */
   window.addEventListener('storage', e => {
-    if (e.key === 'bidcast_state_resourcecast') refreshStats();
+    const trackedKeys = [
+      'bidcast_state_timecast', 'bidcast_state_resourcecast',
+      'bidcast_state_orgcast', 'bidcast_state_rfqcast', 'bidcast_state_dorcast',
+    ];
+    if (trackedKeys.includes(e.key)) refreshStats();
   });
 });
 </script>
