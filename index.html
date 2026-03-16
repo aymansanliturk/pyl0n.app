@@ -171,18 +171,19 @@
   .dash-inner { max-width: 1400px; margin: 0 auto; }
   .dash-stats {
     display: grid;
-    grid-template-columns: repeat(auto-fill, 200px);
-    gap: 12px;
+    grid-template-columns: repeat(4, 150px);
+    gap: 8px;
   }
   .stat-card {
     background: var(--surface);
     border: 1.5px solid var(--border);
     border-radius: 12px;
-    padding: 16px 18px;
+    padding: 14px 14px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 3px;
     box-shadow: 0 4px 16px rgba(0,0,0,0.07);
+    min-width: 0;
   }
   .stat-icon {
     width: 26px; height: 26px; border-radius: 7px;
@@ -195,12 +196,13 @@
     text-transform: uppercase; color: var(--faint);
   }
   .stat-value {
-    font-family: 'DM Mono', monospace; font-size: 16px; font-weight: 700;
-    color: var(--faint); letter-spacing: -0.5px; line-height: 1.1;
+    font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 700;
+    color: var(--faint); letter-spacing: -0.3px; line-height: 1.1;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .stat-value.has-data { color: var(--text); }
   /* Smaller text for longer strings (dates, ranges) */
-  .stat-value.sm { font-size: 12px; letter-spacing: 0; }
+  .stat-value.sm { font-size: 11px; letter-spacing: 0; }
   .stat-source { font-size: 8px; color: var(--faint); margin-top: 2px; }
 
   /* ── Progress Bar ── */
@@ -233,8 +235,7 @@
   font-size: 10px;
   font-weight: 700;
   color: var(--accent);
-  flex-shrink: 0; 
-  }
+  flex-shrink: 0;
   }
   .progress-track {
   height: 6px;
@@ -254,9 +255,9 @@
   .progress-fill.alert { background: #c0392b; }
 
   /* ── Stat card state indicators ── */
-  .stat-card.s-healthy { border-left: 3px solid var(--green); padding-left: 15px; }
-  .stat-card.s-warn    { border-left: 3px solid #d97706; padding-left: 15px; }
-  .stat-card.s-alert   { border-left: 3px solid #c0392b; padding-left: 15px; }
+  .stat-card.s-healthy { border-left: 3px solid var(--green); padding-left: 11px; }
+  .stat-card.s-warn    { border-left: 3px solid #d97706; padding-left: 11px; }
+  .stat-card.s-alert   { border-left: 3px solid #c0392b; padding-left: 11px; }
 
   .stat-chip {
     display: inline-flex; align-items: center;
@@ -329,13 +330,13 @@
     .cards-wrap { padding: 0 24px 48px; }
     .cards { grid-template-columns: repeat(2, 1fr); }
     .hero-title { font-size: 42px; letter-spacing: -2px; }
-    .dash-stats { grid-template-columns: repeat(3, 1fr); }
+    .dash-stats { grid-template-columns: repeat(2, 150px); }
   }
   @media (max-width: 560px) {
     .cards { grid-template-columns: 1fr; }
     .cards-wrap { padding: 0 16px 32px; }
     .hero-title { font-size: 36px; }
-    .dash-stats { grid-template-columns: 1fr; }
+    .dash-stats { grid-template-columns: repeat(2, 1fr); }
     .pp-input.name { width: 180px; }
   }
 
@@ -600,19 +601,19 @@
         </div>
       </div>
 
-      <!-- Master Archive -->
+      <!-- Suite Portfolio -->
       <div class="dash-panel">
-        <div class="dash-panel-hd">Suite Archive</div>
+        <div class="dash-panel-hd">Suite Portfolio</div>
         <div class="archive-rows">
           <div class="archive-row">
-            <div class="archive-row-desc">Export all tool data and project settings to a single JSON archive.</div>
-            <button class="pp-btn" onclick="masterExport()" title="Download Full_Project_Archive.json">↓ Export</button>
+            <div class="archive-row-desc"><strong>Full Project Archive</strong> — all tools, settings &amp; logo in one file.</div>
+            <button class="pp-btn" style="border-color:var(--accent);color:var(--accent);font-weight:700;" onclick="masterExport()" title="Download Full_Project_Archive.json">↓ Export</button>
           </div>
           <div class="archive-row">
-            <div class="archive-row-desc">Restore entire suite from a previously exported archive file.</div>
+            <div class="archive-row-desc">Restore entire suite from a previously exported archive.</div>
             <input type="file" id="master-import-input" accept=".json" style="display:none"
                    onchange="masterImport(this)">
-            <button class="pp-btn" onclick="document.getElementById('master-import-input').click()" title="Import archive JSON">↑ Import</button>
+            <button class="pp-btn" style="border-color:var(--accent);color:var(--accent);font-weight:700;" onclick="document.getElementById('master-import-input').click()" title="Import archive JSON">↑ Import</button>
           </div>
         </div>
       </div>
