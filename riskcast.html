@@ -842,12 +842,8 @@ function suiteWrite() {
 
 function suiteRead(sync) {
   try {
-    if (!sync || sync._src === 'riskcast') {
-      SuiteManager.updateBadge(document.getElementById('suite-sync-badge'));
-      return;
-    }
     const el = document.getElementById('doc-title');
-    if (el && sync.projectName && sync.projectName !== 'Project Name'
+    if (sync && el && sync.projectName && sync.projectName !== 'Project Name'
         && document.activeElement !== el)
       el.value = sync.projectName;
     SuiteManager.updateBadge(document.getElementById('suite-sync-badge'));
