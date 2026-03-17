@@ -323,6 +323,8 @@ input[type="text"]:focus { border-color:var(--accent); background:#fff; }
       Redo
     </button>
     <span class="save-confirm" id="save-confirm">✓ Saved!</span>
+    <div class="pb-sep"></div>
+    <button class="pb-btn" onclick="resetState()" title="Clear all data and reset to defaults" style="color:#c0392b; border-color:#f5c6c6;">↺ Reset</button>
   </div>
 
   <div class="section">
@@ -679,6 +681,7 @@ function collectState() {
 
 function applyState(s) {
   if (!s) return;
+  if (s._empty) return; // fresh start — keep editor visible
   if (s.format) setFormat(s.format);
   document.getElementById('doc-title').value = s.title || '';
   document.getElementById('doc-rev').value   = s.rev   || '';
@@ -877,6 +880,12 @@ function _renderHeatmap(risks) {
     }
   }
   hm.innerHTML = html;
+}
+
+function resetState() {
+  if (!confirm('Reset PYL0N Risk to defaults? This will clear all current data.')) return;
+  ['pyl0n_state_riskcast', 'bidcast_state_riskcast'].forEach(k => localStorage.removeItem(k));
+  window.location.reload();
 }
 
 function goBack() {
