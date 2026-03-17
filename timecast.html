@@ -410,6 +410,8 @@
       Redo
     </button>
     <span class="save-confirm" id="save-confirm">&#10003; Saved!</span>
+    <div class="pb-sep"></div>
+    <button class="pb-btn" onclick="resetState()" title="Clear all data and reset to defaults" style="color:#c0392b; border-color:#f5c6c6;">↺ Reset</button>
   </div>
 
   <!-- Chart Info -->
@@ -425,7 +427,7 @@
         <input type="text" id="bid-status" value="ITB Received" placeholder="e.g. Awarded">
       </label>
       <label>Status Color
-        <input type="color" id="status-color" value="#2c4e87" style="height:38px;width:100%;">
+        <input type="color" id="status-color" value="#415A77" style="height:38px;width:100%;">
       </label>
       <label>Revision
         <input type="text" id="proj-rev" value="Rev. 1.0">
@@ -1486,6 +1488,7 @@ function updateLogoUI() {
   }
 
   function applyState(s) {
+    if (s._empty) return; // fresh start — keep editor visible
     if (s.format) setFormat(s.format);
     if (s.chartTitle)      { const el = document.getElementById('proj-title');   if(el) { el.value = s.chartTitle; el._manuallyEdited = true; } }
     if (s.status)          { const el = document.getElementById('bid-status');   if(el) el.value = s.status; }
@@ -1574,6 +1577,12 @@ function updateLogoUI() {
     a.download = name + '_timecast.html';
     a.click();
     URL.revokeObjectURL(a.href);
+  }
+
+  function resetState() {
+    if (!confirm('Reset PYL0N Time to defaults? This will clear all current data.')) return;
+    ['pyl0n_state_timecast', 'bidcast_state_timecast'].forEach(k => localStorage.removeItem(k));
+    window.location.reload();
   }
 
   function goBack() {

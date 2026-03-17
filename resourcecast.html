@@ -301,6 +301,8 @@
       Redo
     </button>
     <span class="save-confirm" id="save-confirm">✓ Saved!</span>
+    <div class="pb-sep"></div>
+    <button class="pb-btn" onclick="resetState()" title="Clear all data and reset to defaults" style="color:#c0392b; border-color:#f5c6c6;">↺ Reset</button>
   </div>
 
   <!-- Project Info -->
@@ -1314,6 +1316,12 @@ function updateLogoUI() {
 
 
 
+  function resetState() {
+    if (!confirm('Reset PYL0N Resources to defaults? This will clear all current data.')) return;
+    ['pyl0n_state_resourcecast', 'bidcast_state_resourcecast'].forEach(k => localStorage.removeItem(k));
+    window.location.reload();
+  }
+
   function goBack() {
     document.getElementById('output').style.display = 'none';
     document.getElementById('editor').style.display = 'block';
@@ -1349,6 +1357,7 @@ function updateLogoUI() {
   }
 
   function applyState(s) {
+    if (s._empty) return; // fresh start — keep editor visible
     if (s.format) setFormat(s.format);
     phaseCollapsed = s.phaseCollapsed || {};
     document.getElementById('proj-name').value  = s.projName  || '';

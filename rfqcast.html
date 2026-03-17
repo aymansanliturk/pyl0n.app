@@ -290,6 +290,8 @@ input:focus, select:focus { border-color:var(--accent); background:#fff; }
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 014-4h12"/></svg>
       Redo
     </button>
+    <div class="pb-sep"></div>
+    <button class="pb-btn" onclick="resetState()" title="Clear all data and reset to defaults" style="color:#c0392b; border-color:#f5c6c6;">↺ Reset</button>
   </div>
 
   <div class="section">
@@ -898,6 +900,7 @@ function collectState() {
 }
 
 function applyState(s) {
+  if (s._empty) return; // fresh start — keep editor visible
   document.getElementById('proj-name').value       = s.projName || '';
   document.getElementById('offer-due').value       = s.offerDue || '';
   document.getElementById('validity-months').value = s.validityMonths || '3';
@@ -1093,6 +1096,12 @@ function generate() {
   document.getElementById('editor').style.display = 'none';
   document.getElementById('output').style.display  = 'block';
   window.scrollTo(0,0);
+}
+
+function resetState() {
+  if (!confirm('Reset PYL0N RFQ to defaults? This will clear all current data.')) return;
+  ['pyl0n_state_rfqcast', 'bidcast_state_rfqcast'].forEach(k => localStorage.removeItem(k));
+  window.location.reload();
 }
 
 function goBack() {

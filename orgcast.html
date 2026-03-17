@@ -210,6 +210,8 @@
       Redo
     </button>
     <span class="save-confirm" id="save-confirm">✓ Saved!</span>
+    <div class="pb-sep"></div>
+    <button class="pb-btn" onclick="resetState()" title="Clear all data and reset to defaults" style="color:#c0392b; border-color:#f5c6c6;">↺ Reset</button>
   </div>
 
   <!-- Chart info -->
@@ -722,6 +724,12 @@ function updateLogoUI() {
     window.scrollTo(0,0);
   }
 
+  function resetState() {
+    if (!confirm('Reset PYL0N Org to defaults? This will clear all current data.')) return;
+    ['pyl0n_state_orgcast', 'bidcast_state_orgcast'].forEach(k => localStorage.removeItem(k));
+    window.location.reload();
+  }
+
   function goBack() {
     document.getElementById('output').style.display = 'none';
     document.getElementById('editor').style.display = 'block';
@@ -779,6 +787,7 @@ function updateLogoUI() {
   }
 
   function applyState(s) {
+    if (s._empty) return; // fresh start — keep editor visible
     document.getElementById('chart-title').value = s.title||'';
     document.getElementById('chart-rev').value   = s.rev  ||'';
     document.getElementById('chart-date').value  = s.date ||'';

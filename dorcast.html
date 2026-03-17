@@ -303,6 +303,8 @@ input:focus, select:focus { border-color:var(--accent); background:#fff; }
       Redo
     </button>
     <span class="save-confirm" id="save-confirm">✓ Saved!</span>
+    <div class="pb-sep"></div>
+    <button class="pb-btn" onclick="resetState()" title="Clear all data and reset to defaults" style="color:#c0392b; border-color:#f5c6c6;">↺ Reset</button>
   </div>
 
   <div class="section">
@@ -686,6 +688,7 @@ function collectState() {
 }
 
 function applyState(s) {
+  if (s._empty) return; // fresh start — keep editor visible
   document.getElementById('doc-title').value = s.title||'';
   document.getElementById('doc-rev').value   = s.rev  ||'';
   document.getElementById('doc-date').value  = s.date ||'';
@@ -752,6 +755,12 @@ function generate() {
   document.getElementById('editor').style.display = 'none';
   document.getElementById('output').style.display  = 'block';
   window.scrollTo(0,0);
+}
+
+function resetState() {
+  if (!confirm('Reset PYL0N DOR to defaults? This will clear all current data.')) return;
+  ['pyl0n_state_dorcast', 'bidcast_state_dorcast'].forEach(k => localStorage.removeItem(k));
+  window.location.reload();
 }
 
 function goBack() {
