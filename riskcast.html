@@ -356,8 +356,9 @@ input[type="text"]:focus { border-color:var(--accent); background:#fff; }
             <th class="th-topic">Topic <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:8px;">— Subject / area</span></th>
             <th class="th-cause">Cause <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:8px;">— Root cause or trigger</span></th>
             <th style="min-width:190px;">Risk Description</th>
+            <th style="min-width:160px;">Impact <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:8px;">— consequence if realised</span></th>
             <th class="th-lh" style="text-align:center;">Likelihood<br><span style="font-size:7px;font-weight:400;text-transform:none;">1 = Rare · 5 = Certain</span></th>
-            <th class="th-im" style="text-align:center;">Impact<br><span style="font-size:7px;font-weight:400;text-transform:none;">1 = Minor · 5 = Catastrophic</span></th>
+            <th class="th-im" style="text-align:center;">I<br><span style="font-size:7px;font-weight:400;text-transform:none;">1 = Minor · 5 = Catastrophic</span></th>
             <th class="th-score" style="text-align:center;">Score<br><span style="font-size:7px;font-weight:400;text-transform:none;">L × I</span></th>
             <th style="min-width:190px;">Mitigation Plan</th>
             <th style="min-width:100px;">Status</th>
@@ -404,6 +405,7 @@ input[type="text"]:focus { border-color:var(--accent); background:#fff; }
           <th class="oth-topic">Topic</th>
           <th class="oth-cause">Cause</th>
           <th style="min-width:170px;">Risk Description</th>
+          <th style="min-width:130px;">Impact</th>
           <th class="oth-lh">L</th>
           <th class="oth-im">I</th>
           <th class="oth-score">Score</th>
@@ -553,6 +555,7 @@ function addRisk(d) {
     <td><input class="risk-input risk-topic" type="text" placeholder="Subject / area…" value="${esc(d.topic||'')}"></td>
     <td><input class="risk-input risk-cause cause" type="text" placeholder="Root cause or trigger…" value="${esc(d.cause||'')}"></td>
     <td><input class="risk-input risk-desc" type="text" placeholder="Describe the risk event…" value="${esc(d.desc||'')}"></td>
+    <td><input class="risk-input risk-impact-desc" type="text" placeholder="Consequence if risk occurs…" value="${esc(d.impactDesc||'')}"></td>
     <td><select class="risk-sel sel-lh">${opt5(l)}</select></td>
     <td><select class="risk-sel sel-im">${opt5(i)}</select></td>
     <td class="td-score"><span class="score-badge ${lvl.cls}">${score} · ${lvl.label}</span></td>
@@ -623,6 +626,7 @@ function _getRisks() {
       topic:      row.querySelector('.risk-topic').value,
       cause:      row.querySelector('.risk-cause').value,
       desc:       row.querySelector('.risk-desc').value,
+      impactDesc: row.querySelector('.risk-impact-desc').value,
       likelihood: l,
       impact:     i,
       score:      l * i,
@@ -739,13 +743,13 @@ function exportExcel() {
   const wb    = XLSX.utils.book_new();
 
   // Main register sheet
-  const rows = [['#','Category','Topic','Cause','Risk Description','Likelihood','Impact','Score','Level','Mitigation Plan','Status']];
+  const rows = [['#','Category','Topic','Cause','Risk Description','Impact Description','Likelihood','Impact (I)','Score','Level','Mitigation Plan','Status']];
   state.risks.forEach((r, i) => {
     const lvl = scoreLevel(r.score);
-    rows.push([i+1, r.category, r.topic||'', r.cause||'', r.desc, r.likelihood, r.impact, r.score, lvl.label, r.mitigation, r.status]);
+    rows.push([i+1, r.category, r.topic||'', r.cause||'', r.desc, r.impactDesc||'', r.likelihood, r.impact, r.score, lvl.label, r.mitigation, r.status]);
   });
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [{wch:4},{wch:16},{wch:22},{wch:28},{wch:42},{wch:12},{wch:10},{wch:8},{wch:10},{wch:42},{wch:14}];
+  ws['!cols'] = [{wch:4},{wch:16},{wch:22},{wch:28},{wch:42},{wch:36},{wch:12},{wch:10},{wch:8},{wch:10},{wch:42},{wch:14}];
   XLSX.utils.book_append_sheet(wb, ws, 'Risk Register');
 
   // Summary sheet — by level and by category
@@ -824,7 +828,7 @@ function generate() {
 
     tbody.innerHTML += `
       <tr class="cat-group-hdr">
-        <td colspan="9">
+        <td colspan="10">
           <div class="cat-group-hdr-inner">
             <span class="cat-group-name">${esc(cat)}</span>
             <span class="cat-group-meta">${esc(metaParts)}</span>
@@ -843,6 +847,7 @@ function generate() {
           <td class="otr-topic">${esc(r.topic || '')}</td>
           <td class="otr-cause">${esc(r.cause || '')}</td>
           <td>${esc(r.desc)}</td>
+          <td>${esc(r.impactDesc || '')}</td>
           <td class="otr-lh">${r.likelihood}</td>
           <td class="otr-im">${r.impact}</td>
           <td class="otr-score"><span class="otr-badge ${lvl.cls}">${r.score}&thinsp;·&thinsp;${lvl.label}</span></td>
