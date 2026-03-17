@@ -463,7 +463,15 @@ const SuiteManager = (() => {
       el.style.display = 'inline';
     }
   }
-  return { read, write, getLogo, setLogo, removeLogo, onUpdate, updateBadge };
+  function migrate() {
+    Object.keys(localStorage).filter(k => k.startsWith('bidcast_')).forEach(old => {
+      const neo = 'pyl0n_' + old.slice('bidcast_'.length);
+      if (!localStorage.getItem(neo)) localStorage.setItem(neo, localStorage.getItem(old));
+      localStorage.removeItem(old);
+    });
+  }
+  migrate();
+  return { read, write, getLogo, setLogo, removeLogo, onUpdate, updateBadge, migrate };
 })();
 
 /* ══ Logo ══════════════════════════════════════════════════════════ */
