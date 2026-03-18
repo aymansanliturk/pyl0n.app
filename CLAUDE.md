@@ -1,21 +1,22 @@
-# CLAUDE.md — forecast.bid
+# CLAUDE.md — PYL0N Suite (forecast.bid)
 
 This file documents the codebase structure, conventions, and workflows for AI assistants working on this project.
 
 ## Project Overview
 
-**forecast.bid** is a self-contained, zero-installation web application suite for bid and project teams. It runs entirely in the browser — no server, no build step, no backend. The suite consists of six specialized planning tools plus a landing page.
+**PYL0N** is a self-contained, zero-installation web application suite for bid and project teams. It runs entirely in the browser — no server, no build step, no backend. The suite consists of seven specialized planning tools plus a landing page.
 
 ## Tools in the Suite
 
 | File | Tool Name | Purpose |
 |------|-----------|---------|
-| `index.html` | Landing page | Navigation hub with cards linking to all tools |
-| `timecast.html` | TimeCast | Multi-project Gantt timeline with baseline tracking |
+| `index.html` | Landing page / Dashboard | Navigation hub with cards, suite-wide masterImport/masterExport |
+| `timecast.html` | TimeCast | Multi-project Gantt timeline with baseline tracking and dynamic scale |
 | `resourcecast.html` | ResourceCast | Team resource allocation, FTE calculations, cost planning |
 | `orgcast.html` | OrgCast | Organization chart generator with SVG connectors |
 | `rfqcast.html` | RFQCast | Supplier RFQ tracking dashboard |
 | `dorcast.html` | DORCast | RACI/DOR responsibility matrix builder |
+| `riskcast.html` | RiskCast | Risk & opportunity register with scoring matrix |
 | `favicon.svg` | — | Brand favicon |
 | `logo.svg` | — | Brand logo (34×34px grid) |
 
@@ -41,9 +42,14 @@ No local node_modules. Libraries are loaded from CDN:
 
 ### Client-Side Storage
 
-All data persists in the browser via `localStorage`:
+All data persists in the browser via `localStorage`. Active key prefix is `bidcast_`:
 - `bidcast_logo` — company logo (base64-encoded data URL, shared across suite)
-- `bidcast_suite_sync` — shared state object used for cross-tool sync
+- `bidcast_suite_sync` — shared state object for cross-tool sync
+- `bidcast_state_<toolname>` — per-tool state JSON
+
+**`migrate()` in SuiteManager**: Scans `localStorage` for any `pyl0n_` keys (from an older rebrand), maps them to `bidcast_` equivalents, and deletes the old keys — run once on page load to ensure backward compatibility.
+
+**`masterImport` dual-prefix**: `index.html` accepts archive JSON files with either `bidcast_` or legacy `pyl0n_` keys, remapping the old prefix on restore.
 
 No cookies, no IndexedDB, no server storage.
 
@@ -87,10 +93,12 @@ Always use these variables for colors — do not hardcode hex values outside of 
 
 Each tool uses a consistent `collectState()` / `applyState()` pattern:
 - `collectState()` — reads all form inputs and returns a plain JSON object
-- `applyState(state)` — populates all form inputs from a JSON object
+- `applyState(state)` — populates all form inputs from a JSON object; always calls `generate()` at the end
 - `saveJSON()` — calls `collectState()`, writes to localStorage and triggers file download
 - `loadJSON()` — parses uploaded `.json` file and calls `applyState()`
 - `exportHTML()` — creates a fully self-contained HTML snapshot with state embedded as base64
+
+**Important (TimeCast):** `applyState()` calls `generate()` which hides the editor. The `DOMContentLoaded` auto-restore block explicitly forces `editor.style.display = 'block'` after calling `applyState()` to keep the editor visible on initial load.
 
 ### Undo/Redo System
 
@@ -136,6 +144,10 @@ Print layouts target **A4 portrait** or **A3 landscape** depending on the tool.
 - `MILESTONE` — zero-duration point in time
 - `LABOUR` — human resource cost line
 - `EXPENSE` — non-labour cost line
+
+### Risk Type (RiskCast)
+- `risk` — renders score badge with severity color (green/amber/red)
+- `opportunity` — always renders green badge labeled "Gain" regardless of score
 
 ### RFQ Status (RFQCast)
 - `none` — not started
@@ -193,6 +205,11 @@ python3 -m http.server 8080  # then visit http://localhost:8080
 - Tracks project phases as column headers on the Gantt
 - Supports baseline vs. current schedule comparison
 - Phase data is the primary sync source for ResourceCast
+- **Dynamic scale selector** (Phase 27): Monthly / Weekly / Quarterly. Stored as `viewScale` in `chartState` and `collectState`. Weekly columns are 26px-min aligned to Monday boundaries; quarterly columns are 60px-min with Q0–Q3 labels.
+  - `buildUnits(sm, sy, em, ey, scale)` — replaces `buildMonths()` for rendering
+  - `unitColOf(units, m, y, scale)` — replaces `colOf()` for column index lookup
+  - `todayUnitIdx(units, scale)` — today's column index across any scale
+  - Drag interactions (`_ganttDragStart`, `_ganttDragMove`, `_refreshTaskBars`) all scale-aware via `_gDrag.scale` and `_gDrag.months`
 
 ### ResourceCast (`resourcecast.html`)
 - Monthly hours grid — rows are roles, columns are months
@@ -215,6 +232,14 @@ python3 -m http.server 8080  # then visit http://localhost:8080
 - Has a preset modal to load standard responsibility templates
 - Supports multiple parties (columns) with free-form naming
 
+### RiskCast (`riskcast.html`)
+- Risk register with 5×5 scoring matrix (likelihood × impact)
+- Each row has: Type (risk/opportunity), Category, Topic, Cause, Risk Description, Impact Description, Likelihood (1-5), Impact (1-5), Score (auto), Mitigation Plan, Status
+- Opportunities always render green badge ("Gain") regardless of score
+- Score badges: ≤4 green, ≤9 amber, ≤14 orange, ≥15 red
+- Summary pills count by severity; opportunity rows always count as "gain"
+- Excel export columns: `#, Type, Category, Topic, Cause, Risk Description, Impact Description, Likelihood, Impact (I), Score, Level, Mitigation Plan, Status`
+
 ## Function Index by File
 
 Shared functions present in every tool (not repeated below):
@@ -226,6 +251,7 @@ Shared functions present in every tool (not repeated below):
 - `goBack()` — switch output → editor
 - `_snapshot()` / `_scheduleSnap()` / `undo()` / `redo()` / `_syncUndoUI()` — undo/redo
 - `suiteWrite()` / `suiteRead()` / `_updateSyncBadge()` — suite sync
+- `SuiteManager.migrate()` — one-time migration of legacy `pyl0n_` localStorage keys to `bidcast_`
 
 ### timecast.html
 
@@ -247,17 +273,27 @@ Shared functions present in every tool (not repeated below):
 | `updateProjWarn()` | Shows warning when 4+ projects selected with non-A2 format |
 | `updateDelBtns()` | Disables delete buttons when only one project remains |
 | `updateAddProjBtn()` | Updates project count input and UI state |
-| `buildMonths()` | Generates array of `{m, y}` objects for a date range |
+| `buildMonths()` | Generates array of `{m, y}` objects for a date range (monthly only) |
+| `_buildWeekUnits()` | Generates weekly unit array aligned to Monday boundaries |
+| `_buildQuarterUnits()` | Generates quarterly unit array (Q0–Q3 per year) |
+| `buildUnits()` | Dispatcher — returns correct unit array for the given scale |
+| `unitColOf()` | Maps a task month/year to a column index for any scale |
+| `todayUnitIdx()` | Returns today's column index in a units array |
 | `yearBands()` | Groups consecutive months by year into band objects |
 | `el()` | Factory function to create DOM elements with optional class and HTML |
-| `colOf()` | Finds index of a month in the months array by month/year |
+| `colOf()` | Finds index of a month in a monthly array (legacy, still used internally) |
 | `buildSidebar()` | Renders draggable task list sidebar for chart generation |
 | `sameSbLane()` | Checks if sidebar items are in same lane (Bid/Execution) |
 | `getLaneTasks()` | Fetches tasks for a project/lane combination from state |
-| `generate()` | Collects form data and renders Gantt chart output |
+| `generate()` | Collects form data, reads `#view-scale`, sets `viewScale` global, renders Gantt |
 | `refreshChart()` | Re-renders chart preserving current state |
-| `renderChart()` | Builds SVG Gantt chart with timeline, tasks, baseline, and today marker |
+| `renderChart()` | Builds CSS-grid Gantt with timeline, tasks, baseline, today marker; scale-aware |
 | `renderGroup()` | Renders individual task group (bars, milestones) in chart |
+| `_refreshTaskBars()` | Live re-draws bar cells for one task row during drag; uses `buildUnits`/`unitColOf` |
+| `_ganttDragStart()` | Initiates drag — caches `units` and `scale` in `_gDrag` |
+| `_ganttDragMove()` | Updates task dates during drag using `unitColOf` and `.firstMonth`/`.firstYear` |
+| `_ganttDragEnd()` | Finalises drag, syncs dates back to editor |
+| `_colFromMouseX()` | Maps mouse X position to a column index in the current units array |
 | `togglePhase()` | Collapses/expands bid or execution phase section |
 
 ### resourcecast.html
@@ -365,3 +401,17 @@ Shared functions present in every tool (not repeated below):
 | `loadPreset()` | Loads a responsibility template into the matrix |
 | `importExcel()` | Parses Excel file and loads rows/parties |
 | `exportExcel()` | Generates Excel workbook with matrix data |
+
+### riskcast.html
+
+| Function | Description |
+|----------|-------------|
+| `addRisk()` | Creates risk row with type, category, topic, cause, descriptions, scoring inputs, mitigation, status |
+| `removeRisk()` | Deletes risk row and updates summary pills |
+| `_getRisks()` | Extracts all risk data: `{type, category, topic, cause, desc, impactDesc, likelihood, impact, score, mitigation, status}` |
+| `_refreshScore()` | Recalculates score badge color/label for a row; opportunities always render green "Gain" |
+| `_refreshSummaryPills()` | Updates count pills (Critical / High / Medium / Low / Gain) in the editor |
+| `generate()` | Collects state and renders risk register output table |
+| `importExcel()` | Parses Excel file and loads risk rows |
+| `exportExcel()` | Generates Excel workbook; columns: `#, Type, Category, Topic, Cause, Risk Description, Impact Description, Likelihood, Impact (I), Score, Level, Mitigation Plan, Status` |
+| `esc()` | HTML-escapes string for safe DOM insertion |
