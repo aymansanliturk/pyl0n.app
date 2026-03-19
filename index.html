@@ -175,8 +175,9 @@
   .dash-inner { max-width: 1400px; margin: 0 auto; }
   .dash-stats {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 8px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    width: 780px;
   }
   .stat-card {
     background: var(--surface);
@@ -334,7 +335,7 @@
     .cards-wrap { padding: 0 24px 48px; }
     .cards { grid-template-columns: repeat(2, 1fr); }
     .hero-title { font-size: 42px; letter-spacing: -2px; }
-    .dash-stats { grid-template-columns: repeat(3, 1fr); }
+    .dash-stats { grid-template-columns: repeat(2, 1fr); width: auto; }
   }
   @media (max-width: 560px) {
     .cards { grid-template-columns: 1fr; }
