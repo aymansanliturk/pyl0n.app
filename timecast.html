@@ -514,6 +514,7 @@
           <div class="sub" id="out-sub"></div>
         </div>
         <div class="header-right">
+          <div id="print-customer-logo" style="margin-bottom: 6px;"></div>
           <div id="out-badge" class="bid-status-badge"></div>
           <div class="chart-meta" id="out-meta"></div>
         </div>
@@ -549,6 +550,7 @@
 const SuiteManager = (() => {
   const SYNC_KEY = 'bidcast_suite_sync';
   const LOGO_KEY = 'bidcast_logo';
+  const CUSTOMER_LOGO_KEY = 'bidcast_customer_logo';
   function read() {
     try { return JSON.parse(localStorage.getItem(SYNC_KEY) || '{}'); } catch { return {}; }
   }
@@ -560,11 +562,12 @@ const SuiteManager = (() => {
     } catch { return {}; }
   }
   function getLogo() { return localStorage.getItem(LOGO_KEY) || null; }
+  function getCustomerLogo() { return localStorage.getItem(CUSTOMER_LOGO_KEY) || null; }
   function setLogo(dataUrl) { localStorage.setItem(LOGO_KEY, dataUrl); write({ _logoTs: Date.now() }, 'logo'); }
   function removeLogo() { localStorage.removeItem(LOGO_KEY); write({ _logoTs: Date.now() }, 'logo'); }
   function onUpdate(cb) {
     window.addEventListener('storage', e => {
-      if (e.key === SYNC_KEY || e.key === LOGO_KEY) cb(read(), e.key);
+      if (e.key === SYNC_KEY || e.key === LOGO_KEY || e.key === CUSTOMER_LOGO_KEY) cb(read(), e.key);
     });
   }
   function updateBadge(el) {
@@ -576,7 +579,7 @@ const SuiteManager = (() => {
       el.style.display = 'inline';
     }
   }
-  return { read, write, getLogo, setLogo, removeLogo, onUpdate, updateBadge };
+  return { read, write, getLogo, getCustomerLogo, setLogo, removeLogo, onUpdate, updateBadge };
 })();
 
 /* ── Logo (stored in bidcast_logo, shared across all tools) ── */
@@ -594,13 +597,19 @@ function clearLogo() {
   updateLogoUI();
 }
 function updateLogoUI() {
+  // 1. Company Logo (Left)
   const logo = SuiteManager.getLogo();
+  const pl = document.getElementById('print-logo');
+  if (pl) pl.innerHTML = logo ? `<img src="${logo}" style="height:36px;max-width:150px;object-fit:contain;display:block;">` : '';
+  // 2. Customer Logo (Right)
+  const custLogo = SuiteManager.getCustomerLogo();
+  const pcl = document.getElementById('print-customer-logo');
+  if (pcl) pcl.innerHTML = custLogo ? `<img src="${custLogo}" style="height:36px;max-width:150px;object-fit:contain;display:block;margin-left:auto;">` : '';
+  // Dashboard Sync UI (Editor View)
   const st = document.getElementById('logo-status');
   const cl = document.getElementById('logo-clear');
   if (st) st.style.display = logo ? 'inline' : 'none';
   if (cl) cl.style.display = logo ? 'inline-flex' : 'none';
-  const pl = document.getElementById('print-logo');
-  if (pl) pl.innerHTML = logo ? `<img src="${logo}" style="height:36px;max-width:150px;object-fit:contain;display:block;">` : '';
 }
 
   const MN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -1836,7 +1845,7 @@ function suiteRead(sync) {
 
 // Cross-tab sync listener — reacts to any tool updating the shared store or logo.
 SuiteManager.onUpdate((sync, key) => {
-  if (key === 'bidcast_logo') { updateLogoUI(); return; }
+  if (key === 'bidcast_logo' || key === 'bidcast_customer_logo') { updateLogoUI(); return; }
   suiteRead(sync);
 });
 
