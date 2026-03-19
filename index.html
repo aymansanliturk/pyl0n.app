@@ -601,21 +601,34 @@
       <div class="dash-panel">
         <div class="dash-panel-hd">Corporate Identity</div>
         <div class="dash-panel-row">
-          <div class="brand-logo-box" id="brand-logo-box" title="Click to upload logo"
-               onclick="document.getElementById('brand-logo-file').click()">
-            <img id="brand-logo-img" src="" alt="" style="display:none;">
-            <span class="brand-logo-empty" id="brand-logo-empty">⊕</span>
+          <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
+            <div class="brand-logo-box" id="brand-logo-box" title="Click to upload company logo"
+                 onclick="document.getElementById('brand-logo-file').click()">
+              <img id="brand-logo-img" src="" alt="" style="display:none;">
+              <span class="brand-logo-empty" id="brand-logo-empty">⊕</span>
+            </div>
+            <span style="font-size:8px;font-weight:700;color:var(--faint);letter-spacing:0.5px;">COMPANY</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
+            <div class="brand-logo-box" id="customer-logo-box" title="Click to upload customer logo"
+                 onclick="document.getElementById('customer-logo-file').click()">
+              <img id="customer-logo-img" src="" alt="" style="display:none;">
+              <span class="brand-logo-empty" id="customer-logo-empty">⊕</span>
+            </div>
+            <span style="font-size:8px;font-weight:700;color:var(--faint);letter-spacing:0.5px;">CUSTOMER</span>
           </div>
           <div class="dash-panel-info">
-            <div class="dash-panel-title">Company Logo</div>
-            <div class="dash-panel-desc">Shown in all PDF exports across the suite. SVG, PNG or JPG.</div>
+            <div class="dash-panel-title">Brand Logos</div>
+            <div class="dash-panel-desc">Company &amp; Customer logos for PDF exports across the suite.</div>
           </div>
         </div>
         <div class="dash-panel-btns">
           <input type="file" id="brand-logo-file" accept="image/svg+xml,image/png,image/jpeg,image/jpg"
                  style="display:none" onchange="brandUploadLogo(this)">
-          <button class="pp-btn" onclick="document.getElementById('brand-logo-file').click()">Upload Logo</button>
-          <button class="pp-btn danger" id="brand-logo-clear" onclick="brandClearLogo()" style="display:none">Remove</button>
+          <input type="file" id="customer-logo-file" accept="image/svg+xml,image/png,image/jpeg,image/jpg"
+                 style="display:none" onchange="customerUploadLogo(this)">
+          <button class="pp-btn danger" id="brand-logo-clear" onclick="brandClearLogo()" style="display:none">✕ Company</button>
+          <button class="pp-btn danger" id="customer-logo-clear" onclick="customerClearLogo()" style="display:none">✕ Customer</button>
         </div>
       </div>
 
@@ -789,8 +802,9 @@
    All tools embed this same utility.
 ═══════════════════════════════════════════════════════════════════ */
 const SuiteManager = (() => {
-  const SYNC_KEY = 'bidcast_suite_sync';
-  const LOGO_KEY = 'bidcast_logo';
+  const SYNC_KEY          = 'bidcast_suite_sync';
+  const LOGO_KEY          = 'bidcast_logo';
+  const CUSTOMER_LOGO_KEY = 'bidcast_customer_logo';
 
   function read() {
     try { return JSON.parse(localStorage.getItem(SYNC_KEY) || '{}'); }
@@ -805,10 +819,15 @@ const SuiteManager = (() => {
     } catch { return {}; }
   }
 
-  function getLogo() { return localStorage.getItem(LOGO_KEY) || null; }
+  function getLogo()          { return localStorage.getItem(LOGO_KEY)          || null; }
+  function getCustomerLogo()  { return localStorage.getItem(CUSTOMER_LOGO_KEY) || null; }
 
   function setLogo(dataUrl) {
     localStorage.setItem(LOGO_KEY, dataUrl);
+    write({ _logoTs: Date.now() }, 'logo');
+  }
+  function setCustomerLogo(dataUrl) {
+    localStorage.setItem(CUSTOMER_LOGO_KEY, dataUrl);
     write({ _logoTs: Date.now() }, 'logo');
   }
 
@@ -816,10 +835,14 @@ const SuiteManager = (() => {
     localStorage.removeItem(LOGO_KEY);
     write({ _logoTs: Date.now() }, 'logo');
   }
+  function removeCustomerLogo() {
+    localStorage.removeItem(CUSTOMER_LOGO_KEY);
+    write({ _logoTs: Date.now() }, 'logo');
+  }
 
   function onUpdate(cb) {
     window.addEventListener('storage', e => {
-      if (e.key === SYNC_KEY || e.key === LOGO_KEY) cb(read(), e.key);
+      if (e.key === SYNC_KEY || e.key === LOGO_KEY || e.key === CUSTOMER_LOGO_KEY) cb(read(), e.key);
     });
   }
 
@@ -833,7 +856,7 @@ const SuiteManager = (() => {
     }
   }
 
-  return { read, write, getLogo, setLogo, removeLogo, onUpdate, updateBadge };
+  return { read, write, getLogo, setLogo, removeLogo, getCustomerLogo, setCustomerLogo, removeCustomerLogo, onUpdate, updateBadge };
 })();
 
 /* ══ Project Management ══════════════════════════════════════════ */
@@ -1354,13 +1377,22 @@ function refreshStats() {
 
 /* ── Brand Settings panel logo sync ── */
 function _updateBrandPanel() {
-  const logo    = SuiteManager.getLogo();
+  const logo     = SuiteManager.getLogo();
+  const custLogo = SuiteManager.getCustomerLogo();
+
   const img     = document.getElementById('brand-logo-img');
   const empty   = document.getElementById('brand-logo-empty');
   const clearEl = document.getElementById('brand-logo-clear');
   if (img)     { img.src = logo || ''; img.style.display = logo ? 'block' : 'none'; }
   if (empty)   empty.style.display = logo ? 'none' : 'inline';
   if (clearEl) clearEl.style.display = logo ? 'inline-flex' : 'none';
+
+  const custImg     = document.getElementById('customer-logo-img');
+  const custEmpty   = document.getElementById('customer-logo-empty');
+  const custClearEl = document.getElementById('customer-logo-clear');
+  if (custImg)     { custImg.src = custLogo || ''; custImg.style.display = custLogo ? 'block' : 'none'; }
+  if (custEmpty)   custEmpty.style.display = custLogo ? 'none' : 'inline';
+  if (custClearEl) custClearEl.style.display = custLogo ? 'inline-flex' : 'none';
 }
 
 function brandUploadLogo(input) {
@@ -1387,6 +1419,26 @@ function brandClearLogo() {
   ppFlashSync();
 }
 
+function customerUploadLogo(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    SuiteManager.setCustomerLogo(e.target.result);
+    _updateBrandPanel();
+    ppFlashSync();
+  };
+  reader.readAsDataURL(file);
+}
+
+function customerClearLogo() {
+  SuiteManager.removeCustomerLogo();
+  const inp = document.getElementById('customer-logo-file');
+  if (inp) inp.value = '';
+  _updateBrandPanel();
+  ppFlashSync();
+}
+
 /* ── Master Export / Import ── */
 function masterExport() {
   const archive = {};
@@ -1400,9 +1452,11 @@ function masterExport() {
     const v = localStorage.getItem(k);
     if (v != null) archive[k] = v;
   });
-  // Logo (may be large base64)
+  // Logos (may be large base64)
   const logo = localStorage.getItem('bidcast_logo');
   if (logo) archive['bidcast_logo'] = logo;
+  const custLogo = localStorage.getItem('bidcast_customer_logo');
+  if (custLogo) archive['bidcast_customer_logo'] = custLogo;
 
   archive._exportedAt = new Date().toISOString();
   archive._version    = 1;
