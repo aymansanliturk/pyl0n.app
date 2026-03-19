@@ -1605,16 +1605,33 @@ function generateExecutiveReport() {
     const em = tc.endMonth   ?? 11, ey = tc.endYear  ?? sy + 3;
     tcStart = _MN[sm] + ' ' + sy;
     tcEnd   = _MN[em] + ' ' + ey;
+
     (tc.projects || []).forEach(p => {
-      [...(p.bidTasks || []), ...(p.execTasks || [])].forEach(t => {
-        phases.push({
-          name:    t.name,
-          project: p.name,
-          type:    t.type || 'task',
-          sm: t.startMonth ?? 0,  sy: t.startYear  ?? sy,
-          em: t.endMonth   ?? 0,  ey: t.endYear    ?? sy,
+      // Only include Bid Tasks if they are not hidden
+      if (!p.bidHidden) {
+        (p.bidTasks || []).forEach(t => {
+          phases.push({
+            name:    t.name,
+            project: p.name,
+            type:    t.type || 'task',
+            sm: t.sm ?? 0,  sy: t.sy ?? sy,
+            em: t.em ?? 0,  ey: t.ey ?? sy,
+          });
         });
-      });
+      }
+
+      // Only include Exec Tasks if they are not hidden
+      if (!p.execHidden) {
+        (p.execTasks || []).forEach(t => {
+          phases.push({
+            name:    t.name,
+            project: p.name,
+            type:    t.type || 'task',
+            sm: t.sm ?? 0,  sy: t.sy ?? sy,
+            em: t.em ?? 0,  ey: t.ey ?? sy,
+          });
+        });
+      }
     });
     phases.sort((a, b) => (a.sy * 12 + a.sm) - (b.sy * 12 + b.sm));
   }
