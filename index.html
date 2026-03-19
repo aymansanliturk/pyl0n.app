@@ -175,7 +175,7 @@
   .dash-inner { max-width: 1400px; margin: 0 auto; }
   .dash-stats {
     display: grid;
-    grid-template-columns: repeat(4, 150px);
+    grid-template-columns: repeat(5, 1fr);
     gap: 8px;
   }
   .stat-card {
@@ -212,7 +212,7 @@
   /* ── Progress Bar ── */
   .progress-wrap {
   margin-top: 18px;
-  width: 624px; 
+  width: 780px;
   background: var(--surface);
   border: 1.5px solid var(--border);
   border-radius: 12px;
@@ -277,7 +277,7 @@
   /* ── Dashboard side-panels row (Brand + Archive) ── */
   .dash-panels {
     display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap;
-    max-width: 624px;
+    max-width: 780px;
   }
   .dash-panel {
     background: var(--surface); border: 1.5px solid var(--border);
@@ -334,7 +334,7 @@
     .cards-wrap { padding: 0 24px 48px; }
     .cards { grid-template-columns: repeat(2, 1fr); }
     .hero-title { font-size: 42px; letter-spacing: -2px; }
-    .dash-stats { grid-template-columns: repeat(2, 150px); }
+    .dash-stats { grid-template-columns: repeat(3, 1fr); }
   }
   @media (max-width: 560px) {
     .cards { grid-template-columns: 1fr; }
@@ -551,6 +551,18 @@
         <div class="stat-label">Org Composition</div>
         <div class="stat-value sm" id="stat-org">—</div>
         <div class="stat-source">OrgCast</div>
+      </div>
+
+      <div class="stat-card" id="stat-card-exposure">
+        <div class="stat-icon" style="background:#fff3e0;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#b36a00" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="1" x2="12" y2="23"/>
+            <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+          </svg>
+        </div>
+        <div class="stat-label">Exposure (EMV)</div>
+        <div class="stat-value" id="stat-exposure">—</div>
+        <div class="stat-source">RiskCast</div>
       </div>
 
       <div class="stat-card" id="stat-card-risk">
@@ -1110,17 +1122,30 @@ function refreshStats() {
   // ── DORcast: data-row count ───────────────────────────────────────
   const dorRows = dc ? (dc.rows || []).filter(r => r.type !== 'header').length : 0;
 
-  // ── RiskCast: risk count, max score, level breakdown ─────────────
+  // ── RiskCast: risk count, max score, level breakdown, EMV ────────
+  const _PROB_MAP = { 1: 0.20, 2: 0.35, 3: 0.50, 4: 0.65, 5: 0.80 };
   let riskCount = 0, maxRiskScore = 0, riskCritical = 0, riskHigh = 0, riskMedium = 0, riskLow = 0;
+  let totalExposure = 0, hasExposureData = false;
   if (ri) {
     (ri.risks || []).forEach(r => {
-      const s = (r.score != null) ? r.score : ((+r.likelihood||1) * (+r.impact||1));
+      const l = parseInt(r.likelihood) || 1;
+      const i = parseInt(r.impact)     || 1;
+      const s = (r.score != null) ? r.score : (l * i);
       riskCount++;
       if (s > maxRiskScore) maxRiskScore = s;
       if (s >= 20)      riskCritical++;
       else if (s >= 12) riskHigh++;
       else if (s >= 8)  riskMedium++;
       else              riskLow++;
+      // EMV calculation — replicate riskcast.html logic
+      const impC = parseFloat(r.impactCost) || 0;
+      const mitC = parseFloat(r.mitigCost)  || 0;
+      if (impC + mitC > 0) hasExposureData = true;
+      const prob           = _PROB_MAP[l] || 0;
+      const expectedImpact = (l === 1) ? 0 : (impC * prob);
+      const exposure       = expectedImpact + mitC;
+      if ((r.type || 'risk') === 'opportunity') totalExposure -= exposure;
+      else                                       totalExposure += exposure;
     });
   }
 
@@ -1176,6 +1201,22 @@ function refreshStats() {
       ? personCount + (personCount === 1 ? ' person' : ' people') + (orgCount > 1 ? ' · ' + orgCount + ' orgs' : '')
       : '—',
     personCount > 0);
+
+  // Exposure (EMV)
+  const expEl = document.getElementById('stat-exposure');
+  if (expEl) {
+    if (!hasExposureData || riskCount === 0) {
+      expEl.textContent = '—';
+      expEl.style.color = '';
+      expEl.classList.remove('has-data');
+    } else {
+      const absVal = Math.abs(Math.round(totalExposure));
+      const fmtd   = (totalExposure < 0 ? '-' : '') + '€\u202f' + absVal.toLocaleString('en-GB');
+      expEl.textContent = fmtd;
+      expEl.classList.add('has-data');
+      expEl.style.color = totalExposure < 0 ? 'var(--green)' : totalExposure > 0 ? '#b36a00' : '';
+    }
+  }
 
   // Project Risks
   function _riskStatusLabel() {
