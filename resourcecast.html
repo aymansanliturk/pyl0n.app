@@ -18,40 +18,41 @@
   }
   body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; -webkit-font-smoothing: antialiased; }
 
-  /* ── SUITE NAV ── */
-.suite-nav {
-  position: sticky; top: 0; z-index: 100;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 32px;
-  background: rgba(255,255,255,0.9); backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--border);
-}
-.suite-home { display:flex; align-items:center; gap:10px; text-decoration:none; color:var(--text); }
-.suite-logo-icon { width:28px; height:28px; background:var(--accent); border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-.suite-logo-icon svg { width:16px; height:16px; }
-.suite-wordmark { font-size:14px; font-weight:700; letter-spacing:0.5px; }
-.suite-sep { color:var(--border); font-size:20px; font-weight:300; margin:0 4px; }
-.suite-tool-name { font-size:14px; font-weight:600; color:var(--accent); }
-.suite-nav-right { display:flex; align-items:center; gap:8px; }
-.logo-status { font-size:10px; font-weight:600; color:var(--green); }
-.suite-sync-badge { font-size:10px; font-weight:600; color:var(--accent); background:#eef2fb; border:1px solid #c8d6f0; border-radius:20px; padding:3px 10px; letter-spacing:0.2px; }
+  /* ── Unified Toolbar ── */
+  #toolbar {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,0.92); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 24px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .tb-left  { display: flex; align-items: center; gap: 12px; }
+  .tb-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .logo-icon {
+    width: 28px; height: 28px; background: var(--accent2); border-radius: 7px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .logo-icon svg { width: 14px; height: 14px; }
+  .tool-name { font-size: 14px; font-weight: 700; letter-spacing: -0.3px; }
+  .tool-tag  { font-size: 9px; font-weight: 600; color: var(--faint); letter-spacing: 1px; text-transform: uppercase; }
+  .tb-sep    { width: 1px; height: 22px; background: var(--border); }
+  .tb-btn {
+    font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 500;
+    padding: 6px 12px; border-radius: 7px; border: 1.5px solid var(--border);
+    background: var(--bg); color: var(--muted); cursor: pointer; white-space: nowrap; transition: all .15s;
+  }
+  .tb-btn:hover { border-color: var(--accent); color: var(--accent); background: #fff; }
+  .tb-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+  .tb-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+  .tb-btn.primary:hover { background: var(--accent2); }
+  .tb-btn.green { background: var(--green); color: #fff; border-color: var(--green); font-weight: 600; }
+  .tb-btn.green:hover { background: #0a6032; }
+  .tb-btn:disabled { opacity: 0.35; pointer-events: none; }
+  .save-confirm { font-size: 11px; font-weight: 600; color: var(--green); display: none; }
 
 /* ── EDITOR ── */
   #editor { max-width: 1280px; margin: 0 auto; padding: 24px 28px 60px; }
 
-
-  /* Persist bar */
-  .persist-bar { display: flex; align-items: center; gap: 8px; padding: 12px 0; margin-bottom: 16px; flex-wrap: wrap; }
-  .pb-label { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--faint); margin-right: 2px; }
-  .pb-btn { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 6px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; border: 1.5px solid var(--border); background: var(--surface); color: var(--muted); }
-  .pb-btn:hover { border-color: var(--accent); color: var(--accent); background: #f0f4fa; }
-  .pb-btn.dash-btn { border-color:var(--accent); color:var(--accent); }
-  .pb-btn.dash-btn:hover { background:var(--accent); color:#fff; }
-  .pb-btn:disabled { opacity: 0.35; pointer-events: none; }
-  .pb-btn.export { background: var(--accent); color: #fff; border-color: var(--accent); }
-  .pb-btn.export:hover { background: var(--accent2); }
-  .pb-sep { width: 1px; height: 24px; background: var(--border); margin: 0 2px; }
-  .save-confirm { font-size: 11px; font-weight: 600; color: var(--green); display: none; }
 
   /* Sections */
   .section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 14px; }
@@ -68,11 +69,6 @@
     padding: 10px 12px; outline: none; transition: border-color 0.15s; width: 100%;
   }
   input:focus, select:focus { border-color: var(--accent); background: #fff; }
-
-  /* Format buttons */
-  .format-btn { padding: 6px 14px; border-radius: 20px; border: 1.5px solid var(--border); background: none; font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 500; color: var(--muted); cursor: pointer; transition: all 0.15s; }
-  .format-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .format-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
 
   /* Phases */
   .phases-wrap { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-height: 36px; }
@@ -258,50 +254,35 @@
 </style>
 </head>
 <body>
-<nav class="suite-nav no-print">
-  <div style="display:flex; align-items:center; gap:4px;">
-    <a href="index.html" class="suite-home">
-      <div class="suite-logo-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
-      </div>
-      <span class="suite-wordmark">PYL0N</span>
-    </a>
-    <span class="suite-sep">/</span>
-    <span class="suite-tool-name">ResourceCast</span>
+<div id="toolbar" class="no-print">
+  <div class="tb-left">
+    <div class="logo-icon">
+      <svg viewBox="0 0 18 18" fill="none"><rect x="2" y="2" width="14" height="11" rx="1.5" stroke="white" stroke-width="1.5"/><line x1="5" y1="16" x2="13" y2="16" stroke="white" stroke-width="1.5" stroke-linecap="round"/><line x1="9" y1="13" x2="9" y2="16" stroke="white" stroke-width="1.5" stroke-linecap="round"/><line x1="5" y1="6"  x2="13" y2="6"  stroke="white" stroke-width="1.2" stroke-linecap="round"/><line x1="5" y1="9"  x2="10" y2="9"  stroke="white" stroke-width="1.2" stroke-linecap="round"/></svg>
+    </div>
+    <div>
+      <div class="tool-name">ResourceCast</div>
+      <div class="tool-tag">Resource &amp; Cost Planning</div>
+    </div>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" onclick="location.href='index.html'">← Dashboard</button>
   </div>
-  <div class="suite-nav-right">
-    <input type="file" id="logo-input" accept="image/*" style="display:none" onchange="saveLogo(this)">
-    <button class="pb-btn" onclick="document.getElementById('logo-input').click()" title="Upload logo &#8212; stored locally in your browser only">&#128444; Logo</button>
-    <span id="logo-status" class="logo-status" style="display:none;">&#10003; Logo set</span>
-    <button id="logo-clear" class="pb-btn" onclick="clearLogo()" style="display:none; color:#c0392b;">&#215; Remove</button>
-      <span id="suite-sync-badge" class="suite-sync-badge" style="display:none"></span>
+  <div class="tb-right">
+    <button class="tb-btn" onclick="setFormat('A4')" data-fmt="A4">A4</button>
+    <button class="tb-btn active" onclick="setFormat('A3')" data-fmt="A3">A3</button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" id="btn-undo" onclick="undo()" disabled>↩ Undo</button>
+    <button class="tb-btn" id="btn-redo" onclick="redo()" disabled>↪ Redo</button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" onclick="exportHTML()">⬇ Export HTML</button>
+    <span class="save-confirm" id="save-confirm">✓ Saved!</span>
   </div>
-</nav>
+</div>
 
 
 <!-- ═══════════════ EDITOR ═══════════════ -->
 <div id="editor">
 
   
-  <!-- Persist Bar -->
-  <div class="persist-bar">
-    <button class="pb-btn dash-btn" onclick="window.location.href='index.html'" title="Return to Suite Dashboard">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-      ← Dashboard
-    </button>
-    <div class="pb-sep"></div>
-    <button class="pb-btn export" onclick="exportHTML()">Export HTML</button>
-    <div class="pb-sep"></div>
-    <button class="pb-btn" id="btn-undo" onclick="undo()" disabled title="Undo (Ctrl+Z)">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 00-4-4H4"/></svg>
-      Undo
-    </button>
-    <button class="pb-btn" id="btn-redo" onclick="redo()" disabled title="Redo (Ctrl+Y)">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 014-4h12"/></svg>
-      Redo
-    </button>
-    <span class="save-confirm" id="save-confirm">✓ Saved!</span>
-  </div>
 
   <!-- Project Info -->
   <div class="section">
@@ -317,15 +298,6 @@
       <label>Date
         <input type="text" id="proj-date" placeholder="06 Mar 2026" oninput="this.style.outline=(!this.value||/^\d{1,2}\s+[A-Za-z]{3}\s+\d{4}$/.test(this.value.trim()))?'':'2px solid #c0392b'">
       </label>
-    </div>
-    <div style="margin-top:12px;">
-      <div style="display:flex;flex-direction:column;gap:5px;">
-        <span style="font-size:11px;font-weight:500;color:var(--muted);">Page Format</span>
-        <div style="display:flex;gap:6px;margin-top:2px;">
-          <button class="format-btn" onclick="setFormat('A4')" data-fmt="A4">A4</button>
-          <button class="format-btn active" onclick="setFormat('A3')" data-fmt="A3">A3</button>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -575,7 +547,7 @@ function updateLogoUI() {
   function setFormat(fmt) {
     currentFormat = fmt;
     document.getElementById('page-size-style').textContent = `@page { size: ${fmt} landscape; margin: 8mm; }`;
-    document.querySelectorAll('.format-btn').forEach(b => b.classList.toggle('active', b.dataset.fmt === fmt));
+    document.querySelectorAll('.tb-btn[data-fmt]').forEach(b => b.classList.toggle('active', b.dataset.fmt === fmt));
   }
 
   // ── Phase collapse state ──
@@ -1430,7 +1402,7 @@ function updateLogoUI() {
         scale: 2, useCORS: true,
         onclone: d => {
           d.querySelectorAll(
-            '.no-print, .print-bar, .persist-bar, .suite-nav, .config-bar'
+            '.no-print, .print-bar, #toolbar'
           ).forEach(el => el.remove());
           const page = d.querySelector('.out-page');
           if (page) { page.style.padding = '10mm 12mm'; page.style.width = '100%'; }
