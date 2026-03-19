@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LetterCast · PYL0N</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:      #f5f4f0;
+    --surface: #ffffff;
+    --border:  #e0ddd6;
+    --text:    #1a1916;
+    --muted:   #6b6860;
+    --faint:   #a8a49e;
+    --accent:  #2c4e87;
+    --accent2: #1e3a6b;
+    --green:   #107c41;
+    --red:     #c0392b;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Toolbar ── */
+  #toolbar {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 24px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .tb-left  { display: flex; align-items: center; gap: 12px; }
+  .tb-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+  .logo-icon {
+    width: 28px; height: 28px;
+    background: var(--accent2);
+    border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .logo-icon svg { width: 14px; height: 14px; }
+
+  .tool-name { font-size: 14px; font-weight: 700; letter-spacing: -0.3px; }
+  .tool-tag  { font-size: 9px; font-weight: 600; color: var(--faint); letter-spacing: 1px; text-transform: uppercase; }
+  .tb-sep    { width: 1px; height: 22px; background: var(--border); }
+
+  .tb-btn {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px; font-weight: 500;
+    padding: 6px 12px; border-radius: 7px;
+    border: 1.5px solid var(--border);
+    background: var(--bg); color: var(--muted);
+    cursor: pointer; white-space: nowrap;
+    transition: all .15s;
+  }
+  .tb-btn:hover           { border-color: var(--accent); color: var(--accent); background: #fff; }
+  .tb-btn.primary         { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+  .tb-btn.primary:hover   { background: var(--accent2); }
+  .tb-btn.green           { background: var(--green); color: #fff; border-color: var(--green); font-weight: 600; }
+  .tb-btn.green:hover     { background: #0a6032; }
+
+  /* ── Editor layout ── */
+  #editor { max-width: 860px; margin: 0 auto; padding: 24px 20px 80px; }
+
+  /* ── Sections ── */
+  .section { background: var(--surface); border: 1.5px solid var(--border); border-radius: 12px; margin-bottom: 14px; overflow: hidden; }
+  .section-hd {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 18px; background: var(--bg); border-bottom: 1px solid var(--border);
+  }
+  .section-title { font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); }
+  .section-body  { padding: 18px; }
+
+  /* ── Fields ── */
+  .fields { display: grid; gap: 12px; }
+  .f2 { grid-template-columns: 1fr 1fr; }
+  .f3 { grid-template-columns: 1fr 1fr 1fr; }
+  label.field { display: flex; flex-direction: column; gap: 5px; font-size: 10.5px; font-weight: 600; color: var(--muted); }
+
+  input[type=text], input[type=date], textarea, select {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px; color: var(--text);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 10px;
+    background: var(--surface);
+    outline: none;
+    transition: border-color .15s;
+    width: 100%;
+    resize: vertical;
+  }
+  input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+  textarea          { line-height: 1.65; }
+  textarea.intro    { min-height: 160px; }
+  textarea.sec-body { min-height: 100px; font-size: 12.5px; }
+
+  /* ── Logo controls ── */
+  .logo-row  { display: flex; gap: 16px; flex-wrap: wrap; }
+  .logo-ctrl { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 200px; }
+  .logo-ctrl .field-lbl { font-size: 10px; font-weight: 700; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; }
+  .logo-preview {
+    height: 48px; border: 1.5px dashed var(--border); border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg); overflow: hidden; cursor: pointer;
+    transition: border-color .15s;
+  }
+  .logo-preview:hover { border-color: var(--accent); }
+  .logo-preview img   { max-height: 42px; max-width: 100%; object-fit: contain; }
+  .logo-preview span  { font-size: 10px; color: var(--faint); }
+  .logo-btns { display: flex; gap: 6px; }
+  .logo-btn {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 10px; font-weight: 500;
+    padding: 4px 10px; border-radius: 6px;
+    border: 1.5px solid var(--border);
+    background: var(--bg); color: var(--muted); cursor: pointer;
+    transition: all .15s;
+  }
+  .logo-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Dynamic section blocks ── */
+  .dyn-block {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    transition: box-shadow .15s;
+  }
+  .dyn-block.dragging  { opacity: .4; }
+  .dyn-block.drag-over { border-color: var(--accent); box-shadow: 0 0 0 3px #dce6f7; }
+
+  .dyn-block-hd {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .drag-handle {
+    color: var(--faint); font-size: 14px;
+    cursor: grab; line-height: 1;
+    padding: 2px 4px; border-radius: 4px;
+    user-select: none; flex-shrink: 0;
+  }
+  .drag-handle:hover         { color: var(--muted); background: var(--border); }
+  .drag-handle:active        { cursor: grabbing; }
+  .dyn-block-hd input[type=text] {
+    flex: 1; font-size: 12px; font-weight: 600;
+    border: 1.5px solid transparent;
+    background: transparent;
+    padding: 3px 6px; border-radius: 6px;
+  }
+  .dyn-block-hd input:hover { background: #fff; }
+  .dyn-block-hd input:focus { border-color: var(--accent); background: #fff; }
+
+  .btn-del-sec {
+    background: none; border: none; color: var(--faint);
+    cursor: pointer; font-size: 15px;
+    padding: 3px 6px; border-radius: 5px;
+    line-height: 1; flex-shrink: 0;
+    transition: all .15s;
+  }
+  .btn-del-sec:hover { color: var(--red); background: #fff1f2; }
+  .dyn-block-body { padding: 12px; }
+
+  .btn-add-sec {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px; font-weight: 600;
+    padding: 8px 16px; border-radius: 8px;
+    border: 1.5px dashed var(--border);
+    background: var(--bg); color: var(--muted);
+    cursor: pointer; width: 100%; text-align: center;
+    margin-top: 4px; transition: all .15s;
+  }
+  .btn-add-sec:hover { border-color: var(--accent); color: var(--accent); background: #f0f4fa; border-style: solid; }
+
+  /* ── Output toolbar (screen only) ── */
+  #out-toolbar {
+    display: none;
+    max-width: 860px; margin: 0 auto;
+    padding: 10px 20px;
+  }
+  #out-toolbar-inner { display: flex; gap: 8px; align-items: center; }
+
+  /* ── Print / Output styles ── */
+  #output { display: none; }
+  #output.visible {
+    display: block;
+    max-width: 860px; margin: 0 auto; padding: 12px 20px 60px;
+  }
+
+  .out-sheet {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 48px 52px;
+    box-shadow: 0 2px 16px rgba(0,0,0,.07);
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .out-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-bottom: 20px;
+    margin-bottom: 24px;
+    border-bottom: 2.5px solid var(--accent);
+  }
+  .out-logo { max-height: 44px; max-width: 160px; object-fit: contain; }
+
+  .out-meta { display: flex; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
+  .out-meta-left  { font-size: 12.5px; line-height: 2; color: var(--text); }
+  .out-meta-right { font-size: 12px; line-height: 2; color: var(--muted); text-align: right; white-space: nowrap; }
+
+  .out-subject {
+    font-size: 13px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.4px;
+    color: var(--accent);
+    margin-bottom: 22px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .out-subject .re-label {
+    font-size: 9px; font-weight: 700;
+    color: var(--faint); letter-spacing: 1.2px;
+    text-transform: uppercase; margin-right: 8px;
+  }
+
+  .out-intro {
+    font-size: 12.5px; line-height: 1.85;
+    color: var(--text);
+    white-space: pre-wrap;
+    margin-bottom: 28px;
+  }
+
+  .out-sec { margin-bottom: 22px; page-break-inside: avoid; }
+  .out-sec h3 {
+    font-size: 11.5px; font-weight: 700;
+    color: var(--accent2);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid var(--border);
+  }
+  .out-sec p {
+    font-size: 12.5px; line-height: 1.85;
+    color: var(--text); white-space: pre-wrap;
+  }
+
+  .out-footer {
+    margin-top: 36px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    font-size: 9px; color: var(--faint);
+    text-align: center;
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* ── Print ── */
+  @media print {
+    #toolbar, #editor, #out-toolbar { display: none !important; }
+    #output { display: block !important; padding: 0 !important; }
+    .out-sheet { border: none !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; }
+    @page { size: A4 portrait; margin: 20mm; }
+    body { background: #fff !important; }
+  }
+
+  @media (max-width: 620px) {
+    .f2, .f3         { grid-template-columns: 1fr; }
+    .logo-row        { flex-direction: column; }
+    .out-sheet       { padding: 24px 20px; }
+    .out-meta        { flex-direction: column; gap: 4px; }
+    .out-meta-right  { text-align: left; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Toolbar ── -->
+<div id="toolbar">
+  <div class="tb-left">
+    <div class="logo-icon">
+      <svg viewBox="0 0 18 18" fill="none">
+        <rect x="2" y="2" width="14" height="11" rx="1.5" stroke="white" stroke-width="1.5"/>
+        <line x1="5" y1="16" x2="13" y2="16" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="9" y1="13" x2="9" y2="16" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="5" y1="6"  x2="13" y2="6"  stroke="white" stroke-width="1.2" stroke-linecap="round"/>
+        <line x1="5" y1="9"  x2="10" y2="9"  stroke="white" stroke-width="1.2" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div>
+      <div class="tool-name">LetterCast</div>
+      <div class="tool-tag">Cover Letter Generator</div>
+    </div>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" onclick="location.href='index.html'">← Dashboard</button>
+  </div>
+  <div class="tb-right">
+    <input type="file" id="load-file" accept=".json" style="display:none" onchange="loadJSON(this)">
+    <button class="tb-btn" onclick="document.getElementById('load-file').click()">↑ Load JSON</button>
+    <button class="tb-btn" onclick="saveJSON()">↓ Save JSON</button>
+    <button class="tb-btn primary" onclick="generate()">Preview →</button>
+    <button class="tb-btn green" onclick="exportPDF()">⬇ Export PDF</button>
+  </div>
+</div>
+
+<!-- ── Editor ── -->
+<div id="editor">
+
+  <!-- A) Document Info -->
+  <div class="section">
+    <div class="section-hd"><span class="section-title">Document Info</span></div>
+    <div class="section-body">
+      <div class="fields f3" style="margin-bottom:14px;">
+        <label class="field">Project Name
+          <input type="text" id="proj-name" placeholder="e.g. UK Substation Package 2025" oninput="onProjName()">
+        </label>
+        <label class="field">Date
+          <input type="date" id="doc-date">
+        </label>
+        <label class="field">Revision / Ref No.
+          <input type="text" id="doc-ref" placeholder="e.g. Rev.A · OFR-2025-001">
+        </label>
+      </div>
+      <div class="fields f3">
+        <label class="field">Customer Company Name
+          <input type="text" id="cust-company" placeholder="e.g. National Grid plc">
+        </label>
+        <label class="field">Attention To
+          <input type="text" id="cust-attn" placeholder="e.g. Mr. John Smith">
+        </label>
+        <label class="field">Subject Line
+          <input type="text" id="doc-subject" placeholder="e.g. Commercial Offer — 400kV GIS Package">
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Logos -->
+  <div class="section">
+    <div class="section-hd">
+      <span class="section-title">Logos</span>
+      <span style="font-size:10px;color:var(--faint);">Shared across the suite via localStorage</span>
+    </div>
+    <div class="section-body">
+      <div class="logo-row">
+        <div class="logo-ctrl">
+          <div class="field-lbl">Company Logo — Left</div>
+          <div class="logo-preview" id="co-preview" onclick="document.getElementById('co-inp').click()">
+            <span>Click to upload</span>
+          </div>
+          <div class="logo-btns">
+            <input type="file" id="co-inp" accept="image/*" style="display:none" onchange="uploadLogo('co',this)">
+            <button class="logo-btn" onclick="document.getElementById('co-inp').click()">Upload</button>
+            <button class="logo-btn" onclick="clearLogo('co')">Clear</button>
+          </div>
+        </div>
+        <div class="logo-ctrl">
+          <div class="field-lbl">Customer Logo — Right</div>
+          <div class="logo-preview" id="cx-preview" onclick="document.getElementById('cx-inp').click()">
+            <span>Click to upload</span>
+          </div>
+          <div class="logo-btns">
+            <input type="file" id="cx-inp" accept="image/*" style="display:none" onchange="uploadLogo('cx',this)">
+            <button class="logo-btn" onclick="document.getElementById('cx-inp').click()">Upload</button>
+            <button class="logo-btn" onclick="clearLogo('cx')">Clear</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- B) Introduction -->
+  <div class="section">
+    <div class="section-hd"><span class="section-title">Introduction Text</span></div>
+    <div class="section-body">
+      <textarea class="intro" id="intro-text"
+        placeholder="We are pleased to submit our commercial offer in response to your enquiry dated …&#10;&#10;Please find below our proposed scope, key assumptions, and commercial terms."></textarea>
+    </div>
+  </div>
+
+  <!-- C) Dynamic Sections -->
+  <div class="section">
+    <div class="section-hd">
+      <span class="section-title">Document Sections</span>
+      <span style="font-size:10px;color:var(--faint);">Drag ⠿ to reorder</span>
+    </div>
+    <div class="section-body">
+      <div id="sections-list"></div>
+      <button class="btn-add-sec" onclick="addSection()">+ Add Section</button>
+    </div>
+  </div>
+
+</div><!-- /#editor -->
+
+<!-- ── Output toolbar (screen preview) ── -->
+<div id="out-toolbar">
+  <div id="out-toolbar-inner">
+    <button class="tb-btn" onclick="goBack()">← Back to Editor</button>
+    <button class="tb-btn green" onclick="exportPDF()">⬇ Print / Export PDF</button>
+  </div>
+</div>
+
+<!-- ── Output (print view) ── -->
+<div id="output">
+  <div class="out-sheet" id="out-sheet">
+
+    <div class="out-header" id="out-header">
+      <img class="out-logo" id="out-co-logo" src="" alt="Company Logo" style="display:none">
+      <div style="flex:1"></div>
+      <img class="out-logo" id="out-cx-logo" src="" alt="Customer Logo" style="display:none">
+    </div>
+
+    <div class="out-meta">
+      <div class="out-meta-left"  id="out-meta-left"></div>
+      <div class="out-meta-right" id="out-meta-right"></div>
+    </div>
+
+    <div class="out-subject" id="out-subject"></div>
+
+    <div class="out-intro" id="out-intro"></div>
+
+    <div id="out-sections"></div>
+
+    <div class="out-footer">
+      Generated with LetterCast · PYL0N Bid Suite · <span id="out-gen-date"></span>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ══ Helpers ══════════════════════════════════════════════════════════════ */
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function gv(id)    { return (document.getElementById(id) || {}).value || ''; }
+function sv(id, v) { const el = document.getElementById(id); if (el) el.value = v; }
+function $id(id)   { return document.getElementById(id); }
+
+/* ══ SuiteManager ══════════════════════════════════════════════════════════ */
+const SuiteManager = (() => {
+  const KEY = 'bidcast_suite_sync';
+  function read()  { try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { return {}; } }
+  function write(patch, src) {
+    try {
+      const next = { ...read(), ...patch, _ts: Date.now(), _src: src };
+      localStorage.setItem(KEY, JSON.stringify(next));
+    } catch {}
+  }
+  function migrate() {
+    try {
+      Object.keys(localStorage)
+        .filter(k => k.startsWith('pyl0n_'))
+        .forEach(k => {
+          const nk = 'bidcast_' + k.slice(6);
+          if (!localStorage.getItem(nk)) localStorage.setItem(nk, localStorage.getItem(k));
+          localStorage.removeItem(k);
+        });
+    } catch {}
+  }
+  function onUpdate(cb) {
+    window.addEventListener('storage', e => { if (e.key === KEY) cb(read()); });
+  }
+  return { read, write, migrate, onUpdate };
+})();
+
+/* ══ Logo management ══════════════════════════════════════════════════════ */
+const LOGO_KEYS = { co: 'bidcast_logo', cx: 'bidcast_customer_logo' };
+
+function uploadLogo(which, input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try { localStorage.setItem(LOGO_KEYS[which], e.target.result); } catch {}
+    renderLogoPreview(which, e.target.result);
+    input.value = '';
+    autoSave();
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearLogo(which) {
+  localStorage.removeItem(LOGO_KEYS[which]);
+  renderLogoPreview(which, null);
+  autoSave();
+}
+
+function renderLogoPreview(which, dataUrl) {
+  const el = $id(which + '-preview');
+  if (!el) return;
+  el.innerHTML = dataUrl
+    ? `<img src="${dataUrl}" style="max-height:42px;max-width:100%;object-fit:contain;">`
+    : `<span>Click to upload</span>`;
+}
+
+function loadLogos() {
+  renderLogoPreview('co', localStorage.getItem('bidcast_logo') || null);
+  renderLogoPreview('cx', localStorage.getItem('bidcast_customer_logo') || null);
+}
+
+/* ══ Project Name Sync ══════════════════════════════════════════════════════ */
+function onProjName() {
+  SuiteManager.write({ projectName: gv('proj-name') }, 'lettercast');
+  autoSave();
+}
+
+/* ══ Dynamic Sections ══════════════════════════════════════════════════════ */
+let _secCount = 0;
+
+function addSection(data) {
+  _secCount++;
+  const title   = data ? (data.title   || '') : '';
+  const content = data ? (data.content || '') : '';
+
+  const block = document.createElement('div');
+  block.className  = 'dyn-block';
+  block.dataset.id = _secCount;
+  block.innerHTML  = `
+    <div class="dyn-block-hd">
+      <span class="drag-handle" title="Drag to reorder">⠿</span>
+      <input type="text" value="${esc(title)}" placeholder="Section Title" oninput="autoSave()">
+      <button class="btn-del-sec" onclick="this.closest('.dyn-block').remove();autoSave();" title="Remove">✕</button>
+    </div>
+    <div class="dyn-block-body">
+      <textarea class="sec-body" placeholder="Paste your section content here…" oninput="autoSave()">${esc(content)}</textarea>
+    </div>`;
+
+  initDrag(block);
+  $id('sections-list').appendChild(block);
+  autoSave();
+}
+
+function initDrag(block) {
+  const handle = block.querySelector('.drag-handle');
+  const list   = $id('sections-list');
+
+  handle.addEventListener('mousedown', () => { block.draggable = true; });
+  document.addEventListener('mouseup',  () => { block.draggable = false; }, { passive: true });
+
+  block.addEventListener('dragstart', e => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', block.dataset.id);
+    setTimeout(() => block.classList.add('dragging'), 0);
+  });
+  block.addEventListener('dragend', () => {
+    block.draggable = false;
+    block.classList.remove('dragging');
+    list.querySelectorAll('.dyn-block').forEach(b => b.classList.remove('drag-over'));
+    autoSave();
+  });
+  block.addEventListener('dragover', e => {
+    e.preventDefault();
+    list.querySelectorAll('.dyn-block').forEach(b => b.classList.remove('drag-over'));
+    if (!block.classList.contains('dragging')) block.classList.add('drag-over');
+  });
+  block.addEventListener('dragleave', () => block.classList.remove('drag-over'));
+  block.addEventListener('drop', e => {
+    e.preventDefault();
+    const srcId = e.dataTransfer.getData('text/plain');
+    const src   = list.querySelector(`[data-id="${srcId}"]`);
+    if (src && src !== block) {
+      const blocks  = [...list.querySelectorAll('.dyn-block')];
+      const srcPos  = blocks.indexOf(src);
+      const tgtPos  = blocks.indexOf(block);
+      srcPos < tgtPos ? list.insertBefore(src, block.nextSibling) : list.insertBefore(src, block);
+    }
+    block.classList.remove('drag-over');
+  });
+}
+
+function getSections() {
+  return [...$id('sections-list').querySelectorAll('.dyn-block')].map(b => ({
+    title:   b.querySelector('input[type=text]').value,
+    content: b.querySelector('textarea').value,
+  }));
+}
+
+/* ══ Generate Output ════════════════════════════════════════════════════════ */
+function generate() {
+  const coLogo = localStorage.getItem('bidcast_logo');
+  const cxLogo = localStorage.getItem('bidcast_customer_logo');
+
+  /* logos */
+  const outCo = $id('out-co-logo');
+  const outCx = $id('out-cx-logo');
+  if (coLogo) { outCo.src = coLogo; outCo.style.display = ''; }
+  else         { outCo.style.display = 'none'; }
+  if (cxLogo) { outCx.src = cxLogo; outCx.style.display = ''; }
+  else         { outCx.style.display = 'none'; }
+  $id('out-header').style.display = (coLogo || cxLogo) ? 'flex' : 'none';
+
+  /* meta */
+  const rawDate = gv('doc-date');
+  const fmtDate = rawDate
+    ? new Date(rawDate + 'T00:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' })
+    : '—';
+
+  $id('out-meta-left').innerHTML =
+    `<strong>${esc(gv('cust-company') || '—')}</strong><br>` +
+    `Attn: ${esc(gv('cust-attn') || '—')}`;
+
+  $id('out-meta-right').innerHTML =
+    `${fmtDate}<br>${esc(gv('doc-ref') || '')}`;
+
+  /* subject */
+  $id('out-subject').innerHTML =
+    `<span class="re-label">Re:</span>${esc(gv('doc-subject'))}`;
+
+  /* introduction */
+  $id('out-intro').textContent = gv('intro-text');
+
+  /* sections */
+  const container = $id('out-sections');
+  container.innerHTML = '';
+  getSections().forEach(s => {
+    if (!s.title && !s.content) return;
+    const div  = document.createElement('div');
+    div.className = 'out-sec';
+    const h3   = document.createElement('h3');
+    const p    = document.createElement('p');
+    h3.textContent = s.title;
+    p.textContent  = s.content;
+    div.appendChild(h3);
+    div.appendChild(p);
+    container.appendChild(div);
+  });
+
+  /* footer date */
+  $id('out-gen-date').textContent = new Date().toLocaleDateString('en-GB', { month:'long', year:'numeric' });
+
+  /* swap view */
+  $id('editor').style.display   = 'none';
+  $id('toolbar').style.display  = 'none';
+  $id('out-toolbar').style.display = 'block';
+  $id('output').classList.add('visible');
+  window.scrollTo(0, 0);
+}
+
+function goBack() {
+  $id('editor').style.display   = 'block';
+  $id('toolbar').style.display  = 'flex';
+  $id('out-toolbar').style.display = 'none';
+  $id('output').classList.remove('visible');
+}
+
+function exportPDF() {
+  if (!$id('output').classList.contains('visible')) generate();
+  setTimeout(() => window.print(), 120);
+}
+
+/* ══ State ════════════════════════════════════════════════════════════════ */
+function collectState() {
+  return {
+    version:     '1.0',
+    projName:    gv('proj-name'),
+    docDate:     gv('doc-date'),
+    docRef:      gv('doc-ref'),
+    custCompany: gv('cust-company'),
+    custAttn:    gv('cust-attn'),
+    docSubject:  gv('doc-subject'),
+    introText:   gv('intro-text'),
+    sections:    getSections(),
+  };
+}
+
+function applyState(s) {
+  if (!s) return;
+  sv('proj-name',    s.projName    || '');
+  sv('doc-date',     s.docDate     || '');
+  sv('doc-ref',      s.docRef      || '');
+  sv('cust-company', s.custCompany || '');
+  sv('cust-attn',    s.custAttn    || '');
+  sv('doc-subject',  s.docSubject  || '');
+  sv('intro-text',   s.introText   || '');
+
+  $id('sections-list').innerHTML = '';
+  _secCount = 0;
+  (s.sections || []).forEach(sec => addSection(sec));
+}
+
+function autoSave() {
+  try { localStorage.setItem('bidcast_state_lettercast', JSON.stringify(collectState())); } catch {}
+}
+
+function saveJSON() {
+  const s    = collectState();
+  const blob = new Blob([JSON.stringify(s, null, 2)], { type: 'application/json' });
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = (s.projName || 'LetterCast').replace(/[^a-z0-9]/gi, '_') + '_LetterCast.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function loadJSON(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try   { applyState(JSON.parse(e.target.result)); autoSave(); }
+    catch { alert('Invalid JSON file — please check the format.'); }
+    finally { input.value = ''; }
+  };
+  reader.readAsText(file);
+}
+
+/* ══ Boot ═════════════════════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  SuiteManager.migrate();
+  loadLogos();
+
+  /* default date = today */
+  const today = new Date().toISOString().slice(0, 10);
+  $id('doc-date').value = today;
+
+  /* restore persisted state */
+  const saved = localStorage.getItem('bidcast_state_lettercast');
+  if (saved) {
+    try {
+      const s = JSON.parse(saved);
+      applyState(s);
+      if (!s.docDate) sv('doc-date', today);
+    } catch {
+      addDefaultSections();
+    }
+  } else {
+    addDefaultSections();
+    /* pull project name from suite sync */
+    const sync = SuiteManager.read();
+    if (sync.projectName) sv('proj-name', sync.projectName);
+  }
+
+  /* cross-tool sync listener */
+  SuiteManager.onUpdate(sync => {
+    const nameEl = $id('proj-name');
+    if (nameEl && document.activeElement !== nameEl && sync.projectName)
+      sv('proj-name', sync.projectName);
+    loadLogos();
+  });
+
+  /* autosave on any editor input */
+  $id('editor').addEventListener('input',  autoSave);
+  $id('editor').addEventListener('change', autoSave);
+});
+
+function addDefaultSections() {
+  addSection({ title: '1. Scope of Supply',          content: '' });
+  addSection({ title: '2. Assumptions & Deviations', content: '' });
+  addSection({ title: '3. Terms & Conditions',       content: '' });
+}
+</script>
+</body>
+</html>
