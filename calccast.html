@@ -477,6 +477,20 @@ function applyState(s) {
   calculateModel();
 }
 
+function getResourceCastTotal() {
+  try {
+    const rc = JSON.parse(localStorage.getItem('bidcast_state_resourcecast') || 'null');
+    if (!rc) return 0;
+    let total = 0;
+    (rc.roles || []).forEach(r => {
+      const hours = Object.values(r.monthHours || {}).reduce((a, b) => a + (+b || 0), 0);
+      total += (+r.rate || 0) * hours;
+    });
+    (rc.expenses || []).forEach(e => { total += +e.amount || 0; });
+    return total;
+  } catch { return 0; }
+}
+
 function calculateModel() {
   // ── 1. Read global parameters ────────────────────────────────────────
   const fxMap = {
@@ -496,18 +510,42 @@ function calculateModel() {
   const kpiNoEbit = (1 + risk) * (1 + sga) * (1 + exu) * (1 + ba);
 
   // ── 2. Process each cost row ─────────────────────────────────────────
+  const rcTotal = getResourceCastTotal();
   let totalDirect = 0;
   let totalOrder  = 0;
 
   document.querySelectorAll('#cost-tbody .cost-row').forEach(tr => {
-    const excluded = tr.querySelector('.sel-scope').value === 'excluded';
-    const qty      = parseFloat(tr.querySelector('.inp-qty').value)        || 0;
-    const unit     = parseFloat(tr.querySelector('.inp-unit-price').value) || 0;
-    const ccy      = tr.querySelector('.sel-currency').value;
-    const fx       = fxMap[ccy] ?? 1;
+    const cat      = tr.querySelector('.sel-category').value;
+    const scopeSel = tr.querySelector('.sel-scope');
+    const qtyInp   = tr.querySelector('.inp-qty');
+    const unitInp  = tr.querySelector('.inp-unit-price');
+    const ccySel   = tr.querySelector('.sel-currency');
 
-    const rowCost = excluded ? 0 : qty * unit * fx;
-    const rowSell = excluded ? 0 : rowCost * kpiMult;
+    // AUTO-FEED LOGIC FOR RESOURCECAST
+    if (cat === 'Project Hours & Travel') {
+      qtyInp.value  = 1;
+      unitInp.value = Math.round(rcTotal);
+      ccySel.value  = 'EUR';
+      // Visual lock
+      qtyInp.readOnly = true; unitInp.readOnly = true;
+      ccySel.style.pointerEvents = 'none';
+      qtyInp.style.background = '#eef2f9'; unitInp.style.background = '#eef2f9'; ccySel.style.background = '#eef2f9';
+    } else {
+      // Unlock if category changes
+      qtyInp.readOnly = false; unitInp.readOnly = false;
+      ccySel.style.pointerEvents = 'auto';
+      qtyInp.style.background = ''; unitInp.style.background = ''; ccySel.style.background = '';
+    }
+
+    const excluded = scopeSel.value === 'excluded';
+    const qty      = parseFloat(qtyInp.value)  || 0;
+    const unit     = parseFloat(unitInp.value) || 0;
+    const ccy      = ccySel.value;
+    const fx       = fxMap[ccy] || 1;
+
+    // MATH FIX
+    const rowCost = excluded ? 0 : (qty * unit * fx);
+    const rowSell = excluded ? 0 : (rowCost * kpiMult);
     totalDirect += rowCost;
     totalOrder  += rowSell;
 
@@ -553,7 +591,15 @@ function _autoSave() {
 }
 
 /* ══ Cost Table ════════════════════════════════════════════════════════ */
-const CATEGORIES = ['Transformers','GIS','Cables','Civil Works','Project Hours','Other'];
+const CATEGORIES = [
+  'Transformers', 'Shunt Reactors', '400kV / 245–275kV / 66–145kV GIS',
+  'Control & Protection & Telecom', 'STATCOM', 'MV Switchgear / AIS Switchgear',
+  'Auxiliary Transformers', 'Harmonic Filters / MSCDN', 'ICMS',
+  'Auxiliary System & UPS', 'Diesel Generator', 'Panels', 'LV/HV Cables',
+  'Earthing & Lightning', 'Building Systems', 'Civil Works', 'I&C Contractor',
+  'Onshore/Offshore Supervision', 'Studies', 'Project Hours & Travel',
+  'Training', 'O&M', 'Other Cost Items'
+];
 const CURRENCIES  = ['EUR','USD','GBP','DKK'];
 let _rowCounter   = 0;
 
