@@ -262,7 +262,7 @@ input[type="number"] { font-family: 'DM Mono', monospace; }
     </div>
 
     <div class="field-group-label">KPI Stack (%)</div>
-    <div class="fields f6">
+    <div class="fields f6" style="grid-template-columns: repeat(7, 1fr);">
       <label>Risk %
         <input type="number" id="kpi-risk" value="5.0" min="0" max="100" step="0.1"
           oninput="calculateModel()">
@@ -285,6 +285,10 @@ input[type="number"] { font-family: 'DM Mono', monospace; }
       </label>
       <label>Negotiation Margin %
         <input type="number" id="kpi-neg" value="5.0" min="0" max="100" step="0.1"
+          oninput="calculateModel()">
+      </label>
+      <label>Warranty %
+        <input type="number" id="kpi-warranty" value="1.0" min="0" max="100" step="0.1"
           oninput="calculateModel()">
       </label>
     </div>
@@ -440,6 +444,7 @@ function collectState() {
     kpiBa:        g('kpi-ba').value,
     kpiEbit:      g('kpi-ebit').value,
     kpiNeg:       g('kpi-neg').value,
+    kpiWarranty:  g('kpi-warranty').value,
     // Guarantee
     guarBondType: g('guar-bond-type').value,
     guarDuration: g('guar-duration').value,
@@ -467,6 +472,7 @@ function applyState(s) {
   set('kpi-ba',          s.kpiBa);
   set('kpi-ebit',        s.kpiEbit);
   set('kpi-neg',         s.kpiNeg);
+  set('kpi-warranty',    s.kpiWarranty);
   set('guar-bond-type',  s.guarBondType);
   set('guar-duration',   s.guarDuration);
   set('guar-rate',       s.guarRate);
@@ -499,15 +505,17 @@ function calculateModel() {
     GBP: parseFloat(document.getElementById('fx-gbp').value)  || 1.17,
     DKK: parseFloat(document.getElementById('fx-dkk').value)  || 0.134,
   };
-  const risk = (parseFloat(document.getElementById('kpi-risk').value) || 0) / 100;
-  const sga  = (parseFloat(document.getElementById('kpi-sga').value)  || 0) / 100;
-  const exu  = (parseFloat(document.getElementById('kpi-exu').value)  || 0) / 100;
-  const ba   = (parseFloat(document.getElementById('kpi-ba').value)   || 0) / 100;
-  const ebit = (parseFloat(document.getElementById('kpi-ebit').value) || 0) / 100;
-  const neg  = (parseFloat(document.getElementById('kpi-neg').value)  || 0) / 100;
+  const risk = (parseFloat(document.getElementById('kpi-risk').value)     || 0) / 100;
+  const warr = (parseFloat(document.getElementById('kpi-warranty').value) || 0) / 100;
+  const sga  = (parseFloat(document.getElementById('kpi-sga').value)      || 0) / 100;
+  const exu  = (parseFloat(document.getElementById('kpi-exu').value)      || 0) / 100;
+  const ba   = (parseFloat(document.getElementById('kpi-ba').value)       || 0) / 100;
+  const ebit = (parseFloat(document.getElementById('kpi-ebit').value)     || 0) / 100;
+  const neg  = (parseFloat(document.getElementById('kpi-neg').value)      || 0) / 100;
 
-  const kpiMult   = (1 + risk) * (1 + sga) * (1 + exu) * (1 + ba) * (1 + ebit);
-  const kpiNoEbit = (1 + risk) * (1 + sga) * (1 + exu) * (1 + ba);
+  // KPI Stack: Risk -> Warranty -> SG&A -> EXU -> BA -> EBIT
+  const kpiMult   = (1 + risk) * (1 + warr) * (1 + sga) * (1 + exu) * (1 + ba) * (1 + ebit);
+  const kpiNoEbit = (1 + risk) * (1 + warr) * (1 + sga) * (1 + exu) * (1 + ba);
 
   // ── 2. Process each cost row ─────────────────────────────────────────
   const rcTotal = getResourceCastTotal();
@@ -521,23 +529,24 @@ function calculateModel() {
     const unitInp  = tr.querySelector('.inp-unit-price');
     const ccySel   = tr.querySelector('.sel-currency');
 
-    // AUTO-FEED LOGIC FOR RESOURCECAST
+    // AUTO-FEED: ResourceCast to Project Hours
     if (cat === 'Project Hours & Travel') {
       qtyInp.value  = 1;
       unitInp.value = Math.round(rcTotal);
       ccySel.value  = 'EUR';
-      // Visual lock
+      // Visual Lock
       qtyInp.readOnly = true; unitInp.readOnly = true;
       ccySel.style.pointerEvents = 'none';
       qtyInp.style.background = '#eef2f9'; unitInp.style.background = '#eef2f9'; ccySel.style.background = '#eef2f9';
     } else {
-      // Unlock if category changes
+      // Unlock for other categories
       qtyInp.readOnly = false; unitInp.readOnly = false;
       ccySel.style.pointerEvents = 'auto';
       qtyInp.style.background = ''; unitInp.style.background = ''; ccySel.style.background = '';
     }
 
     const excluded = scopeSel.value === 'excluded';
+    // FIX: Parse float or default to 0 to prevent NaN
     const qty      = parseFloat(qtyInp.value)  || 0;
     const unit     = parseFloat(unitInp.value) || 0;
     const ccy      = ccySel.value;
@@ -556,16 +565,27 @@ function calculateModel() {
     tr.querySelector('.sell-eur').textContent = excluded ? '—' : fmt(rowSell);
   });
 
-  // ── 3. Calculate summary totals ──────────────────────────────────────
+  // ── 3. Guarantee Cost Calculation ────────────────────────────────────
+  // Assuming Guarantee cost applies to Total Order Cost
+  const guarDuration       = parseFloat(document.getElementById('guar-duration').value) || 0;
+  const guarRate           = (parseFloat(document.getElementById('guar-rate').value) || 0) / 100;
+  const totalGuaranteeCost = totalOrder * guarRate * guarDuration;
+
+  // Add guarantee cost to both direct and order totals
+  totalDirect += totalGuaranteeCost;
+  totalOrder  += totalGuaranteeCost;
+
+  // ── 4. Calculate summary totals ──────────────────────────────────────
   const customerPrice  = totalOrder * (1 + neg);
   const salesMarginEUR = customerPrice - totalDirect;
   const salesMarginPct = customerPrice > 0 ? (salesMarginEUR / customerPrice) * 100 : 0;
-  // Profit = value above all overhead provisions (risk + SG&A + EXU + BA); includes EBIT + neg buffer
+
+  // Profit = value above all overhead provisions; includes EBIT + neg buffer
   const overheadCost   = totalDirect * kpiNoEbit;
   const profitEUR      = customerPrice - overheadCost;
   const profitPct      = customerPrice > 0 ? (profitEUR / customerPrice) * 100 : 0;
 
-  // ── 4. Update summary UI ─────────────────────────────────────────────
+  // ── 5. Update summary UI ─────────────────────────────────────────────
   const fmtEUR = n => '€\u202f' + Math.round(n).toLocaleString('en-GB');
   const fmtPct = n => n.toFixed(1) + '\u202f%';
   const $      = id => document.getElementById(id);
@@ -578,7 +598,7 @@ function calculateModel() {
   $('sum-profit-eur').textContent      = fmtEUR(profitEUR);
   $('sum-profit-pct').textContent      = fmtPct(profitPct);
 
-  // ── 5. Auto-save ─────────────────────────────────────────────────────
+  // ── 6. Auto-save ─────────────────────────────────────────────────────
   _autoSave();
 }
 
