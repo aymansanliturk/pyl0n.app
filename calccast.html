@@ -186,6 +186,23 @@ input[type="number"] { font-family: 'DM Mono', monospace; }
   font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 600;
   color: #86efac;
 }
+
+/* ── Drag & Drop and Row Actions ── */
+.cost-row.is-dragging { opacity: 0.4; background: #eef2f9; }
+.cost-row.drag-over-top td { border-top: 2px solid var(--accent) !important; }
+.cost-row.drag-over-bottom td { border-bottom: 2px solid var(--accent) !important; }
+.drag-handle {
+  cursor: grab; color: var(--faint); font-size: 14px; padding-right: 4px;
+  user-select: none; font-weight: bold; vertical-align: middle;
+}
+.drag-handle:active { cursor: grabbing; }
+.row-actions { display: flex; gap: 4px; align-items: center; justify-content: center; }
+.btn-add-below {
+  background: none; border: 1px solid var(--border); border-radius: 4px;
+  width: 22px; height: 22px; cursor: pointer; color: var(--green); font-size: 14px;
+  display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s; line-height: 1;
+}
+.btn-add-below:hover { border-color: var(--green); background: #f0fdf4; }
 </style>
 </head>
 <body>
@@ -323,7 +340,7 @@ input[type="number"] { font-family: 'DM Mono', monospace; }
       <table class="calc-table" id="cost-table">
         <thead>
           <tr>
-            <th class="th-c" style="width:28px;">#</th>
+            <th class="th-c" style="width:50px;">#</th>
             <th style="min-width:140px;">Category</th>
             <th style="min-width:180px;">Description</th>
             <th style="width:110px;">Scope</th>
@@ -335,7 +352,7 @@ input[type="number"] { font-family: 'DM Mono', monospace; }
             <th class="th-c" style="width:76px;">Ccy</th>
             <th class="th-r" style="width:150px;">Cost Price EUR</th>
             <th class="th-r" style="width:150px;">Selling Price EUR</th>
-            <th style="width:36px;"></th>
+            <th style="width:60px;"></th>
           </tr>
         </thead>
         <tbody id="cost-tbody"></tbody>
@@ -663,60 +680,51 @@ const CATEGORIES = [
 const CURRENCIES  = ['EUR','USD','GBP','DKK'];
 let _rowCounter   = 0;
 
-function addCostRow(data = {}) {
+function addCostRow(data = {}, insertAfter = null) {
   const tbody = document.getElementById('cost-tbody');
   const idx   = _rowCounter++;
   const tr    = document.createElement('tr');
   tr.className   = 'cost-row';
   tr.dataset.idx = idx;
 
-  function catOpts(sel) {
-    return CATEGORIES.map(c =>
-      `<option${c === (sel || 'Other') ? ' selected' : ''}>${c}</option>`
-    ).join('');
-  }
-  function ccyOpts(sel) {
-    return CURRENCIES.map(c =>
-      `<option${c === (sel || 'EUR') ? ' selected' : ''}>${c}</option>`
-    ).join('');
-  }
-  function estFixOpts(sel) {
-    return ['Estimated', 'Fixed'].map(o =>
-      `<option value="${o}"${(sel || 'Estimated') === o ? ' selected' : ''}>${o}</option>`
-    ).join('');
-  }
-  function unitOpts(sel) {
-    return ['pcs', 'ls', 'kg', 'sqm', 'hrs', 'm', 'litre'].map(o =>
-      `<option value="${o}"${(sel || 'pcs') === o ? ' selected' : ''}>${o}</option>`
-    ).join('');
-  }
+  function catOpts(sel) { return CATEGORIES.map(c => `<option${c === (sel || 'Other') ? ' selected' : ''}>${c}</option>`).join(''); }
+  function ccyOpts(sel) { return CURRENCIES.map(c => `<option${c === (sel || 'EUR') ? ' selected' : ''}>${c}</option>`).join(''); }
+  function estFixOpts(sel) { return ['Estimated', 'Fixed'].map(o => `<option value="${o}"${(sel || 'Estimated') === o ? ' selected' : ''}>${o}</option>`).join(''); }
+  function unitOpts(sel) { return ['pcs', 'ls', 'kg', 'sqm', 'hrs', 'm', 'litre'].map(o => `<option value="${o}"${(sel || 'pcs') === o ? ' selected' : ''}>${o}</option>`).join(''); }
 
   tr.innerHTML = `
-    <td class="td-num row-num"></td>
+    <td class="td-num"><span class="drag-handle" title="Drag to reorder">⋮⋮</span> <span class="row-num"></span></td>
     <td><select class="calc-sel sel-category" oninput="calculateModel()">${catOpts(data.category)}</select></td>
-    <td><input type="text" class="calc-inp inp-desc" placeholder="Item description..."
-          value="${_esc(data.desc || '')}" oninput="calculateModel()"></td>
+    <td><input type="text" class="calc-inp inp-desc" placeholder="Item description..." value="${_esc(data.desc || '')}" oninput="calculateModel()"></td>
     <td>
       <select class="calc-sel sel-scope" oninput="calculateModel()">
         <option value="included"${(data.scope || 'included') === 'included' ? ' selected' : ''}>Included</option>
         <option value="excluded"${data.scope === 'excluded' ? ' selected' : ''}>Excluded</option>
       </select>
     </td>
-    <td><input type="text"   class="calc-inp inp-supplier" placeholder="Supplier name"
-          value="${_esc(data.supplier || '')}" oninput="calculateModel()"></td>
+    <td><input type="text"   class="calc-inp inp-supplier" placeholder="Supplier name" value="${_esc(data.supplier || '')}" oninput="calculateModel()"></td>
     <td><select class="calc-sel sel-est-fix" oninput="calculateModel()">${estFixOpts(data.estFix)}</select></td>
     <td><select class="calc-sel sel-units"   oninput="calculateModel()">${unitOpts(data.units)}</select></td>
-    <td><input type="number" class="calc-inp num inp-qty" placeholder="1"
-          min="0" step="1" value="${data.qty || ''}" oninput="calculateModel()"></td>
-    <td><input type="number" class="calc-inp num inp-unit-price" placeholder="0.00"
-          min="0" step="100" value="${data.unitPrice || ''}" oninput="calculateModel()"></td>
+    <td><input type="number" class="calc-inp num inp-qty" placeholder="1" min="0" step="1" value="${data.qty || ''}" oninput="calculateModel()"></td>
+    <td><input type="number" class="calc-inp num inp-unit-price" placeholder="0.00" min="0" step="100" value="${data.unitPrice || ''}" oninput="calculateModel()"></td>
     <td><select class="calc-sel sel-currency" oninput="calculateModel()">${ccyOpts(data.currency)}</select></td>
     <td><span class="calc-readonly cost-eur">—</span></td>
     <td><span class="calc-readonly sell-eur">—</span></td>
-    <td><button class="btn-del-row" onclick="deleteCostRow(this)" title="Remove row">✕</button></td>
+    <td>
+      <div class="row-actions">
+        <button class="btn-add-below" onclick="addCostRow({}, this.closest('.cost-row'))" title="Insert row below">+</button>
+        <button class="btn-del-row" onclick="deleteCostRow(this)" title="Remove row">✕</button>
+      </div>
+    </td>
   `;
 
-  tbody.appendChild(tr);
+  if (insertAfter && insertAfter.nextSibling) {
+    tbody.insertBefore(tr, insertAfter.nextSibling);
+  } else {
+    tbody.appendChild(tr);
+  }
+
+  _attachDragEvents(tr);
   _renumberRows();
   calculateModel();
 }
@@ -730,6 +738,65 @@ function deleteCostRow(btn) {
 function _renumberRows() {
   document.querySelectorAll('#cost-tbody .cost-row .row-num').forEach((cell, i) => {
     cell.textContent = i + 1;
+  });
+}
+
+let _draggedRow = null;
+
+function _attachDragEvents(row) {
+  const handle = row.querySelector('.drag-handle');
+
+  // Only allow dragging when interacting with the handle (prevents text-selection issues)
+  handle.addEventListener('mousedown', () => row.setAttribute('draggable', 'true'));
+  handle.addEventListener('mouseup',   () => row.removeAttribute('draggable'));
+
+  row.addEventListener('dragstart', e => {
+    _draggedRow = row;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', row.dataset.idx);
+    setTimeout(() => row.classList.add('is-dragging'), 0);
+  });
+
+  row.addEventListener('dragend', e => {
+    row.classList.remove('is-dragging');
+    row.removeAttribute('draggable');
+    _draggedRow = null;
+    document.querySelectorAll('.cost-row').forEach(r => r.classList.remove('drag-over-top', 'drag-over-bottom'));
+    _renumberRows();
+    calculateModel();
+  });
+
+  row.addEventListener('dragover', e => {
+    e.preventDefault();
+    if (!_draggedRow || _draggedRow === row) return;
+    const rect = row.getBoundingClientRect();
+    const mid  = rect.top + rect.height / 2;
+    if (e.clientY < mid) {
+      row.classList.add('drag-over-top');
+      row.classList.remove('drag-over-bottom');
+    } else {
+      row.classList.add('drag-over-bottom');
+      row.classList.remove('drag-over-top');
+    }
+  });
+
+  row.addEventListener('dragleave', e => {
+    row.classList.remove('drag-over-top', 'drag-over-bottom');
+  });
+
+  row.addEventListener('drop', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (_draggedRow && _draggedRow !== row) {
+      const rect = row.getBoundingClientRect();
+      const mid  = rect.top + rect.height / 2;
+      if (e.clientY < mid) {
+        row.parentNode.insertBefore(_draggedRow, row);
+      } else {
+        row.parentNode.insertBefore(_draggedRow, row.nextSibling);
+      }
+    }
+    row.classList.remove('drag-over-top', 'drag-over-bottom');
   });
 }
 
