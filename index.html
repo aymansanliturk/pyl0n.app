@@ -1188,24 +1188,28 @@ function refreshStats() {
     const ba   = (parseFloat(cc.kpiBa)       || 0) / 100;
     const ebit = (parseFloat(cc.kpiEbit)     || 0) / 100;
     const neg  = (parseFloat(cc.kpiNeg)      || 0) / 100;
-    const kpiMult = (1 + risk) * (1 + warr) * (1 + sga) * (1 + exu) * (1 + ba) * (1 + ebit);
+    const kpiTotalPct = risk + warr + sga + exu + ba + ebit;
+    const divSell = kpiTotalPct >= 1 ? 0.01 : (1 - kpiTotalPct);
+    const divNeg  = neg >= 1 ? 0.01 : (1 - neg);
     let totalOrder = 0;
     cc.costRows.forEach(r => {
       const excluded = r.scope === 'excluded';
       const qty  = parseFloat(r.qty)       || 0;
       const unit = parseFloat(r.unitPrice) || 0;
-      const fx   = fxMap[r.currency]      || 1;
+      const fx   = fxMap[r.currency]       || 1;
       const rowCost = excluded ? 0 : (qty * unit * fx);
-      const rowSell = excluded ? 0 : (rowCost * kpiMult);
+      const rowSell = excluded ? 0 : (rowCost / divSell);
       totalDirect += rowCost;
       totalOrder  += rowSell;
     });
-    const guarDuration = parseFloat(cc.guarDuration) || 0;
-    const guarRate     = (parseFloat(cc.guarRate) || 0) / 100;
-    const guarCost     = totalOrder * guarRate * guarDuration;
-    totalOrder  += guarCost;
-    totalDirect += guarCost;
-    customerPrice = totalOrder * (1 + neg);
+    (cc.guarRows || []).forEach(g => {
+      const dur  = parseFloat(g.duration) || 0;
+      const rate = (parseFloat(g.rate)    || 0) / 100;
+      const bondCost = totalOrder * rate * dur;
+      totalDirect += bondCost;
+      totalOrder  += bondCost;
+    });
+    customerPrice = totalOrder / divNeg;
   }
 
   // ── Timecast: dates, task/milestone counts, progress ─────────────
@@ -1215,7 +1219,6 @@ function refreshStats() {
     const em = tc.endMonth   ?? 11, ey = tc.endYear    ?? sy + 3;
     tcStart = _MN[sm] + ' ' + sy;
     tcEnd   = _MN[em] + ' ' + ey;
-
     const startTotal = sy * 12 + sm;
     const endTotal   = ey * 12 + em;
     const now        = new Date();
@@ -1275,7 +1278,7 @@ function refreshStats() {
       else if (s >= 12) riskHigh++;
       else if (s >= 8)  riskMedium++;
       else              riskLow++;
-      // EMV calculation — replicate riskcast.html logic
+      // EMV calculation
       const impC = parseFloat(r.impactCost) || 0;
       const mitC = parseFloat(r.mitigCost)  || 0;
       if (impC + mitC > 0) hasExposureData = true;
@@ -1294,7 +1297,6 @@ function refreshStats() {
     el.textContent = text;
     el.classList.toggle('has-data', !!active);
   }
-  // Update a card badge: show live text when available, fall back to staticDefault
   function _badge(id, liveText, staticDefault) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -1309,7 +1311,6 @@ function refreshStats() {
 
   // ── Stat cards ────────────────────────────────────────────────────
   const hasBudget = budget !== null && budget > 0;
-  // Project Value (CalcCast) → fallback to ResourceCast budget if CalcCast is empty
   const budgetCard = document.getElementById('stat-card-budget');
   const budgetChip = document.getElementById('chip-budget');
   if (hasCalcData && customerPrice > 0) {
@@ -1330,13 +1331,11 @@ function refreshStats() {
     if (budgetChip) budgetChip.className = 'stat-chip hidden';
   }
 
-  // Team: prefer Orgcast people; fall back to ResourceCast role count
   const teamN = personCount > 0 ? personCount : roleCount;
   _set('stat-team',
     teamN > 0 ? teamN + (personCount > 0 ? (teamN === 1 ? ' person' : ' people') : (teamN === 1 ? ' role' : ' roles')) : '—',
     teamN > 0);
 
-  // Key phases: from suite sync phases array; fall back to task count
   const sync   = SuiteManager.read();
   const phaseN = (sync.phases || []).length;
   _set('stat-phases',
@@ -1344,22 +1343,16 @@ function refreshStats() {
     : taskCount > 0 ? taskCount + (taskCount === 1 ? ' task' : ' tasks') : '—',
     phaseN > 0 || taskCount > 0);
 
-  // Project Timeline
   _set('stat-timeline', tcStart && tcEnd ? tcStart + ' → ' + tcEnd : '—', !!(tcStart && tcEnd));
-
-  // RFQ Status
   _set('stat-rfq',
     rfqItems > 0 ? rfqReceived + ' rec · ' + rfqPending + ' pend' : '—',
     rfqItems > 0);
-
-  // Org Composition
   _set('stat-org',
     personCount > 0
       ? personCount + (personCount === 1 ? ' person' : ' people') + (orgCount > 1 ? ' · ' + orgCount + ' orgs' : '')
       : '—',
     personCount > 0);
 
-  // Exposure (EMV)
   const expEl = document.getElementById('stat-exposure');
   if (expEl) {
     if (!hasExposureData || riskCount === 0) {
@@ -1375,7 +1368,6 @@ function refreshStats() {
     }
   }
 
-  // Project Risks
   function _riskStatusLabel() {
     if (riskCritical > 0) return 'CRITICAL';
     if (riskHigh     > 0) return 'HIGH';
@@ -1385,12 +1377,9 @@ function refreshStats() {
   }
   const riskStatusLabel = _riskStatusLabel();
   _set('stat-risk',
-    riskCount > 0
-      ? riskCount + (riskCount === 1 ? ' risk' : ' risks')
-      : '—',
+    riskCount > 0 ? riskCount + (riskCount === 1 ? ' risk' : ' risks') : '—',
     riskCount > 0);
 
-  // Timeline: amber warning at ≥ 90%, red at 100%+
   const timelineCard = document.getElementById('stat-card-timeline');
   const timelineChip = document.getElementById('chip-timeline');
   if (timelineCard && timelineChip) {
@@ -1406,7 +1395,6 @@ function refreshStats() {
     }
   }
 
-  // RFQ: amber warning when > 50% of active quotes still pending
   const rfqCard = document.getElementById('stat-card-rfq');
   const rfqChip = document.getElementById('chip-rfq');
   if (rfqCard && rfqChip) {
@@ -1421,7 +1409,6 @@ function refreshStats() {
     }
   }
 
-  // Risks: chip shows highest level; red when Critical, amber when High
   const riskCard = document.getElementById('stat-card-risk');
   const riskChip = document.getElementById('chip-risk');
   if (riskCard && riskChip) {
@@ -1453,14 +1440,10 @@ function refreshStats() {
     }
   }
 
-  // ── Tool card badge — RiskCast ────────────────────────────────────
   _badge('badge-riskcast',
-    riskCount > 0
-      ? riskCount + (riskCount === 1 ? ' risk' : ' risks') + ' · ' + riskStatusLabel
-      : '',
+    riskCount > 0 ? riskCount + (riskCount === 1 ? ' risk' : ' risks') + ' · ' + riskStatusLabel : '',
     '5×5 Matrix · Heat Map');
 
-  // ── Progress bar ──────────────────────────────────────────────────
   const progressWrap = document.getElementById('progress-wrap');
   if (progressWrap) {
     if (tcProgress !== null) {
@@ -1468,8 +1451,7 @@ function refreshStats() {
       const fill = document.getElementById('progress-fill');
       if (fill) {
         fill.style.width = tcProgress + '%';
-        fill.className = 'progress-fill' +
-          (tcProgress >= 100 ? ' alert' : tcProgress >= 90 ? ' warn' : '');
+        fill.className = 'progress-fill' + (tcProgress >= 100 ? ' alert' : tcProgress >= 90 ? ' warn' : '');
       }
       const pct = document.getElementById('progress-pct');
       if (pct) pct.textContent = tcProgress + '% complete';
@@ -1482,15 +1464,15 @@ function refreshStats() {
     }
   }
 
-  // ── Tool card live badges ─────────────────────────────────────────
   const tcParts = [];
   if (taskCount      > 0) tcParts.push(taskCount + (taskCount === 1 ? ' task' : ' tasks'));
   if (milestoneCount > 0) tcParts.push(milestoneCount + (milestoneCount === 1 ? ' milestone' : ' milestones'));
-  _badge('badge-timecast',    tcParts.length ? tcParts.join(' · ') : '',     'Gantt · Baseline');
+  _badge('badge-timecast',     tcParts.length ? tcParts.join(' · ') : '',      'Gantt · Baseline');
   _badge('badge-resourcecast', roleCount > 0 ? roleCount + (roleCount === 1 ? ' role' : ' roles') + ' defined' : '', 'Rates · Cost Planning');
-  _badge('badge-orgcast',      personCount > 0 ? personCount + (personCount === 1 ? ' person' : ' people') : '',      'SVG · Print');
+  _badge('badge-orgcast',      personCount > 0 ? personCount + (personCount === 1 ? ' person' : ' people') : '',     'SVG · Print');
   _badge('badge-rfqcast',      rfqItems > 0 ? rfqItems + (rfqItems === 1 ? ' item' : ' items') + (rfqReceived > 0 ? ' · ' + rfqReceived + ' received' : '') : '', 'Alerts · Dashboard');
-  _badge('badge-dorcast',      dorRows > 0 ? dorRows + (dorRows === 1 ? ' row' : ' rows') + ' defined' : '',          'Excel · PDF · JSON');
+  _badge('badge-dorcast',      dorRows > 0 ? dorRows + (dorRows === 1 ? ' row' : ' rows') + ' defined' : '',         'Excel · PDF · JSON');
+  _badge('badge-calccast',     hasCalcData ? 'Data Active' : '',               'W2W · Margins');
 }
 
 /* ── Brand Settings panel logo sync ── */
