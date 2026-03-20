@@ -1616,19 +1616,16 @@ function generateExecutiveReport() {
   const sync         = SuiteManager.read();
   const projectName  = sync.projectName || document.getElementById('pp-name')?.value || 'Project';
   const today        = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
-
   function _load(key) {
     try { return JSON.parse(localStorage.getItem('bidcast_state_' + key) || 'null'); } catch { return null; }
   }
   const tc = _load('timecast');
   const rc = _load('resourcecast');
   const ri = _load('riskcast');
-
   // ── CalcCast: Financials for Report ──────────────────────────────
   const cc = _load('calccast');
-  let ccDirect = 0, ccOrder = 0, ccCustomer = 0, ccMargin = 0, ccProfit = 0, hasCalc = false;
+  let ccDirect = 0, ccOrder = 0, ccCustomer = 0, ccMargin = 0, ccProfit = 0;
   if (cc && cc.costRows) {
-    hasCalc = true;
     const fxMap = { EUR: 1.0, USD: parseFloat(cc.fxUsd)||0.92, GBP: parseFloat(cc.fxGbp)||1.17, DKK: parseFloat(cc.fxDkk)||0.134 };
     const risk = (parseFloat(cc.kpiRisk)||0)/100;
     const warr = (parseFloat(cc.kpiWarranty)||0)/100;
@@ -1642,30 +1639,30 @@ function generateExecutiveReport() {
     const divSell = kpiTotalPct >= 1 ? 0.01 : (1 - kpiTotalPct);
     const divBase = kpiBasePct  >= 1 ? 0.01 : (1 - kpiBasePct);
     const divNeg  = neg >= 1 ? 0.01 : (1 - neg);
-    // 1. Row Costs
     cc.costRows.forEach(r => {
       if (r.scope === 'excluded') return;
-      const q  = parseFloat(r.qty)       || 0;
+      const q  = parseFloat(r.qty) || 0;
       const u  = parseFloat(r.unitPrice) || 0;
-      const fx = fxMap[r.currency]       || 1;
+      const fx = fxMap[r.currency] || 1;
       const cost = q * u * fx;
       ccDirect += cost;
       ccOrder  += (cost / divSell);
     });
-    // 2. Guarantee Costs
     (cc.guarRows || []).forEach(g => {
       const dur  = parseFloat(g.duration) || 0;
-      const rate = (parseFloat(g.rate)    || 0) / 100;
+      const rate = (parseFloat(g.rate) || 0) / 100;
       const bondCost = ccOrder * rate * dur;
       ccDirect += bondCost;
       ccOrder  += bondCost;
     });
-    // 3. Final Metrics
     ccCustomer = ccOrder / divNeg;
     ccMargin   = ccCustomer - ccDirect;
     const overhead = (ccDirect / divBase) - ccDirect;
     ccProfit = ccCustomer - (ccDirect + overhead);
   }
+  // Bulletproof Flag: Only use CalcCast if it has a valid > 0 price
+  const showCalc = !isNaN(ccCustomer) && ccCustomer > 0;
+  // ── ResourceCast: labour + expenses ──────────────────────────────
   let totalBudget = 0, totalLabour = 0, totalExpenses = 0;
   const roleRows = [], expenseRows = [];
   if (rc) {
@@ -1682,7 +1679,6 @@ function generateExecutiveReport() {
     });
     totalBudget = totalLabour + totalExpenses;
   }
-
   // ── RiskCast: risks + EMV ─────────────────────────────────────────
   const _PROB_MAP = { 1: 0.20, 2: 0.35, 3: 0.50, 4: 0.65, 5: 0.80 };
   let totalExposure = 0;
@@ -1701,8 +1697,7 @@ function generateExecutiveReport() {
       risks.push({ ...r, _score: s, _emv: emv });
     });
   }
-
-  // ── TimeCast: dates + all phases (bid + exec tasks) ──────────────
+  // ── TimeCast: dates + all phases ──────────────────────────────
   let tcStart = '', tcEnd = '';
   const phases = [];
   if (tc) {
@@ -1710,46 +1705,23 @@ function generateExecutiveReport() {
     const em = tc.endMonth   ?? 11, ey = tc.endYear  ?? sy + 3;
     tcStart = _MN[sm] + ' ' + sy;
     tcEnd   = _MN[em] + ' ' + ey;
-
     (tc.projects || []).forEach(p => {
-      // Only include Bid Tasks if they are not hidden
       if (!p.bidHidden) {
         (p.bidTasks || []).forEach(t => {
-          phases.push({
-            name:    t.name,
-            project: p.name,
-            type:    t.type || 'task',
-            sm: t.sm ?? 0,  sy: t.sy ?? sy,
-            em: t.em ?? 0,  ey: t.ey ?? sy,
-          });
+          phases.push({ name: t.name, project: p.name, type: t.type || 'task', sm: t.sm ?? 0, sy: t.sy ?? sy, em: t.em ?? 0, ey: t.ey ?? sy });
         });
       }
-
-      // Only include Exec Tasks if they are not hidden
       if (!p.execHidden) {
         (p.execTasks || []).forEach(t => {
-          phases.push({
-            name:    t.name,
-            project: p.name,
-            type:    t.type || 'task',
-            sm: t.sm ?? 0,  sy: t.sy ?? sy,
-            em: t.em ?? 0,  ey: t.ey ?? sy,
-          });
+          phases.push({ name: t.name, project: p.name, type: t.type || 'task', sm: t.sm ?? 0, sy: t.sy ?? sy, em: t.em ?? 0, ey: t.ey ?? sy });
         });
       }
     });
     phases.sort((a, b) => (a.sy * 12 + a.sm) - (b.sy * 12 + b.sm));
   }
-
-  // ── Top 5 risks (by score, risks only) ───────────────────────────
-  const topRisks = [...risks]
-    .filter(r => (r.type || 'risk') !== 'opportunity')
-    .sort((a, b) => b._score - a._score)
-    .slice(0, 5);
-
+  const topRisks = [...risks].filter(r => (r.type || 'risk') !== 'opportunity').sort((a, b) => b._score - a._score).slice(0, 5);
   // ── Helpers ───────────────────────────────────────────────────────
   function fmtEUR(n) { return '€' + Math.round(n).toLocaleString('de-DE'); }
-
   function scoreBadge(s) {
     const isCrit = s >= 15, isHigh = s >= 10, isMed = s >= 5;
     const bg    = isCrit ? '#fff1f2' : isHigh ? '#fef3c7' : isMed ? '#fffbeb' : '#f0fdf4';
@@ -1757,10 +1729,8 @@ function generateExecutiveReport() {
     const lbl   = isCrit ? 'Critical' : isHigh ? 'High' : isMed ? 'Medium' : 'Low';
     return `<span style="display:inline-block;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;background:${bg};color:${color};">${s} · ${lbl}</span>`;
   }
-
   const logoHtml     = companyLogo  ? `<img src="${companyLogo}"  style="height:34px;max-width:120px;object-fit:contain;">` : '<span></span>';
   const custLogoHtml = customerLogo ? `<img src="${customerLogo}" style="height:34px;max-width:120px;object-fit:contain;">` : '<span></span>';
-
   function pageHeader(pageLabel) {
     return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;padding-bottom:12px;border-bottom:2px solid #1e3a6b;">
       <div>${logoHtml}</div>
@@ -1771,7 +1741,6 @@ function generateExecutiveReport() {
       <div>${custLogoHtml}</div>
     </div>`;
   }
-
   // ── Page 1: Cover ─────────────────────────────────────────────────
   let html = `<div class="er-wrap">
   <div class="er-page">
@@ -1783,9 +1752,9 @@ function generateExecutiveReport() {
     </div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px;">
       <div style="background:#f5f4f0;border-radius:10px;padding:14px 18px;">
-        <div style="font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#a8a49e;margin-bottom:5px;">Total Budget</div>
-        <div style="font-size:20px;font-weight:700;color:#1a1916;">${totalBudget > 0 ? fmtEUR(totalBudget) : '—'}</div>
-        <div style="font-size:8px;color:#a8a49e;margin-top:2px;">ResourceCast</div>
+        <div style="font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#a8a49e;margin-bottom:5px;">Project Value</div>
+        <div style="font-size:20px;font-weight:700;color:#1a1916;">${showCalc ? fmtEUR(ccCustomer) : (totalBudget > 0 ? fmtEUR(totalBudget) : '—')}</div>
+        <div style="font-size:8px;color:#a8a49e;margin-top:2px;">${showCalc ? 'CalcCast · Customer Price' : 'ResourceCast · Direct Cost'}</div>
       </div>
       <div style="background:#f5f4f0;border-radius:10px;padding:14px 18px;">
         <div style="font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#a8a49e;margin-bottom:5px;">Risk Exposure (EMV)</div>
@@ -1805,7 +1774,6 @@ function generateExecutiveReport() {
       <span style="color:#a8a49e;">Generated with PYL0N Suite</span>
     </div>
   </div>`;
-
   // ── Page 2: Risk Profile ─────────────────────────────────────────
   html += `<div class="er-page">
     ${pageHeader('Risk Profile')}
@@ -1813,7 +1781,6 @@ function generateExecutiveReport() {
       <div style="font-size:8px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#2c4e87;margin-bottom:3px;">Risk Profile</div>
       <div style="font-size:20px;font-weight:700;letter-spacing:-0.5px;color:#1a1916;">Top ${topRisks.length > 0 ? Math.min(5, topRisks.length) : ''} Risks</div>
     </div>`;
-
   if (topRisks.length === 0) {
     html += `<div style="color:#a8a49e;font-size:13px;padding:20px 0;">No risk data found. Open RiskCast to add risks.</div>`;
   } else {
@@ -1840,22 +1807,18 @@ function generateExecutiveReport() {
         </tr>`).join('')}
       </tbody>
     </table>`;
-    if (risks.length > 5) {
-      html += `<div style="margin-top:8px;font-size:9px;color:#a8a49e;text-align:right;">${risks.length - 5} additional risks not shown — see full RiskCast register.</div>`;
-    }
+    if (risks.length > 5) html += `<div style="margin-top:8px;font-size:9px;color:#a8a49e;text-align:right;">${risks.length - 5} additional risks not shown.</div>`;
   }
   html += `</div>`;
-
-  // ── Page 3: Project Schedule (all phases) ────────────────────────
+  // ── Page 3: Project Schedule ────────────────────────────────────
   html += `<div class="er-page">
     ${pageHeader('Project Schedule')}
     <div style="margin-bottom:20px;">
       <div style="font-size:8px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#2c4e87;margin-bottom:3px;">Project Schedule</div>
       <div style="font-size:20px;font-weight:700;letter-spacing:-0.5px;color:#1a1916;">Timeline Overview</div>
     </div>`;
-
   if (phases.length === 0) {
-    html += `<div style="color:#a8a49e;font-size:13px;padding:20px 0;">No tasks found. Open TimeCast to add tasks and milestones.</div>`;
+    html += `<div style="color:#a8a49e;font-size:13px;padding:20px 0;">No tasks found. Open TimeCast to add tasks.</div>`;
   } else {
     html += `<table style="width:100%;border-collapse:collapse;font-size:11px;">
       <thead>
@@ -1871,9 +1834,7 @@ function generateExecutiveReport() {
         ${phases.map((p, i) => {
           const isMile = p.type === 'milestone';
           const accentColor = isMile ? '#be123c' : '#2c4e87';
-          const typeBadge = isMile
-            ? `<span style="display:inline-block;padding:2px 7px;border-radius:20px;font-size:8px;font-weight:700;background:#fff1f2;color:#be123c;">Milestone</span>`
-            : `<span style="display:inline-block;padding:2px 7px;border-radius:20px;font-size:8px;font-weight:700;background:#f0f4ff;color:#2c4e87;">Task</span>`;
+          const typeBadge = isMile ? `<span style="display:inline-block;padding:2px 7px;border-radius:20px;font-size:8px;font-weight:700;background:#fff1f2;color:#be123c;">Milestone</span>` : `<span style="display:inline-block;padding:2px 7px;border-radius:20px;font-size:8px;font-weight:700;background:#f0f4ff;color:#2c4e87;">Task</span>`;
           const startStr = _MN[p.sm] + ' ' + p.sy;
           const endStr   = isMile ? '—' : _MN[p.em] + ' ' + p.ey;
           return `<tr style="background:${i % 2 === 0 ? '#f5f4f0' : '#ffffff'};border-bottom:1px solid #e0ddd6;border-left:3px solid ${accentColor};">
@@ -1888,7 +1849,6 @@ function generateExecutiveReport() {
     </table>`;
   }
   html += `</div>`;
-
   // ── Page 4: Commercial Summary ────────────────────────────────────
   html += `<div class="er-page">
     ${pageHeader('Financial Overview')}
@@ -1896,18 +1856,44 @@ function generateExecutiveReport() {
       <div style="font-size:8px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#2c4e87;margin-bottom:3px;">Financial Overview</div>
       <div style="font-size:20px;font-weight:700;letter-spacing:-0.5px;color:#1a1916;">Commercial Summary</div>
     </div>`;
-
+  if (showCalc) {
+    html += `<div style="font-size:9px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#6b6860;margin-bottom:7px;">W2W Financial Build-up</div>
+    <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:24px;">
+      <tbody>
+        <tr style="border-bottom:1px solid #e0ddd6;">
+          <td style="padding:9px 11px;color:#6b6860;">Total Direct Cost (Incl. Guarantees)</td>
+          <td style="padding:9px 11px;text-align:right;font-family:'DM Mono',monospace;font-weight:600;color:#1a1916;">${fmtEUR(ccDirect)}</td>
+        </tr>
+        <tr style="border-bottom:1px solid #e0ddd6;">
+          <td style="padding:9px 11px;color:#6b6860;">Total Order Cost (Before Neg. Margin)</td>
+          <td style="padding:9px 11px;text-align:right;font-family:'DM Mono',monospace;font-weight:600;color:#1a1916;">${fmtEUR(ccOrder)}</td>
+        </tr>
+        <tr style="background:#f0fdf4;border-bottom:2px solid #107c41;">
+          <td style="padding:10px 11px;font-weight:700;color:#107c41;text-transform:uppercase;font-size:10px;letter-spacing:0.5px;">Customer Price</td>
+          <td style="padding:10px 11px;text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:#107c41;font-size:13px;">${fmtEUR(ccCustomer)}</td>
+        </tr>
+        <tr>
+          <td style="padding:9px 11px;color:#6b6860;font-size:10px;">Expected Sales Margin</td>
+          <td style="padding:9px 11px;text-align:right;font-family:'DM Mono',monospace;font-weight:600;color:#2c4e87;">${fmtEUR(ccMargin)}</td>
+        </tr>
+        <tr>
+          <td style="padding:9px 11px;color:#6b6860;font-size:10px;">Expected Profit (EBIT + Neg.)</td>
+          <td style="padding:9px 11px;text-align:right;font-family:'DM Mono',monospace;font-weight:600;color:#2c4e87;">${fmtEUR(ccProfit)}</td>
+        </tr>
+      </tbody>
+    </table>`;
+  }
   if (roleRows.length === 0 && expenseRows.length === 0) {
-    html += `<div style="color:#a8a49e;font-size:13px;padding:20px 0;">No commercial data found. Open ResourceCast to add roles and expenses.</div>`;
+    if (!showCalc) html += `<div style="color:#a8a49e;font-size:13px;padding:20px 0;">No commercial data found.</div>`;
   } else {
     if (roleRows.length > 0) {
       html += `<div style="font-size:9px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#6b6860;margin-bottom:7px;">Labour Costs</div>
       <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:18px;">
         <thead>
           <tr style="background:#f5f4f0;border-bottom:2px solid #e0ddd6;">
-            <th style="padding:7px 11px;text-align:left;font-size:8px;font-weight:700;letter-spacing:0.5px;color:#6b6860;">ROLE</th>
-            <th style="padding:7px 11px;text-align:right;font-size:8px;font-weight:700;letter-spacing:0.5px;color:#6b6860;">HOURS</th>
-            <th style="padding:7px 11px;text-align:right;font-size:8px;font-weight:700;letter-spacing:0.5px;color:#6b6860;">COST (EUR)</th>
+            <th style="padding:7px 11px;text-align:left;font-size:8px;font-weight:700;color:#6b6860;">ROLE</th>
+            <th style="padding:7px 11px;text-align:right;font-size:8px;font-weight:700;color:#6b6860;">HOURS</th>
+            <th style="padding:7px 11px;text-align:right;font-size:8px;font-weight:700;color:#6b6860;">COST (EUR)</th>
           </tr>
         </thead>
         <tbody>
@@ -1923,45 +1909,30 @@ function generateExecutiveReport() {
         </tbody>
       </table>`;
     }
-
     if (expenseRows.length > 0) {
       html += `<div style="font-size:9px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#6b6860;margin-bottom:7px;">Expenses</div>
       <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:18px;">
-        <thead>
-          <tr style="background:#f5f4f0;border-bottom:2px solid #e0ddd6;">
-            <th style="padding:7px 11px;text-align:left;font-size:8px;font-weight:700;letter-spacing:0.5px;color:#6b6860;">DESCRIPTION</th>
-            <th style="padding:7px 11px;text-align:right;font-size:8px;font-weight:700;letter-spacing:0.5px;color:#6b6860;">AMOUNT (EUR)</th>
-          </tr>
-        </thead>
         <tbody>
           ${expenseRows.map(e => `<tr style="border-bottom:1px solid #e0ddd6;">
             <td style="padding:7px 11px;color:#1a1916;">${esc(e.label)}</td>
             <td style="padding:7px 11px;text-align:right;font-family:'DM Mono',monospace;font-weight:600;color:#1a1916;">${fmtEUR(e.amount)}</td>
           </tr>`).join('')}
-          <tr style="background:#f5f4f0;font-weight:700;">
-            <td style="padding:7px 11px;color:#1a1916;">Expenses Subtotal</td>
-            <td style="padding:7px 11px;text-align:right;font-family:'DM Mono',monospace;color:#1a1916;">${fmtEUR(totalExpenses)}</td>
-          </tr>
         </tbody>
       </table>`;
     }
-
-    html += `<div style="background:#1e3a6b;border-radius:10px;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;">
-      <div style="font-size:11px;font-weight:700;color:#fff;letter-spacing:0.5px;">TOTAL PROJECT COST</div>
-      <div style="font-size:22px;font-weight:700;color:#fff;font-family:'DM Mono',monospace;">${fmtEUR(totalBudget)}</div>
-    </div>`;
   }
-
+  const finalValueStr = showCalc ? 'CUSTOMER PRICE' : 'TOTAL DIRECT COST';
+  const finalValueNum = showCalc ? ccCustomer : totalBudget;
+  html += `<div style="background:#1e3a6b;border-radius:10px;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;">
+    <div style="font-size:11px;font-weight:700;color:#fff;letter-spacing:0.5px;">${finalValueStr}</div>
+    <div style="font-size:22px;font-weight:700;color:#fff;font-family:'DM Mono',monospace;">${fmtEUR(finalValueNum)}</div>
+  </div>`;
   html += `<div style="margin-top:auto;padding-top:20px;border-top:1px solid #e0ddd6;font-size:8px;color:#a8a49e;text-align:center;letter-spacing:0.5px;text-transform:uppercase;">Generated with PYL0N Suite · ${today}</div>
   </div></div>`;
-
-  // ── Nav bar (screen only, hidden in print) ───────────────────────
   const navBar = `<div class="no-print" style="position:sticky;top:0;background:#fff;padding:12px 48px;border-bottom:1px solid var(--border);display:flex;gap:12px;z-index:1000;margin-bottom:24px;">
     <button class="pp-btn" onclick="closeExecutiveReport()" style="font-weight:600;color:var(--accent);border-color:var(--accent);">← Back to Dashboard</button>
     <button class="btn-primary" onclick="window.print()">🖨 Print Report</button>
   </div>`;
-
-  // ── Inject + show ─────────────────────────────────────────────────
   const container = document.getElementById('executive-report-output');
   container.innerHTML = navBar + html;
   document.body.classList.add('printing-report');
