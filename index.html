@@ -493,7 +493,7 @@
   <div class="dash-inner">
     <div class="dash-stats">
 
-<div class="stat-card">
+<div class="stat-card" id="stat-card-budget">
   <div class="stat-icon" style="background:#f0fdf8;">
     <svg viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
       <path d="M4 10h12"/>
@@ -501,9 +501,10 @@
       <path d="M19 6a7.7 7.7 0 0 0-5.2-2A7.9 7.9 0 0 0 6 12c0 4.4 3.5 8 7.8 8 2 0 3.8-.8 5.2-2"/>
     </svg>
   </div>
-  <div class="stat-label">Total Budget</div>
+  <div class="stat-label">Project Value</div>
   <div class="stat-value" id="stat-budget">—</div>
-  <div class="stat-source">ResourceCast</div>
+  <div class="stat-source">CalcCast · Customer Price</div>
+  <div class="stat-chip hidden" id="chip-budget"></div>
 </div>
 
       <div class="stat-card">
@@ -758,6 +759,30 @@
     <div class="card-desc">Dynamic project organisation charts with SVG connectors. Team roles sync in from ResourceCast.</div>
     <div class="card-footer">
       <span class="feat-tag" id="badge-orgcast">SVG · Print</span>
+      <span class="sync-pill">↻ Suite</span>
+      <span class="card-arrow">→</span>
+    </div>
+  </a>
+
+  <a href="calccast.html" class="card" style="--card-color:#6366f1;">
+    <div class="card-icon" style="background:#eef2ff;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="2" width="16" height="20" rx="2"/>
+        <line x1="8" y1="6" x2="16" y2="6"/>
+        <line x1="8" y1="10" x2="8" y2="10"/>
+        <line x1="12" y1="10" x2="12" y2="10"/>
+        <line x1="16" y1="10" x2="16" y2="10"/>
+        <line x1="8" y1="14" x2="8" y2="14"/>
+        <line x1="12" y1="14" x2="12" y2="14"/>
+        <line x1="16" y1="14" x2="16" y2="14"/>
+        <line x1="8" y1="18" x2="16" y2="18"/>
+      </svg>
+    </div>
+    <div class="card-name">CalcCast</div>
+    <div class="card-tagline">Financial Pricing Engine</div>
+    <div class="card-desc">Calculate W2W project costs, apply KPI stacks, and determine final customer price. Feeds directly from ResourceCast.</div>
+    <div class="card-footer">
+      <span class="feat-tag" id="badge-calccast">W2W · Margins</span>
       <span class="sync-pill">↻ Suite</span>
       <span class="card-arrow">→</span>
     </div>
@@ -1150,6 +1175,39 @@ function refreshStats() {
     if (total > 0 || roleCount) budget = total;
   }
 
+  // ── CalcCast: Financials ──────────────────────────────────────────
+  const cc = _load('calccast');
+  let customerPrice = 0, totalDirect = 0, hasCalcData = false;
+  if (cc && cc.costRows) {
+    hasCalcData = true;
+    const fxMap = { EUR: 1.0, USD: parseFloat(cc.fxUsd) || 0.92, GBP: parseFloat(cc.fxGbp) || 1.17, DKK: parseFloat(cc.fxDkk) || 0.134 };
+    const risk = (parseFloat(cc.kpiRisk)     || 0) / 100;
+    const warr = (parseFloat(cc.kpiWarranty) || 0) / 100;
+    const sga  = (parseFloat(cc.kpiSga)      || 0) / 100;
+    const exu  = (parseFloat(cc.kpiExu)      || 0) / 100;
+    const ba   = (parseFloat(cc.kpiBa)       || 0) / 100;
+    const ebit = (parseFloat(cc.kpiEbit)     || 0) / 100;
+    const neg  = (parseFloat(cc.kpiNeg)      || 0) / 100;
+    const kpiMult = (1 + risk) * (1 + warr) * (1 + sga) * (1 + exu) * (1 + ba) * (1 + ebit);
+    let totalOrder = 0;
+    cc.costRows.forEach(r => {
+      const excluded = r.scope === 'excluded';
+      const qty  = parseFloat(r.qty)       || 0;
+      const unit = parseFloat(r.unitPrice) || 0;
+      const fx   = fxMap[r.currency]      || 1;
+      const rowCost = excluded ? 0 : (qty * unit * fx);
+      const rowSell = excluded ? 0 : (rowCost * kpiMult);
+      totalDirect += rowCost;
+      totalOrder  += rowSell;
+    });
+    const guarDuration = parseFloat(cc.guarDuration) || 0;
+    const guarRate     = (parseFloat(cc.guarRate) || 0) / 100;
+    const guarCost     = totalOrder * guarRate * guarDuration;
+    totalOrder  += guarCost;
+    totalDirect += guarCost;
+    customerPrice = totalOrder * (1 + neg);
+  }
+
   // ── Timecast: dates, task/milestone counts, progress ─────────────
   let tcStart = null, tcEnd = null, tcProgress = null, taskCount = 0, milestoneCount = 0;
   if (tc) {
@@ -1251,7 +1309,26 @@ function refreshStats() {
 
   // ── Stat cards ────────────────────────────────────────────────────
   const hasBudget = budget !== null && budget > 0;
-  _set('stat-budget', hasBudget ? _fmtEUR(budget) : '—', hasBudget);
+  // Project Value (CalcCast) → fallback to ResourceCast budget if CalcCast is empty
+  const budgetCard = document.getElementById('stat-card-budget');
+  const budgetChip = document.getElementById('chip-budget');
+  if (hasCalcData && customerPrice > 0) {
+    _set('stat-budget', _fmtEUR(customerPrice), true);
+    if (budgetChip) {
+      budgetChip.textContent = 'Cost: ' + _fmtEUR(totalDirect);
+      budgetChip.className = 'stat-chip amber';
+      if (budgetCard) budgetCard.classList.add('s-warn');
+    }
+  } else if (hasBudget) {
+    _set('stat-budget', _fmtEUR(budget), true);
+    if (budgetChip) {
+      budgetChip.textContent = 'Resource Cost Only';
+      budgetChip.className = 'stat-chip green';
+    }
+  } else {
+    _set('stat-budget', '—', false);
+    if (budgetChip) budgetChip.className = 'stat-chip hidden';
+  }
 
   // Team: prefer Orgcast people; fall back to ResourceCast role count
   const teamN = personCount > 0 ? personCount : roleCount;
@@ -1312,21 +1389,6 @@ function refreshStats() {
       ? riskCount + (riskCount === 1 ? ' risk' : ' risks')
       : '—',
     riskCount > 0);
-
-  // ── Stat card visual cues ─────────────────────────────────────────
-  // Budget: Financial Health indicator (green) when budget > 0
-  const budgetCard = document.getElementById('stat-card-budget');
-  const budgetChip = document.getElementById('chip-budget');
-  if (budgetCard && budgetChip) {
-    if (hasBudget) {
-      budgetChip.textContent = '✓ Financial Health';
-      budgetChip.className = 'stat-chip green';
-      budgetCard.classList.add('s-healthy');
-    } else {
-      budgetChip.className = 'stat-chip hidden';
-      budgetCard.classList.remove('s-healthy');
-    }
-  }
 
   // Timeline: amber warning at ≥ 90%, red at 100%+
   const timelineCard = document.getElementById('stat-card-timeline');
