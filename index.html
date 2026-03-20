@@ -882,6 +882,15 @@
    bidcast_logo (company logo as base64 dataURL).
    All tools embed this same utility.
 ═══════════════════════════════════════════════════════════════════ */
+/* ── Global Dirty State (Unexported Changes) ── */
+window._hasUnexportedChanges = false;
+window.addEventListener('beforeunload', (e) => {
+  if (window._hasUnexportedChanges) {
+    e.preventDefault();
+    e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+  }
+});
+
 const SuiteManager = (() => {
   const SYNC_KEY          = 'bidcast_suite_sync';
   const LOGO_KEY          = 'bidcast_logo';
@@ -1564,10 +1573,20 @@ function masterExport() {
   const blob = new Blob([JSON.stringify(archive, null, 2)], { type: 'application/json' });
   const a    = document.createElement('a');
   a.href     = URL.createObjectURL(blob);
+
+  // Generate Timestamp: DD-MM-YYYY_HH-mm
+  const now = new Date();
+  const pad = n => n.toString().padStart(2, '0');
+  const ts = `${pad(now.getDate())}-${pad(now.getMonth()+1)}-${now.getFullYear()}_${pad(now.getHours())}-${pad(now.getMinutes())}`;
+
   const proj = (SuiteManager.read().projectName || 'Project').replace(/[^a-z0-9]/gi, '_');
-  a.download = proj + '_Full_Archive.json';
+  a.download = `${proj}_Backup_${ts}.json`;
+
   a.click();
   URL.revokeObjectURL(a.href);
+
+  // Reset dirty flag since user has safely exported
+  window._hasUnexportedChanges = false;
 }
 
 function masterImport(input) {
@@ -1979,7 +1998,10 @@ document.addEventListener('DOMContentLoaded', () => {
       'bidcast_state_calccast', 'bidcast_state_lettercast',
       'bidcast_suite_sync',
     ];
-    if (trackedKeys.includes(e.key)) refreshStats();
+    if (trackedKeys.includes(e.key)) {
+      window._hasUnexportedChanges = true; // Mark as dirty
+      refreshStats();
+    }
   });
 });
 </script>
