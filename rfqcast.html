@@ -90,10 +90,18 @@ input:focus, select:focus { border-color:var(--accent); background:#fff; }
 .v-binding  { background:var(--s-binding); color:var(--s-binding-txt); }
 .v-expired  { background:var(--s-expired); color:var(--s-expired-txt); }
 
-/* Expand button */
-.expand-btn { background:none; border:1px solid var(--border); border-radius:4px; width:20px; height:20px; cursor:pointer; color:var(--faint); font-size:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:all 0.15s; }
-.expand-btn:hover { border-color:var(--accent); color:var(--accent); }
-.expand-btn.open { background:var(--accent); color:#fff; border-color:var(--accent); }
+/* Expand button & Row Hover */
+.rfq-table tbody tr.rfq-row { transition: background 0.15s; cursor: pointer; }
+.rfq-table tbody tr.rfq-row:hover { background: #f8faff !important; }
+
+.expand-btn {
+  background: #f0f4fa; border: 1px solid #dbe4f0; border-radius: 6px;
+  width: 24px; height: 24px; cursor: pointer; color: var(--accent);
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); flex-shrink: 0;
+}
+.expand-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.expand-btn.open { transform: rotate(180deg); background: var(--accent2); color: #fff; border-color: var(--accent2); }
 
 /* Detail row */
 .detail-row { display:none; }
@@ -422,7 +430,12 @@ function addItem(data) {
   }
 
   tr.innerHTML = `
-    <td><span class="drag-handle">⠿</span></td>
+    <td style="white-space: nowrap;">
+      <span class="drag-handle" title="Drag to reorder" style="vertical-align: middle;">⋮⋮</span>
+      <button class="expand-btn" title="Click to expand details" style="vertical-align: middle; margin-left: 4px;">
+        <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>
+    </td>
     <td><select class="rfq-inp-category" style="font-size:11px;padding:5px 7px;width:100%;border:none;background:transparent;cursor:pointer;">${catOpts(data.category)}</select></td>
     <td><input class="item-desc" type="text" value="${esc(data.desc||'')}" placeholder="Technical description" style="width:100%;min-width:200px;border:none;background:transparent;padding:5px;"></td>
     <td><input class="item-qty" type="text" value="${esc(data.qty||'')}" placeholder="Qty" style="width:50px;text-align:center;border:none;background:transparent;padding:5px;"></td>
