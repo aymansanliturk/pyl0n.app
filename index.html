@@ -1160,6 +1160,49 @@ function refreshStats() {
   const oc = _load('orgcast');
   const rq = _load('rfqcast');
   const dc = _load('dorcast');
+
+  // ── CalcCast financials ──────────────────────────────────────────────
+  const cc = _load('calccast');
+  let ccDirect = 0, ccOrder = 0, ccCustomer = 0, ccMargin = 0, ccProfit = 0, hasCalc = false;
+  if (cc && cc.costRows) {
+    hasCalc = true;
+    const fxMap = { EUR: 1.0, USD: parseFloat(cc.fxUsd)||0.92, GBP: parseFloat(cc.fxGbp)||1.17, DKK: parseFloat(cc.fxDkk)||0.134 };
+    const risk = (parseFloat(cc.kpiRisk)||0)/100;
+    const warr = (parseFloat(cc.kpiWarranty)||0)/100;
+    const sga  = (parseFloat(cc.kpiSga)||0)/100;
+    const exu  = (parseFloat(cc.kpiExu)||0)/100;
+    const ba   = (parseFloat(cc.kpiBa)||0)/100;
+    const ebit = (parseFloat(cc.kpiEbit)||0)/100;
+    const neg  = (parseFloat(cc.kpiNeg)||0)/100;
+    const kpiBasePct  = risk + warr + sga + exu + ba;
+    const kpiTotalPct = kpiBasePct + ebit;
+    const divSell = kpiTotalPct >= 1 ? 0.01 : (1 - kpiTotalPct);
+    const divBase = kpiBasePct  >= 1 ? 0.01 : (1 - kpiBasePct);
+    const divNeg  = neg >= 1 ? 0.01 : (1 - neg);
+    // 1. Row Costs
+    cc.costRows.forEach(r => {
+      if (r.scope === 'excluded') return;
+      const q  = parseFloat(r.qty)       || 0;
+      const u  = parseFloat(r.unitPrice) || 0;
+      const fx = fxMap[r.currency]       || 1;
+      const cost = q * u * fx;
+      ccDirect += cost;
+      ccOrder  += (cost / divSell);
+    });
+    // 2. Guarantee Costs
+    (cc.guarRows || []).forEach(g => {
+      const dur  = parseFloat(g.duration) || 0;
+      const rate = (parseFloat(g.rate)    || 0) / 100;
+      const bondCost = ccOrder * rate * dur;
+      ccDirect += bondCost;
+      ccOrder  += bondCost;
+    });
+    // 3. Final Metrics
+    ccCustomer = ccOrder / divNeg;
+    ccMargin   = ccCustomer - ccDirect;
+    const overhead = (ccDirect / divBase) - ccDirect;
+    ccProfit = ccCustomer - (ccDirect + overhead);
+  }
   const ri = _load('riskcast');
 
   // ── ResourceCast: budget, role count ──────────────────────────────
@@ -1760,9 +1803,9 @@ function generateExecutiveReport() {
     </div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px;">
       <div style="background:#f5f4f0;border-radius:10px;padding:14px 18px;">
-        <div style="font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#a8a49e;margin-bottom:5px;">Total Budget</div>
-        <div style="font-size:20px;font-weight:700;color:#1a1916;">${totalBudget > 0 ? fmtEUR(totalBudget) : '—'}</div>
-        <div style="font-size:8px;color:#a8a49e;margin-top:2px;">ResourceCast</div>
+        <div style="font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#a8a49e;margin-bottom:5px;">Project Value</div>
+        <div style="font-size:20px;font-weight:700;color:#1a1916;">${hasCalc && ccCustomer > 0 ? fmtEUR(ccCustomer) : (totalBudget > 0 ? fmtEUR(totalBudget) : '—')}</div>
+        <div style="font-size:8px;color:#a8a49e;margin-top:2px;">${hasCalc ? 'CalcCast · Customer Price' : 'ResourceCast'}</div>
       </div>
       <div style="background:#f5f4f0;border-radius:10px;padding:14px 18px;">
         <div style="font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#a8a49e;margin-bottom:5px;">Risk Exposure (EMV)</div>
@@ -1874,6 +1917,34 @@ function generateExecutiveReport() {
       <div style="font-size:20px;font-weight:700;letter-spacing:-0.5px;color:#1a1916;">Commercial Summary</div>
     </div>`;
 
+  if (hasCalc) {
+    html += `<div style="font-size:9px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#6b6860;margin-bottom:7px;">W2W Financial Build-up</div>
+    <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:24px;">
+      <tbody>
+        <tr style="border-bottom:1px solid #e0ddd6;">
+          <td style="padding:9px 11px;color:#6b6860;">Total Direct Cost (Incl. Guarantees)</td>
+          <td style="padding:9px 11px;text-align:right;font-family:'DM Mono',monospace;font-weight:600;color:#1a1916;">${fmtEUR(ccDirect)}</td>
+        </tr>
+        <tr style="border-bottom:1px solid #e0ddd6;">
+          <td style="padding:9px 11px;color:#6b6860;">Total Order Cost (Before Neg. Margin)</td>
+          <td style="padding:9px 11px;text-align:right;font-family:'DM Mono',monospace;font-weight:600;color:#1a1916;">${fmtEUR(ccOrder)}</td>
+        </tr>
+        <tr style="background:#f0fdf4;border-bottom:2px solid #107c41;">
+          <td style="padding:10px 11px;font-weight:700;color:#107c41;text-transform:uppercase;font-size:10px;letter-spacing:0.5px;">Customer Price</td>
+          <td style="padding:10px 11px;text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:#107c41;font-size:13px;">${fmtEUR(ccCustomer)}</td>
+        </tr>
+        <tr>
+          <td style="padding:9px 11px;color:#6b6860;font-size:10px;">Expected Sales Margin</td>
+          <td style="padding:9px 11px;text-align:right;font-family:'DM Mono',monospace;font-weight:600;color:#2c4e87;">${fmtEUR(ccMargin)}</td>
+        </tr>
+        <tr>
+          <td style="padding:9px 11px;color:#6b6860;font-size:10px;">Expected Profit (EBIT + Neg.)</td>
+          <td style="padding:9px 11px;text-align:right;font-family:'DM Mono',monospace;font-weight:600;color:#2c4e87;">${fmtEUR(ccProfit)}</td>
+        </tr>
+      </tbody>
+    </table>`;
+  }
+
   if (roleRows.length === 0 && expenseRows.length === 0) {
     html += `<div style="color:#a8a49e;font-size:13px;padding:20px 0;">No commercial data found. Open ResourceCast to add roles and expenses.</div>`;
   } else {
@@ -1923,9 +1994,11 @@ function generateExecutiveReport() {
       </table>`;
     }
 
+    const finalValueStr = hasCalc ? 'CUSTOMER PRICE' : 'TOTAL PROJECT COST';
+    const finalValueNum = hasCalc && ccCustomer > 0 ? ccCustomer : totalBudget;
     html += `<div style="background:#1e3a6b;border-radius:10px;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;">
-      <div style="font-size:11px;font-weight:700;color:#fff;letter-spacing:0.5px;">TOTAL PROJECT COST</div>
-      <div style="font-size:22px;font-weight:700;color:#fff;font-family:'DM Mono',monospace;">${fmtEUR(totalBudget)}</div>
+      <div style="font-size:11px;font-weight:700;color:#fff;letter-spacing:0.5px;">${finalValueStr}</div>
+      <div style="font-size:22px;font-weight:700;color:#fff;font-family:'DM Mono',monospace;">${fmtEUR(finalValueNum)}</div>
     </div>`;
   }
 
