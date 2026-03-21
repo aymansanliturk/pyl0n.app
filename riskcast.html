@@ -330,6 +330,7 @@ input[type="text"]:focus { border-color:var(--accent); background:#fff; }
     <div class="tb-sep"></div>
     <button class="tb-btn green" onclick="exportExcel()">⬇ Export Excel</button>
     <button class="tb-btn primary" onclick="exportPDF()">⬇ Export PDF</button>
+    <span id="autosave-label" style="font-size:10px;color:var(--faint);"></span>
     <span class="save-confirm" id="save-confirm">✓ Saved!</span>
   </div>
 </div>
@@ -346,6 +347,7 @@ input[type="text"]:focus { border-color:var(--accent); background:#fff; }
       </label>
       <label>Revision <input type="text" id="doc-rev" value="Rev. 0"></label>
       <label>Date     <input type="text" id="doc-date"></label>
+      <label>Project No. <input type="text" id="proj-num" placeholder="e.g. PRJ-001" oninput="_scheduleSnap(); SuiteManager.write({projNum:this.value.trim()},'riskcast')"></label>
     </div>
   </div>
 
@@ -791,6 +793,7 @@ function collectState() {
     version: '2.0',
     format:  currentFormat,
     title:   document.getElementById('doc-title').value,
+    projNum: document.getElementById('proj-num').value,
     rev:     document.getElementById('doc-rev').value,
     date:    document.getElementById('doc-date').value,
     risks:   _getRisks(),
@@ -801,6 +804,7 @@ function applyState(s) {
   if (!s) return;
   if (s.format) setFormat(s.format);
   document.getElementById('doc-title').value = s.title || '';
+  document.getElementById('proj-num').value  = s.projNum || '';
   document.getElementById('doc-rev').value   = s.rev   || '';
   document.getElementById('doc-date').value  = s.date  || '';
   document.getElementById('risk-body').innerHTML = '';
@@ -1088,12 +1092,14 @@ function suiteRead(sync) {
     if (sync && el && sync.projectName && sync.projectName !== 'Project Name'
         && document.activeElement !== el)
       el.value = sync.projectName;
+    const pn = document.getElementById('proj-num');
+    if (pn && sync.projNum && document.activeElement !== pn) pn.value = sync.projNum;
     SuiteManager.updateBadge(document.getElementById('suite-sync-badge'));
   } catch(e) {}
 }
 
 /* ══ Undo / Redo ════════════════════════════════════════════════════ */
-let _hist = [], _histIdx = -1, _histTimer, _suppHist = false;
+let _hist = [], _histIdx = -1, _histTimer, _suppHist = false, _lastSaved = null;
 function _snapshot() {
   if (_suppHist) return;
   const s = JSON.stringify(collectState());
@@ -1103,6 +1109,7 @@ function _snapshot() {
   _histIdx = _hist.length - 1;
   _syncUndoUI();
   localStorage.setItem('bidcast_state_riskcast', s);
+  _lastSaved = Date.now(); _updateSavedLabel();
 }
 function _scheduleSnap() {
   if (_suppHist) return;
@@ -1126,6 +1133,13 @@ function _syncUndoUI() {
   const u = document.getElementById('btn-undo'), r = document.getElementById('btn-redo');
   if (u) u.disabled = _histIdx <= 0;
   if (r) r.disabled = _histIdx >= _hist.length - 1;
+}
+function _updateSavedLabel() {
+  const el = document.getElementById('autosave-label');
+  if (!el) return;
+  if (!_lastSaved) { el.textContent = ''; return; }
+  const s = Math.floor((Date.now() - _lastSaved) / 1000);
+  el.textContent = s < 5 ? '● Saved' : s < 60 ? '● Saved ' + s + 's ago' : '● Saved ' + Math.floor(s / 60) + 'm ago';
 }
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey||e.metaKey) && e.key==='z' && !e.shiftKey) { e.preventDefault(); undo(); }
@@ -1173,6 +1187,8 @@ document.addEventListener('DOMContentLoaded', () => {
   updateLogoUI();
   const _saved = localStorage.getItem('bidcast_state_riskcast');
   if (_saved) { try { applyState(JSON.parse(_saved)); } catch(e) {} }
+  _lastSaved = Date.now(); _updateSavedLabel();
+  setInterval(_updateSavedLabel, 15000);
   suiteRead(SuiteManager.read());
   setTimeout(suiteWrite, 900);
   SuiteManager.onUpdate((sync, key) => {
