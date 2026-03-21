@@ -14,7 +14,7 @@
   :root {
     --bg: #f5f4f0; --surface: #ffffff; --border: #e0ddd6;
     --text: #1a1916; --muted: #6b6860; --faint: #a8a49e;
-    --accent: #2c4e87; --accent2: #1e3a6b; --green: #107c41; --red: #c0392b;
+    --accent: #2c4e87; --accent2: #1e3a6b; --green: #107c41; --green-dk: #0a6032; --red: #c0392b;
   }
   body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; -webkit-font-smoothing: antialiased; }
 
@@ -46,7 +46,7 @@
   .tb-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
   .tb-btn.primary:hover { background: var(--accent2); }
   .tb-btn.green { background: var(--green); color: #fff; border-color: var(--green); font-weight: 600; }
-  .tb-btn.green:hover { background: #0a6032; }
+  .tb-btn.green:hover { background: var(--green-dk); }
   .tb-btn:disabled { opacity: 0.35; pointer-events: none; }
   .save-confirm { font-size: 11px; font-weight: 600; color: var(--green); display: none; }
 
@@ -1353,7 +1353,7 @@ function updateLogoUI() {
   // ── Save / Load / Export ──
   function _suiteBundle(ownState) {
     const suite = { _suite:true, _version:1, _savedAt:new Date().toISOString(), _savedFrom:'resourcecast' };
-    ['timecast','resourcecast','orgcast','rfqcast','dorcast'].forEach(k => {
+    ['timecast','resourcecast','orgcast','rfqcast','dorcast','calccast','riskcast'].forEach(k => {
       const raw = localStorage.getItem('bidcast_state_' + k);
       suite[k] = raw ? JSON.parse(raw) : null;
     });
@@ -1380,7 +1380,7 @@ function updateLogoUI() {
       try {
         const data = JSON.parse(e.target.result);
         if (data._suite) {
-          ['timecast','resourcecast','orgcast','rfqcast','dorcast'].forEach(k => {
+          ['timecast','resourcecast','orgcast','rfqcast','dorcast','calccast','riskcast'].forEach(k => {
             if (k !== 'resourcecast' && data[k]) localStorage.setItem('bidcast_state_' + k, JSON.stringify(data[k]));
           });
           if (data.resourcecast) applyState(data.resourcecast);
