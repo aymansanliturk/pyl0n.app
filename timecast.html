@@ -23,7 +23,7 @@
     --today:    #e05555;
     --exec-hdr: #3a7a52;
     --brand:    #2c4e87;
-    --green:    #107c41;
+    --green:    #107c41; --green-dk: #0a6032;
     --red:      #c0392b;
   }
 
@@ -57,7 +57,7 @@
   .tb-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
   .tb-btn.primary:hover { background: var(--accent2); }
   .tb-btn.green { background: var(--green); color: #fff; border-color: var(--green); font-weight: 600; }
-  .tb-btn.green:hover { background: #0a6032; }
+  .tb-btn.green:hover { background: var(--green-dk); }
   .tb-btn:disabled { opacity: 0.35; pointer-events: none; }
   .warn-badge { font-size: 10px; color: #b36a00; background: #fff3e0; border: 1px solid #f5c97a; border-radius: 20px; padding: 2px 10px; display: none; }
   .warn-badge.visible { display: inline-block; }
@@ -1562,7 +1562,7 @@ function updateLogoUI() {
 
   function _suiteBundle(ownState) {
     const suite = { _suite:true, _version:1, _savedAt:new Date().toISOString(), _savedFrom:'timecast' };
-    ['timecast','resourcecast','orgcast','rfqcast','dorcast'].forEach(k => {
+    ['timecast','resourcecast','orgcast','rfqcast','dorcast','calccast','riskcast'].forEach(k => {
       const raw = localStorage.getItem('bidcast_state_' + k);
       suite[k] = raw ? JSON.parse(raw) : null;
     });
@@ -1591,7 +1591,7 @@ function updateLogoUI() {
       try {
         const data = JSON.parse(e.target.result);
         if (data._suite) {
-          ['timecast','resourcecast','orgcast','rfqcast','dorcast'].forEach(k => {
+          ['timecast','resourcecast','orgcast','rfqcast','dorcast','calccast','riskcast'].forEach(k => {
             if (k !== 'timecast' && data[k]) localStorage.setItem('bidcast_state_' + k, JSON.stringify(data[k]));
           });
           if (data.timecast) applyState(data.timecast);

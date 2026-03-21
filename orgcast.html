@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OrgCast · PYL0N</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style id="page-size-style">@page { size: A4 landscape; margin: 10mm; }</style>
 <style>
@@ -12,7 +13,7 @@
   :root {
     --bg:      #f5f4f0; --surface: #ffffff; --border: #e0ddd6;
     --text:    #1a1916; --muted:   #6b6860; --faint:  #a8a49e;
-    --accent:  #2c4e87; --accent2: #1e3a6b; --brand:  #2c4e87; --green: #107c41; --red: #c0392b;
+    --accent:  #2c4e87; --accent2: #1e3a6b; --brand:  #2c4e87; --green: #107c41; --green-dk: #0a6032; --red: #c0392b;
   }
   body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; -webkit-font-smoothing:antialiased; }
 
@@ -44,7 +45,7 @@
   .tb-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
   .tb-btn.primary:hover { background: var(--accent2); }
   .tb-btn.green { background: var(--green); color: #fff; border-color: var(--green); font-weight: 600; }
-  .tb-btn.green:hover { background: #0a6032; }
+  .tb-btn.green:hover { background: var(--green-dk); }
   .tb-btn:disabled { opacity: 0.35; pointer-events: none; }
   .save-confirm { font-size: 10px; color: var(--green); display: none; font-weight: 600; }
 
@@ -170,6 +171,7 @@
     <button class="tb-btn" id="btn-undo" onclick="undo()" disabled>↩ Undo</button>
     <button class="tb-btn" id="btn-redo" onclick="redo()" disabled>↪ Redo</button>
     <div class="tb-sep"></div>
+    <button class="tb-btn green" onclick="exportExcel()">⬇ Export Excel</button>
     <button class="tb-btn" onclick="exportHTML()">⬇ Export HTML</button>
     <span class="save-confirm" id="save-confirm">✓ Saved!</span>
   </div>
@@ -715,7 +717,7 @@ function updateLogoUI() {
 
   function _suiteBundle(ownState) {
     const suite = { _suite:true, _version:1, _savedAt:new Date().toISOString(), _savedFrom:'orgcast' };
-    ['timecast','resourcecast','orgcast','rfqcast','dorcast'].forEach(k => {
+    ['timecast','resourcecast','orgcast','rfqcast','dorcast','calccast','riskcast'].forEach(k => {
       const raw = localStorage.getItem('bidcast_state_' + k);
       suite[k] = raw ? JSON.parse(raw) : null;
     });
@@ -742,7 +744,7 @@ function updateLogoUI() {
       try {
         const data = JSON.parse(e.target.result);
         if (data._suite) {
-          ['timecast','resourcecast','orgcast','rfqcast','dorcast'].forEach(k => {
+          ['timecast','resourcecast','orgcast','rfqcast','dorcast','calccast','riskcast'].forEach(k => {
             if (k !== 'orgcast' && data[k]) localStorage.setItem('bidcast_state_' + k, JSON.stringify(data[k]));
           });
           if (data.orgcast) applyState(data.orgcast);
@@ -786,6 +788,40 @@ function updateLogoUI() {
     const a       = document.createElement('a');
     a.href=URL.createObjectURL(blob); a.download=name+'_orgcast.html'; a.click();
     URL.revokeObjectURL(a.href);
+  }
+
+  function exportExcel() {
+    const state  = collectState();
+    const people = getPeople();
+    const nameMap = {};
+    people.forEach((p, i) => { nameMap[String(i)] = p.name || ('Vacancy ' + (i + 1)); });
+
+    const rows = people.map((p, i) => ({
+      '#':          i + 1,
+      'Name':       p.vacancy ? '(Vacant)' : p.name,
+      'Title':      p.title || '',
+      'Role':       roleLabel(p.role),
+      'Company':    compLabel(p.company),
+      'Reports To': p.parent !== '' ? (nameMap[p.parent] || '') : '',
+      'Vacancy':    p.vacancy ? 'Yes' : 'No',
+    }));
+
+    const wb  = XLSX.utils.book_new();
+    const ws  = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [
+      { wch: 4 }, { wch: 28 }, { wch: 32 }, { wch: 20 }, { wch: 20 }, { wch: 28 }, { wch: 8 }
+    ];
+    XLSX.utils.book_append_sheet(wb, ws, 'Organisation');
+
+    const meta = XLSX.utils.aoa_to_sheet([
+      ['Chart Title', state.title || ''],
+      ['Date',        state.date  || ''],
+      ['Format',      state.format || 'A4'],
+    ]);
+    XLSX.utils.book_append_sheet(wb, meta, 'Info');
+
+    const name = (state.title || 'orgcast').replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
+    XLSX.writeFile(wb, name + '_orgcast.xlsx');
   }
 
   function setParentByRole(childRole, parentRole) {

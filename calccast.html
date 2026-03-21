@@ -6,13 +6,16 @@
 <title>CalcCast · PYL0N</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style id="page-size-style">@page { size: A3 landscape; margin: 8mm; }</style>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
   --bg: #f5f4f0; --surface: #ffffff; --border: #e0ddd6;
   --text: #1a1916; --muted: #6b6860; --faint: #a8a49e;
-  --accent: #2c4e87; --accent2: #1e3a6b; --green: #107c41; --red: #c0392b;
+  --accent: #2c4e87; --accent2: #1e3a6b; --green: #107c41; --green-dk: #0a6032; --red: #c0392b;
 }
 
 body {
@@ -49,6 +52,9 @@ body {
 .tb-btn:hover { border-color: var(--accent); color: var(--accent); background: #fff; }
 .tb-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
 .tb-btn.primary:hover { background: var(--accent2); }
+.tb-btn.green { background: var(--green); color: #fff; border-color: var(--green); font-weight: 600; }
+.tb-btn.green:hover { background: var(--green-dk); }
+.tb-btn:disabled { opacity: 0.35; pointer-events: none; }
 .save-confirm { font-size: 10px; color: var(--green); display: none; font-weight: 600; }
 
 /* ── Editor ── */
@@ -230,17 +236,25 @@ input[type="number"] { font-family: 'DM Mono', monospace; }
     <button class="tb-btn" onclick="location.href='index.html'">← Dashboard</button>
   </div>
   <div class="tb-right">
+    <button class="tb-btn" id="btn-undo" onclick="undo()" disabled>↩ Undo</button>
+    <button class="tb-btn" id="btn-redo" onclick="redo()" disabled>↪ Redo</button>
+    <div class="tb-sep"></div>
     <label class="tb-btn" style="cursor:pointer;">
       ↑ Load JSON
       <input type="file" accept=".json" style="display:none;" onchange="loadJSON(this)">
     </label>
     <button class="tb-btn primary" onclick="saveJSON()">↓ Save JSON</button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn green" onclick="exportExcel()">⬇ Export Excel</button>
+    <button class="tb-btn" onclick="exportHTML()">⬇ Export HTML</button>
+    <button class="tb-btn" onclick="exportPDF()">⬇ PDF</button>
     <span class="save-confirm" id="save-confirm">✓ Saved</span>
   </div>
 </div>
 
 <!-- ══════════════════ EDITOR ══════════════════ -->
 <div id="editor">
+  <div id="print-logo" style="margin-bottom:8px;"></div>
 
   <!-- Section 1: Global Parameters & KPIs -->
   <div class="section">
@@ -439,7 +453,15 @@ const SuiteManager = (() => {
     });
   }
 
-  return { read, write, getLogo, setLogo, removeLogo, migrate };
+  function onUpdate(cb) {
+    window.addEventListener('storage', e => {
+      if (e.storageArea !== localStorage) return;
+      if (e.key && e.key !== SYNC_KEY && e.key !== LOGO_KEY) return;
+      cb(read(), e.key);
+    });
+  }
+
+  return { read, write, getLogo, setLogo, removeLogo, migrate, onUpdate };
 })();
 
 /* ══ State ═════════════════════════════════════════════════════════════ */
@@ -627,17 +649,51 @@ function calculateModel() {
   $('sum-profit-eur').textContent      = fmtEUR(profitEUR);
   $('sum-profit-pct').textContent      = fmtPct(profitPct);
 
-  // ── 6. Auto-save ─────────────────────────────────────────────────────
-  _autoSave();
+  // ── 6. Auto-save & undo snapshot ─────────────────────────────────────
+  _scheduleSnap();
 }
 
-let _saveTimer;
-function _autoSave() {
-  clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(() => {
-    localStorage.setItem('bidcast_state_calccast', JSON.stringify(collectState()));
-  }, 600);
+/* ══ Undo / Redo ════════════════════════════════════════════════════════ */
+let _hist = [], _histIdx = -1, _suppHist = false, _histTimer = null;
+
+function _snapshot() {
+  if (_suppHist) return;
+  const s = JSON.stringify(collectState());
+  if (_hist[_histIdx] === s) return;
+  _hist.splice(_histIdx + 1);
+  _hist.push(s);
+  if (_hist.length > 50) _hist.shift(); else _histIdx++;
+  _syncUndoUI();
+  localStorage.setItem('bidcast_state_calccast', s);
 }
+function _scheduleSnap() {
+  if (_suppHist) return;
+  clearTimeout(_histTimer); _histTimer = setTimeout(_snapshot, 800);
+}
+function _syncUndoUI() {
+  const u = document.getElementById('btn-undo');
+  const r = document.getElementById('btn-redo');
+  if (u) u.disabled = _histIdx <= 0;
+  if (r) r.disabled = _histIdx >= _hist.length - 1;
+}
+function undo() {
+  clearTimeout(_histTimer);
+  if (_histIdx <= 0) return;
+  _histIdx--; _suppHist = true;
+  applyState(JSON.parse(_hist[_histIdx]));
+  _suppHist = false; _syncUndoUI();
+}
+function redo() {
+  clearTimeout(_histTimer);
+  if (_histIdx >= _hist.length - 1) return;
+  _histIdx++; _suppHist = true;
+  applyState(JSON.parse(_hist[_histIdx]));
+  _suppHist = false; _syncUndoUI();
+}
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
+});
 
 /* ══ Guarantee Table ═══════════════════════════════════════════════════ */
 function addGuarRow(data = {}) {
@@ -833,6 +889,114 @@ function _collectCostRows() {
   });
 }
 
+/* ══ Logo ════════════════════════════════════════════════════════════ */
+function saveLogo(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => { SuiteManager.setLogo(e.target.result); updateLogoUI(); };
+  reader.readAsDataURL(file);
+}
+function clearLogo() {
+  SuiteManager.removeLogo();
+  const inp = document.getElementById('logo-input');
+  if (inp) inp.value = '';
+  updateLogoUI();
+}
+function updateLogoUI() {
+  const logo = SuiteManager.getLogo();
+  const pl = document.getElementById('print-logo');
+  if (pl) pl.innerHTML = logo ? `<img src="${logo}" style="height:36px;max-width:150px;object-fit:contain;display:block;">` : '';
+}
+
+/* ══ Exports ════════════════════════════════════════════════════════════ */
+function exportHTML() {
+  const state   = collectState();
+  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(state))));
+  const src     = document.documentElement.outerHTML;
+  const inject  = ['<scr','ipt>','window.addEventListener("DOMContentLoaded",function(){var s=JSON.parse(decodeURIComponent(escape(atob("',encoded,'"))));applyState(s);});','</scr','ipt>'].join('');
+  const out     = src.replace('</body>', inject + '\n</body>');
+  const name    = (state.projName || 'calccast').replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
+  const blob    = new Blob([out], { type: 'text/html' });
+  const a       = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name + '_calccast.html'; a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function exportPDF() {
+  const state = collectState();
+  const name  = (state.projName || 'calccast').replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
+  html2pdf().set({
+    margin: [8, 8, 8, 8],
+    filename: name + '_calccast.pdf',
+    image: { type: 'jpeg', quality: 0.97 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'mm', format: 'a3', orientation: 'landscape' }
+  }).from(document.getElementById('editor')).save();
+}
+
+function exportExcel() {
+  const state = collectState();
+  const wb    = XLSX.utils.book_new();
+
+  // Sheet 1: Parameters
+  const params = [
+    ['Project Name',        state.projName   || ''],
+    ['LoA ID',              state.loaId      || ''],
+    ['Project Type',        state.projType   || ''],
+    [''],
+    ['FX Rates (1 unit → EUR)'],
+    ['USD → EUR',           parseFloat(state.fxUsd)      || ''],
+    ['GBP → EUR',           parseFloat(state.fxGbp)      || ''],
+    ['DKK → EUR',           parseFloat(state.fxDkk)      || ''],
+    [''],
+    ['KPI Stack (%)'],
+    ['Risk %',              parseFloat(state.kpiRisk)     || ''],
+    ['SG&A %',              parseFloat(state.kpiSga)      || ''],
+    ['HQ Adders EXU %',     parseFloat(state.kpiExu)      || ''],
+    ['HQ Adders BA %',      parseFloat(state.kpiBa)       || ''],
+    ['EBIT %',              parseFloat(state.kpiEbit)     || ''],
+    ['Negotiation Margin %',parseFloat(state.kpiNeg)      || ''],
+    ['Warranty %',          parseFloat(state.kpiWarranty) || ''],
+  ];
+  const wsP = XLSX.utils.aoa_to_sheet(params);
+  wsP['!cols'] = [{ wch: 28 }, { wch: 20 }];
+  XLSX.utils.book_append_sheet(wb, wsP, 'Parameters');
+
+  // Sheet 2: Cost Breakdown
+  const costRows = (state.costRows || []).map((r, i) => ({
+    '#':           i + 1,
+    'Category':    r.category  || '',
+    'Description': r.desc      || '',
+    'Scope':       r.scope     || '',
+    'Supplier':    r.supplier  || '',
+    'Est/Fix':     r.estFix    || '',
+    'Unit':        r.units     || '',
+    'Qty':         parseFloat(r.qty)       || '',
+    'Unit Price':  parseFloat(r.unitPrice) || '',
+    'Currency':    r.currency  || '',
+    'RFQ ID':      r.rfqId     || '',
+  }));
+  const wsC = XLSX.utils.json_to_sheet(costRows.length ? costRows : [{}]);
+  wsC['!cols'] = [{ wch:4 },{ wch:24 },{ wch:32 },{ wch:12 },{ wch:24 },{ wch:10 },{ wch:8 },{ wch:8 },{ wch:14 },{ wch:8 },{ wch:10 }];
+  XLSX.utils.book_append_sheet(wb, wsC, 'Cost Breakdown');
+
+  // Sheet 3: Guarantee Bonds
+  const guarRows = (state.guarRows || []).map(r => ({
+    'Bond Type':     r.type                  || '',
+    'Duration (yr)': parseFloat(r.duration)  || '',
+    'Rate %':        parseFloat(r.rate)      || '',
+  }));
+  if (guarRows.length) {
+    const wsG = XLSX.utils.json_to_sheet(guarRows);
+    wsG['!cols'] = [{ wch: 24 }, { wch: 16 }, { wch: 10 }];
+    XLSX.utils.book_append_sheet(wb, wsG, 'Guarantee Bonds');
+  }
+
+  const name = (state.projName || 'calccast').replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
+  XLSX.writeFile(wb, name + '_calccast.xlsx');
+}
+
 /* ══ Persistence ════════════════════════════════════════════════════════ */
 function saveJSON() {
   const state = collectState();
@@ -859,20 +1023,26 @@ function loadJSON(input) {
 /* ══ Boot ═══════════════════════════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', () => {
   SuiteManager.migrate();
+  updateLogoUI();
 
   const saved = localStorage.getItem('bidcast_state_calccast');
   if (saved) {
-    try { applyState(JSON.parse(saved)); } catch { calculateModel(); }
+    try { _suppHist = true; applyState(JSON.parse(saved)); _suppHist = false; } catch { calculateModel(); }
   } else {
     calculateModel();
   }
+  setTimeout(_snapshot, 300);
+
+  SuiteManager.onUpdate((sync, key) => {
+    if (key === 'bidcast_logo') { updateLogoUI(); return; }
+  });
 
   // Live update when RFQCast pushes winning quotes from another tab
   window.addEventListener('storage', e => {
     if (e.key === 'bidcast_state_calccast') {
       const latest = localStorage.getItem('bidcast_state_calccast');
       if (latest) {
-        try { applyState(JSON.parse(latest)); } catch {}
+        try { _suppHist = true; applyState(JSON.parse(latest)); _suppHist = false; } catch {}
       }
     }
   });
