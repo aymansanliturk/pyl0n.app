@@ -20,6 +20,23 @@
   --risk-high:      #c05600; --risk-high-bg:     #ffedd5;
   --risk-critical:  #991b1b; --risk-critical-bg: #fee2e2;
 }
+
+/* ── Dark mode ── */
+[data-theme="dark"] {
+  --bg: #1a1917;
+  --surface: #242320;
+  --border: #3a3835;
+  --text: #e8e6e1;
+  --muted: #9b9891;
+  --faint: #6b6860;
+  --accent: #5b82c4;
+  --accent2: #4a6da8;
+  --green: #22a85a;
+  --green-dk: #1a8a47;
+}
+[data-theme="dark"] #toolbar {
+  background: rgba(36,35,32,0.95);
+}[data-theme="dark"] { --risk-low: #22a85a; --risk-low-bg: #0e2918; --risk-medium: #c49e3a; --risk-medium-bg: #2e2408; --risk-high: #e07a2a; --risk-high-bg: #2a1808; --risk-critical: #e05555; --risk-critical-bg: #2e0f0f; }
 body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; -webkit-font-smoothing:antialiased; }
 
 /* ── Unified Toolbar ── */
@@ -331,6 +348,7 @@ input[type="text"]:focus { border-color:var(--accent); background:#fff; }
     <div class="tb-sep"></div>
     <button class="tb-btn green" onclick="exportExcel()">⬇ Export Excel</button>
     <button class="tb-btn primary" onclick="exportPDF()">⬇ Export PDF</button>
+    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;">🌙</button>
     <span id="autosave-label" style="font-size:10px;color:var(--faint);"></span>
     <span class="save-confirm" id="save-confirm">✓ Saved!</span>
   </div>
@@ -1196,6 +1214,7 @@ window.addEventListener('afterprint', function() {
 })();
 
 document.addEventListener('DOMContentLoaded', () => {
+  _applyTheme(localStorage.getItem('bidcast_theme') || 'light');
   updateLogoUI();
   const _saved = localStorage.getItem('bidcast_state_riskcast');
   if (_saved) { try { applyState(JSON.parse(_saved)); } catch(e) {} }
@@ -1205,9 +1224,30 @@ document.addEventListener('DOMContentLoaded', () => {
   setTimeout(suiteWrite, 900);
   SuiteManager.onUpdate((sync, key) => {
     if (key === 'bidcast_logo') { updateLogoUI(); return; }
+    if (sync && sync.theme) _applyTheme(sync.theme);
     suiteRead(sync);
   });
 });
+
+/* ── Dark mode ── */
+function toggleTheme() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const newTheme = isDark ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', newTheme);
+  localStorage.setItem('bidcast_theme', newTheme);
+  const btn = document.getElementById('theme-toggle-btn');
+  if (btn) btn.textContent = newTheme === 'dark' ? '☀' : '🌙';
+  try {
+    const sync = JSON.parse(localStorage.getItem('bidcast_suite_sync') || '{}');
+    sync.theme = newTheme; sync._ts = Date.now();
+    localStorage.setItem('bidcast_suite_sync', JSON.stringify(sync));
+  } catch(e) {}
+}
+function _applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme || 'light');
+  const btn = document.getElementById('theme-toggle-btn');
+  if (btn) btn.textContent = theme === 'dark' ? '☀' : '🌙';
+}
 </script>
 </body>
 </html>

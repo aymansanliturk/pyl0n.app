@@ -22,6 +22,23 @@
     --red:     #c0392b;
   }
 
+/* ── Dark mode ── */
+[data-theme="dark"] {
+  --bg: #1a1917;
+  --surface: #242320;
+  --border: #3a3835;
+  --text: #e8e6e1;
+  --muted: #9b9891;
+  --faint: #6b6860;
+  --accent: #5b82c4;
+  --accent2: #4a6da8;
+  --green: #22a85a;
+  --green-dk: #1a8a47;
+}
+[data-theme="dark"] #toolbar {
+  background: rgba(36,35,32,0.95);
+}
+
   body {
     font-family: 'DM Sans', sans-serif;
     background: var(--bg);
@@ -311,6 +328,7 @@
     <button class="tb-btn" onclick="saveJSON()">↓ Save JSON</button>
     <button class="tb-btn primary" onclick="generate()">Preview →</button>
     <button class="tb-btn green" onclick="exportPDF()">⬇ Export PDF</button>
+  <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;">🌙</button>
   </div>
 </div>
 
@@ -718,6 +736,7 @@ function loadJSON(input) {
 
 /* ══ Boot ═════════════════════════════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', () => {
+  _applyTheme(localStorage.getItem('bidcast_theme') || 'light');
   SuiteManager.migrate();
   loadLogos();
 
@@ -759,6 +778,26 @@ function addDefaultSections() {
   addSection({ title: '1. Scope of Supply',          content: '' });
   addSection({ title: '2. Assumptions & Deviations', content: '' });
   addSection({ title: '3. Terms & Conditions',       content: '' });
+}
+
+/* ── Dark mode ── */
+function toggleTheme() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const newTheme = isDark ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', newTheme);
+  localStorage.setItem('bidcast_theme', newTheme);
+  const btn = document.getElementById('theme-toggle-btn');
+  if (btn) btn.textContent = newTheme === 'dark' ? '☀' : '🌙';
+  try {
+    const sync = JSON.parse(localStorage.getItem('bidcast_suite_sync') || '{}');
+    sync.theme = newTheme; sync._ts = Date.now();
+    localStorage.setItem('bidcast_suite_sync', JSON.stringify(sync));
+  } catch(e) {}
+}
+function _applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme || 'light');
+  const btn = document.getElementById('theme-toggle-btn');
+  if (btn) btn.textContent = theme === 'dark' ? '☀' : '🌙';
 }
 </script>
 </body>

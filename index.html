@@ -23,6 +23,23 @@
     --red:     #c0392b;
   }
 
+/* ── Dark mode ── */
+[data-theme="dark"] {
+  --bg: #1a1917;
+  --surface: #242320;
+  --border: #3a3835;
+  --text: #e8e6e1;
+  --muted: #9b9891;
+  --faint: #6b6860;
+  --accent: #5b82c4;
+  --accent2: #4a6da8;
+  --green: #22a85a;
+  --green-dk: #1a8a47;
+}
+[data-theme="dark"] #toolbar {
+  background: rgba(36,35,32,0.95);
+}[data-theme="dark"] { --navy: #2a3f6a; }
+
   body {
     font-family: 'DM Sans', sans-serif;
     background: var(--bg);
@@ -450,6 +467,7 @@
     PYL0N Suite<br>
     100% Private · Local Execution
   </div>
+  <button id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:16px;padding:4px 8px;border:none;background:transparent;cursor:pointer;color:inherit;margin-left:auto;">🌙</button>
 </header>
 
 <!-- ── Workspace Bar ── -->
@@ -1993,6 +2011,7 @@ function closeExecutiveReport() {
 
 /* ── Boot ── */
 document.addEventListener('DOMContentLoaded', () => {
+  _applyTheme(localStorage.getItem('bidcast_theme') || 'light');
   SuiteManager.migrate();
   ppLoad();
   ppPopulateSelect();
@@ -2009,6 +2028,7 @@ document.addEventListener('DOMContentLoaded', () => {
   /* React to changes made in other tools or tabs. */
   SuiteManager.onUpdate((sync, changedKey) => {
     if (changedKey === 'bidcast_logo') { ppUpdateLogo(); _updateBrandPanel(); return; }
+    if (sync && sync.theme) _applyTheme(sync.theme);
     const nameInput = document.getElementById('pp-name');
     if (nameInput && document.activeElement !== nameInput && sync.projectName != null)
       nameInput.value = sync.projectName;
@@ -2031,6 +2051,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
+
+/* ── Dark mode ── */
+function toggleTheme() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const newTheme = isDark ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', newTheme);
+  localStorage.setItem('bidcast_theme', newTheme);
+  const btn = document.getElementById('theme-toggle-btn');
+  if (btn) btn.textContent = newTheme === 'dark' ? '☀' : '🌙';
+  try {
+    const sync = JSON.parse(localStorage.getItem('bidcast_suite_sync') || '{}');
+    sync.theme = newTheme; sync._ts = Date.now();
+    localStorage.setItem('bidcast_suite_sync', JSON.stringify(sync));
+  } catch(e) {}
+}
+function _applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme || 'light');
+  const btn = document.getElementById('theme-toggle-btn');
+  if (btn) btn.textContent = theme === 'dark' ? '☀' : '🌙';
+}
 </script>
 
 </body>
