@@ -60,6 +60,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text)
 .tool-tag  { font-size: 9px; font-weight: 600; color: var(--faint); letter-spacing: 1px; text-transform: uppercase; }
 .tb-sep    { width: 1px; height: 22px; background: var(--border); }
 .kb-hint { font-size:11px; color:var(--text); opacity:0.45; margin-left:auto; white-space:nowrap; }
+.save-confirm { font-size: 10px; color: #3a7a52; display: none; font-weight: 600; }
 .tb-btn {
   font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 500;
   padding: 6px 12px; border-radius: 7px; border: 1.5px solid var(--border);
@@ -239,6 +240,7 @@ input:focus, select:focus { border-color:var(--accent); background:#fff; }
     <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;">🌙</button>
     <div style="position:relative;display:inline-block;"><button class="tb-btn" id="backup-btn" onclick="_showBackups()" style="font-size:11px;">⏱ Backups</button></div>
     <span id="autosave-label" style="font-size:10px;color:var(--faint);"></span>
+    <span class="save-confirm" id="save-confirm">✓ Saved!</span>
     <span class="kb-hint">Ctrl+S save · Ctrl+E PDF</span>
   </div>
 </div>
@@ -1022,6 +1024,8 @@ function saveJSON() {
   const a = document.createElement('a');
   a.href=URL.createObjectURL(blob); a.download=name+'_suite.json'; a.click();
   URL.revokeObjectURL(a.href);
+  const c = document.getElementById('save-confirm');
+  if (c) { c.style.display = 'inline'; setTimeout(() => c.style.display = 'none', 2000); }
   _writeBackup();
 }
 
