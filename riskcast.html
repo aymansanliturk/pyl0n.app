@@ -7,6 +7,7 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style id="page-size-style">@page { size: A3 landscape; margin: 10mm; }</style>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -863,8 +864,19 @@ function exportHTML() {
 
 /* ══ Export ═════════════════════════════════════════════════════════ */
 function exportPDF() {
-  generate();
-  window.print();
+  const state = collectState();
+  const name = (state.projName || 'riskcast').replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
+  html2pdf().set({
+    margin: 10,
+    filename: 'riskcast-export.pdf',
+    image: { type: 'jpeg', quality: 0.97 },
+    html2canvas: { scale: 0.85, useCORS: true, onclone: d => {
+      d.querySelectorAll('.no-print, .print-bar').forEach(el => el.remove());
+      const out = d.querySelector('#output');
+      if (out) { out.style.display = 'block'; out.style.padding = '0'; }
+    }},
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  }).from(document.getElementById('output')).save();
 }
 
 function exportExcel() {
