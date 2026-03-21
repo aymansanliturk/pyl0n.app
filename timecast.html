@@ -1120,6 +1120,7 @@ function updateLogoUI() {
   function renderChart() {
     const { title, sub, rev, sm, sy, em, ey, projects, showToday = true } = chartState;
     const scale = chartState.viewScale || viewScale || 'monthly';
+    const now = new Date();
     let units = buildUnits(sm, sy, em, ey, scale);
     // Fall back to a 12-month window if the range is invalid / empty.
     if (!units || !units.length) {
@@ -1138,6 +1139,16 @@ function updateLogoUI() {
 
     chartState.multiProj  = multiProj;
     chartState._hasNotes  = hasNotes;
+
+    // Critical path: mark tasks before rendering bars
+    const onlyTasks = allTasks.filter(t => t.type === 'task' || t.type === 'TASK' || !t.type);
+    onlyTasks.forEach(t => { t._isCritical = false; });
+    onlyTasks.forEach((a, ai) => {
+      onlyTasks.forEach((b, bi) => {
+        if (ai === bi) return;
+        if (a.em === b.sm && a.ey === b.sy) { a._isCritical = true; b._isCritical = true; }
+      });
+    });
 
     // Header
     document.getElementById('out-title').textContent = title;
@@ -1269,16 +1280,6 @@ function updateLogoUI() {
       renderGroup(proj.execTasks, false, showPhaseHeaders, pi);
     });
 
-    // Critical path: find TASK pairs where A ends the same unit B starts (zero float)
-    // Mark tasks with _isCritical flag before rendering bars
-    const onlyTasks = allTasks.filter(t => t.type === 'task' || t.type === 'TASK' || !t.type);
-    onlyTasks.forEach(t => { t._isCritical = false; });
-    onlyTasks.forEach((a, ai) => {
-      onlyTasks.forEach((b, bi) => {
-        if (ai === bi) return;
-        if (a.em === b.sm && a.ey === b.sy) { a._isCritical = true; b._isCritical = true; }
-      });
-    });
     const hasCriticalPath = onlyTasks.some(t => t._isCritical);
 
     // Legend
