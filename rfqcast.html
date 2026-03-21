@@ -59,6 +59,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text)
 .tool-name { font-size: 14px; font-weight: 700; letter-spacing: -0.3px; }
 .tool-tag  { font-size: 9px; font-weight: 600; color: var(--faint); letter-spacing: 1px; text-transform: uppercase; }
 .tb-sep    { width: 1px; height: 22px; background: var(--border); }
+.kb-hint { font-size:11px; color:var(--text); opacity:0.45; margin-left:auto; white-space:nowrap; }
 .tb-btn {
   font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 500;
   padding: 6px 12px; border-radius: 7px; border: 1.5px solid var(--border);
@@ -238,6 +239,7 @@ input:focus, select:focus { border-color:var(--accent); background:#fff; }
     <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;">🌙</button>
     <div style="position:relative;display:inline-block;"><button class="tb-btn" id="backup-btn" onclick="_showBackups()" style="font-size:11px;">⏱ Backups</button></div>
     <span id="autosave-label" style="font-size:10px;color:var(--faint);"></span>
+    <span class="kb-hint">Ctrl+S save · Ctrl+E PDF</span>
   </div>
 </div>
 
@@ -259,6 +261,9 @@ input:focus, select:focus { border-color:var(--accent); background:#fff; }
 
   <div class="section">
     <div class="section-title">Procurement Items <span style="font-size:10px;font-weight:400;color:var(--faint);text-transform:none;letter-spacing:0;"> — Click on any row to expand details, enter prices, and select a winner.</span></div>
+    <div style="margin-bottom:10px;">
+      <input type="text" id="rfq-filter" placeholder="Filter items…" oninput="filterRfqItems(this.value)" style="font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 10px;outline:none;width:260px;transition:border-color 0.15s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+    </div>
     <div class="rfq-table-wrap">
       <table class="rfq-table">
         <thead id="rfq-table-head">
@@ -828,6 +833,20 @@ function collectState() {
   };
 }
 
+function filterRfqItems(query) {
+  const q = (query || '').toLowerCase().trim();
+  document.querySelectorAll('#rfq-body tr.rfq-row').forEach(tr => {
+    const id = tr.dataset.id;
+    const desc = (tr.querySelector('.item-desc')?.value || '').toLowerCase();
+    const cat  = (tr.querySelector('.rfq-inp-category')?.value || '').toLowerCase();
+    const match = !q || desc.includes(q) || cat.includes(q);
+    tr.style.display = match ? '' : 'none';
+    // Also hide/show associated detail row
+    const det = document.querySelector(`#rfq-body tr.detail-row[data-parent="${id}"]`);
+    if (det) det.style.display = match ? '' : 'none';
+  });
+}
+
 function applyState(s) {
   document.getElementById('proj-name').value       = s.projName || '';
   document.getElementById('proj-num').value        = s.projNum  || '';
@@ -836,6 +855,9 @@ function applyState(s) {
   document.getElementById('doc-rev').value         = s.rev  || '';
   document.getElementById('doc-date').value        = s.date || '';
   if (s.format) setFormat(s.format);
+
+  const filterEl = document.getElementById('rfq-filter');
+  if (filterEl) filterEl.value = '';
 
   document.getElementById('rfq-body').innerHTML = '';
   rowCount = 0;
@@ -1069,6 +1091,8 @@ function exportExcel() {
 function importExcel(input) {
   // Simple import logic placeholder adapted for new Category system
   alert("Import function needs template adjustment for new category system. Please use manual entry for now.");
+  const filterEl = document.getElementById('rfq-filter');
+  if (filterEl) filterEl.value = '';
   input.value='';
 }
 
@@ -1135,6 +1159,10 @@ function _updateSavedLabel() {
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
   if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+    if (e.key === 's') { e.preventDefault(); saveJSON(); }
+    if (e.key === 'e') { e.preventDefault(); exportPDF(); }
+  }
 });
 (function() {
   const _rawApply = applyState;

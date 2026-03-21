@@ -70,6 +70,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text)
 .tb-btn.green:hover { background: var(--green-dk); }
 .tb-btn:disabled { opacity: 0.35; pointer-events: none; }
 .save-confirm { font-size: 10px; color: var(--green); display: none; font-weight: 600; }
+.kb-hint { font-size:11px; color:var(--text); opacity:0.45; margin-left:auto; white-space:nowrap; }
 
 /* ── Editor ── */
 #editor { max-width:1500px; margin:0 auto; padding:24px 28px 60px; }
@@ -352,6 +353,7 @@ input[type="text"]:focus { border-color:var(--accent); background:#fff; }
     <div style="position:relative;display:inline-block;"><button class="tb-btn" id="backup-btn" onclick="_showBackups()" style="font-size:11px;">⏱ Backups</button></div>
     <span id="autosave-label" style="font-size:10px;color:var(--faint);"></span>
     <span class="save-confirm" id="save-confirm">✓ Saved!</span>
+    <span class="kb-hint">Ctrl+S save · Ctrl+E PDF</span>
   </div>
 </div>
 
@@ -379,6 +381,9 @@ input[type="text"]:focus { border-color:var(--accent); background:#fff; }
 
   <div class="section">
     <div class="section-title">Risk Register</div>
+    <div style="margin-bottom:10px;">
+      <input type="text" id="risk-filter" placeholder="Filter risks…" oninput="filterRisks(this.value)" style="font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 10px;outline:none;width:260px;transition:border-color 0.15s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+    </div>
     <div class="risk-table-wrap">
       <table class="risk-table">
         <thead>
@@ -820,6 +825,18 @@ function collectState() {
   };
 }
 
+function filterRisks(query) {
+  const q = (query || '').toLowerCase().trim();
+  document.querySelectorAll('#risk-body tr.risk-row').forEach(tr => {
+    const cat    = (tr.querySelector('.risk-cat')?.value || '').toLowerCase();
+    const topic  = (tr.querySelector('.risk-topic')?.value || '').toLowerCase();
+    const cause  = (tr.querySelector('.risk-cause')?.value || '').toLowerCase();
+    const desc   = (tr.querySelector('.risk-desc')?.value || '').toLowerCase();
+    const match  = !q || cat.includes(q) || topic.includes(q) || cause.includes(q) || desc.includes(q);
+    tr.style.display = match ? '' : 'none';
+  });
+}
+
 function applyState(s) {
   if (!s) return;
   if (s.format) setFormat(s.format);
@@ -827,6 +844,8 @@ function applyState(s) {
   document.getElementById('proj-num').value  = s.projNum || '';
   document.getElementById('doc-rev').value   = s.rev   || '';
   document.getElementById('doc-date').value  = s.date  || '';
+  const filterEl = document.getElementById('risk-filter');
+  if (filterEl) filterEl.value = '';
   document.getElementById('risk-body').innerHTML = '';
   _rowIdx = 0;
   (s.risks || []).forEach(r => addRisk(r));
@@ -1176,6 +1195,10 @@ function _updateSavedLabel() {
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey||e.metaKey) && e.key==='z' && !e.shiftKey) { e.preventDefault(); undo(); }
   if ((e.ctrlKey||e.metaKey) && (e.key==='y' || (e.key==='z'&&e.shiftKey))) { e.preventDefault(); redo(); }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+    if (e.key === 's') { e.preventDefault(); saveJSON(); }
+    if (e.key === 'e') { e.preventDefault(); exportPDF(); }
+  }
 });
 (function() {
   const _rawApply = applyState;
