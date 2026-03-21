@@ -80,6 +80,7 @@
   .warn-badge { font-size: 10px; color: #b36a00; background: #fff3e0; border: 1px solid #f5c97a; border-radius: 20px; padding: 2px 10px; display: none; }
   .warn-badge.visible { display: inline-block; }
   .save-confirm { font-size: 10px; color: #3a7a52; display: none; font-weight: 600; }
+  .kb-hint { font-size:11px; color:var(--text); opacity:0.45; margin-left:auto; white-space:nowrap; }
   .screen-hint { font-size: 10.5px; color: var(--faint); background: #f5f4f0; border: 1px solid var(--border); border-radius: 6px; padding: 8px 14px; display: none; margin: 8px 24px 0; }
   .screen-hint.visible { display: block; }
 
@@ -282,6 +283,8 @@
   .bar-baseline.solo { border-radius: 2px; left: 3px; right: 3px; }
 
   .milestone { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%) rotate(45deg); width: 12px; height: 12px; border-radius: 2px; z-index: 5; }
+  .bar-pct { position: absolute; top: 0; left: 0; height: 100%; background: rgba(0,0,0,0.28); border-radius: 3px 0 0 3px; pointer-events: none; z-index: 10; }
+  .pct-input { width:46px; font-size:11px; text-align:center; }
 
   /* ── Interactive drag handles on Gantt bars ── */
   .bar-handle {
@@ -392,6 +395,7 @@
     <div style="position:relative;display:inline-block;"><button class="tb-btn" id="backup-btn" onclick="_showBackups()" style="font-size:11px;">⏱ Backups</button></div>
     <span id="autosave-label" style="font-size:10px;color:var(--faint);"></span>
     <span class="save-confirm" id="save-confirm">✓ Saved!</span>
+    <span class="kb-hint">Ctrl+S save · Ctrl+E PDF</span>
   </div>
 </div>
 <div class="screen-hint" id="screen-hint">
@@ -678,6 +682,7 @@ function updateLogoUI() {
         </div>
       </td>
       <td style="width:13%"><input class="t-notes" type="text" value="${data.notes||''}" placeholder="Notes..." style="font-size:11px"></td>
+      <td style="width:6%"><input class="pct-input" type="number" min="0" max="100" value="${data.pct||0}" style="width:46px;font-size:11px;text-align:center;"><span style="font-size:10px;color:var(--faint);">%</span></td>
       <td style="width:8%">${!isM ? `<button class="btn-baseline-toggle" onclick="toggleBaseline(this)">± Plan</button>` : ''}</td>
       <td style="width:4%"><button class="btn-del" onclick="removeTaskRow(this)">×</button></td>
     `;
@@ -747,7 +752,8 @@ function updateLogoUI() {
           ey: parseInt(btr.querySelector('.t-bey').value),
         };
       }
-      rows.push({ type, name, sm, sy, em, ey, color, notes, baseline });
+      const pct = Math.min(100, Math.max(0, parseInt(tr.querySelector('.pct-input')?.value) || 0));
+      rows.push({ type, name, sm, sy, em, ey, color, notes, baseline, pct });
     }
     return rows;
   }
@@ -1218,6 +1224,26 @@ function updateLogoUI() {
               let p='m'; if(si===ei)p='solo'; else if(c===si)p='s'; else if(c===ei)p='e';
               const seg = _makeBarSegment(t, cls, p, projIdx, lane, i, c, si, ei);
               if (t._isCritical) seg.classList.add('cp');
+              // % complete overlay
+              const pct = t.pct || 0;
+              if (pct > 0 && t.type !== 'milestone') {
+                const totalCells = ei - si + 1;
+                const pctCells   = (pct / 100) * totalCells;
+                const fullCells  = Math.floor(pctCells);
+                const fraction   = pctCells - fullCells;
+                const relC       = c - si;
+                if (relC < fullCells) {
+                  const ov = document.createElement('div');
+                  ov.className = 'bar-pct';
+                  ov.style.width = '100%';
+                  seg.appendChild(ov);
+                } else if (relC === fullCells && fraction > 0) {
+                  const ov = document.createElement('div');
+                  ov.className = 'bar-pct';
+                  ov.style.width = (fraction * 100) + '%';
+                  seg.appendChild(ov);
+                }
+              }
               cell.appendChild(seg);
             }
           }
@@ -1743,6 +1769,10 @@ function updateLogoUI() {
   document.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
     if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+      if (e.key === 's') { e.preventDefault(); saveJSON(); }
+      if (e.key === 'e') { e.preventDefault(); exportPDF(); }
+    }
   });
   (function() {
     const _rawApply = applyState;
