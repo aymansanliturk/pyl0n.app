@@ -228,6 +228,57 @@ label input[readonly] { background: var(--bg); color: var(--muted); cursor: defa
 .three-col { display: grid; grid-template-columns: 1fr 1.8fr; gap: 16px; }
 .big-stat  { font-family: 'DM Mono', monospace; font-size: 22px; font-weight: 700; }
 
+/* ── Factory cards ── */
+.factory-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 18px; }
+.factory-card {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 12px; padding: 20px;
+}
+.factory-card-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 16px;
+}
+.factory-cat  { font-size: 13px; font-weight: 700; color: var(--text); }
+.factory-dc   { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--faint); margin-top: 2px; }
+.factory-warn { font-size: 11px; color: var(--amber); font-weight: 600; margin-bottom: 12px; display: none; }
+.btn-del-factory {
+  background: none; border: 1.5px solid var(--border); border-radius: 7px;
+  color: var(--faint); font-size: 11px; cursor: pointer; padding: 4px 9px; flex-shrink: 0;
+  transition: all .15s;
+}
+.btn-del-factory:hover { border-color: var(--red); color: var(--red); }
+.factory-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 14px; }
+.factory-kpis label { font-size: 10px; }
+.factory-kpis label input {
+  font-size: 12px; padding: 6px 8px;
+}
+.factory-stack { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.fsr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; border-bottom: 1px solid var(--border); gap: 8px;
+}
+.fsr:last-child { border-bottom: none; }
+.fsr.fhi { background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%); }
+.fsr-label { font-size: 11px; font-weight: 500; color: var(--muted); }
+.fsr.fhi .fsr-label { color: rgba(255,255,255,0.7); }
+.fsr-val { font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 600; color: var(--text); }
+.fsr.fhi .fsr-val { color: #fff; }
+.factory-add-bar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 20px;
+}
+.factory-add-bar select {
+  font-family: 'DM Sans', sans-serif; font-size: 12px;
+  border: 1.5px solid var(--border); border-radius: 8px; background: var(--bg);
+  color: var(--text); padding: 7px 10px; outline: none; cursor: pointer; min-width: 200px;
+}
+.factory-add-bar select:focus { border-color: var(--accent); }
+.btn-add-factory {
+  font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 600;
+  padding: 7px 16px; border-radius: 8px; border: 1.5px solid var(--accent);
+  background: var(--accent); color: #fff; cursor: pointer; transition: all .15s;
+}
+.btn-add-factory:hover { background: var(--accent2); border-color: var(--accent2); }
+#factory-empty { text-align: center; padding: 40px 24px; color: var(--faint); font-size: 13px; }
+
 @media (max-width: 900px) {
   .summary-banner { grid-template-columns: 1fr 1fr; }
   .two-col, .three-col, .sc-grid { grid-template-columns: 1fr; }
@@ -270,6 +321,7 @@ label input[readonly] { background: var(--bg); color: var(--muted); cursor: defa
   <button class="tab-btn"         onclick="showTab('kpis',       this)">③ W2W KPIs</button>
   <button class="tab-btn"         onclick="showTab('loa',        this)">④ LoA W2W</button>
   <button class="tab-btn"         onclick="showTab('scenarios',  this)">⑤ Scenarios</button>
+  <button class="tab-btn"         onclick="showTab('factories',  this)">⑥ Factory Breakdowns</button>
 </div>
 
 <!-- ══════════════════════════ MAIN CONTENT ═════════════════════════════════ -->
@@ -532,6 +584,24 @@ label input[readonly] { background: var(--bg); color: var(--muted); cursor: defa
     </div>
   </div><!-- /tab-scenarios -->
 
+  <!-- ── Tab 6: Factory Breakdowns ────────────────────────────────────────── -->
+  <div id="tab-factories" class="tab-panel">
+
+    <div class="factory-add-bar">
+      <select id="factory-cat-select">
+        <option value="">— select category —</option>
+      </select>
+      <button class="btn-add-factory" onclick="addFactory()">+ Add Factory Breakdown</button>
+      <span style="font-size:11px;color:var(--faint);">Base Direct Cost is read live from CalcCast · KPI inputs are saved independently.</span>
+    </div>
+
+    <div id="factory-empty" style="display:none;">
+      No factory breakdowns yet. Select a category above and click Add.
+    </div>
+    <div class="factory-grid" id="factory-list"></div>
+
+  </div><!-- /tab-factories -->
+
 </div><!-- /main-content -->
 
 <script>
@@ -583,6 +653,15 @@ let _directCost  = 0;    // total EUR direct cost (included rows only)
 let _byCategory  = {};   // { categoryName: totalEUR }
 let _lastResults = null; // last computeKpis() result (Scenario A)
 
+/* ══ W2W Report local persistence (factories survive CalcCast Refresh) ════ */
+let _w2wState = (() => {
+  try { return JSON.parse(localStorage.getItem('bidcast_state_w2wreport') || '{"factories":[]}'); }
+  catch { return { factories: [] }; }
+})();
+function saveW2WState() {
+  localStorage.setItem('bidcast_state_w2wreport', JSON.stringify(_w2wState));
+}
+
 /* ══ Data Ingestion ════════════════════════════════════════════════════════ */
 function loadCalcCastData() {
   try {
@@ -619,6 +698,7 @@ function loadCalcCastData() {
 
   updateAll();
   renderScope();
+  renderFactories();   // update live DC values; KPI inputs are not touched
 }
 
 function refreshAll() {
@@ -978,6 +1058,133 @@ function cloneToB() {
     if (el) el.value = kA[key].toFixed(1);
   });
   updateScenarios();
+}
+
+/* ══ Tab 6: Factory Breakdowns ═════════════════════════════════════════════ */
+function _populateCatDropdown() {
+  const sel = $('factory-cat-select');
+  if (!sel) return;
+  const cats = Object.keys(_byCategory).filter(c => (_byCategory[c] || 0) > 0).sort();
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— select category —</option>' +
+    cats.map(c => `<option value="${_esc(c)}"${c === prev ? ' selected' : ''}>${_esc(c)}</option>`).join('');
+}
+
+function _esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function addFactory() {
+  const sel = $('factory-cat-select');
+  const cat = sel ? sel.value : '';
+  if (!cat) return;
+  _w2wState.factories.push({
+    id:  Date.now(),
+    category: cat,
+    kpis: { rw: 5, sga: 4, exu: 3, ba: 2, ebit: 8 },
+  });
+  saveW2WState();
+  renderFactories();
+}
+
+function removeFactory(id) {
+  _w2wState.factories = _w2wState.factories.filter(f => f.id !== id);
+  saveW2WState();
+  renderFactories();
+}
+
+function updateFactoryKpi(id, key, val) {
+  const f = _w2wState.factories.find(f => f.id === id);
+  if (!f) return;
+  f.kpis[key] = parseFloat(val) || 0;
+  saveW2WState();
+  // Re-render only the results portion of this card to avoid losing focus
+  _refreshFactoryStack(id);
+}
+
+function _computeFactory(dc, kpis) {
+  const afterRW   = dc        * (1 + kpis.rw   / 100);
+  const afterSGA  = afterRW   * (1 + kpis.sga  / 100);
+  const afterEXU  = afterSGA  * (1 + kpis.exu  / 100);
+  const afterBA   = afterEXU  * (1 + kpis.ba   / 100);
+  const transfer  = afterBA   * (1 + kpis.ebit / 100);
+  return { dc, afterRW, afterSGA, afterEXU, afterBA, transfer };
+}
+
+function _factoryStackHTML(r) {
+  const rows = [
+    { label: 'Base Direct Cost',       val: r.dc       },
+    { label: 'After Risk + Warranty',  val: r.afterRW  },
+    { label: 'After SG&A',            val: r.afterSGA },
+    { label: 'After EXU',             val: r.afterEXU },
+    { label: 'After BA',              val: r.afterBA  },
+    { label: 'Factory Transfer Price', val: r.transfer, hi: true },
+  ];
+  return rows.map(row =>
+    `<div class="fsr${row.hi ? ' fhi' : ''}">
+      <span class="fsr-label">${row.label}</span>
+      <span class="fsr-val">${fmtK(row.val)}</span>
+    </div>`
+  ).join('');
+}
+
+function _refreshFactoryStack(id) {
+  const f = _w2wState.factories.find(f => f.id === id);
+  if (!f) return;
+  const stackEl = $('fstack-' + id);
+  if (!stackEl) return;
+  const dc = _byCategory[f.category] || 0;
+  const r  = _computeFactory(dc, f.kpis);
+  stackEl.innerHTML = _factoryStackHTML(r);
+}
+
+function renderFactories() {
+  _populateCatDropdown();
+
+  const list    = $('factory-list');
+  const empty   = $('factory-empty');
+  if (!list) return;
+
+  if (_w2wState.factories.length === 0) {
+    list.innerHTML = '';
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+
+  list.innerHTML = _w2wState.factories.map(f => {
+    const dc   = _byCategory[f.category] || 0;
+    const r    = _computeFactory(dc, f.kpis);
+    const warn = dc === 0
+      ? `<div class="factory-warn" style="display:block;">⚠ No Direct Cost found for "${_esc(f.category)}" — check CalcCast data.</div>`
+      : '';
+
+    const kpiFields = [
+      ['rw',   'Risk+Warr %'],
+      ['sga',  'SG&A %'],
+      ['exu',  'EXU %'],
+      ['ba',   'BA %'],
+      ['ebit', 'EBIT %'],
+    ].map(([key, lbl]) =>
+      `<label>${lbl}
+        <input type="number" value="${f.kpis[key]}" min="0" step="0.1"
+          onchange="updateFactoryKpi(${f.id},'${key}',this.value)">
+      </label>`
+    ).join('');
+
+    return `<div class="factory-card" id="fcard-${f.id}">
+      <div class="factory-card-head">
+        <div>
+          <div class="factory-cat">${_esc(f.category)}</div>
+          <div class="factory-dc">Base DC: ${fmtK(dc)}</div>
+        </div>
+        <button class="btn-del-factory" onclick="removeFactory(${f.id})">✕ Remove</button>
+      </div>
+      ${warn}
+      <div class="factory-kpis">${kpiFields}</div>
+      <div class="factory-stack" id="fstack-${f.id}">${_factoryStackHTML(r)}</div>
+    </div>`;
+  }).join('');
 }
 
 /* ══ Tab Switching ═════════════════════════════════════════════════════════ */
