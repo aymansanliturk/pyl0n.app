@@ -604,6 +604,14 @@ function buildVendorBlock(v, i, requiredMonths, rfqId) {
           </select>
         </label>
         <label style="font-size:9.5px;font-weight:500;color:var(--muted);display:flex;flex-direction:column;gap:3px;">
+          Warranty Included
+          <select class="v-field vf-input" data-vi="${i}" data-key="warranty">
+            <option value="">—</option>
+            <option value="Yes" ${v.warranty==='Yes'?'selected':''}>Yes</option>
+            <option value="No"  ${v.warranty==='No'?'selected':''}>No</option>
+          </select>
+        </label>
+        <label style="font-size:9.5px;font-weight:500;color:var(--muted);display:flex;flex-direction:column;gap:3px;">
           Enquiry Sent
           <input type="date" class="v-field vf-input" data-vi="${i}" data-key="enquiry" value="${v.enquiry||''}">
         </label>
@@ -700,6 +708,13 @@ function updateVendorPills(tr, vendors) {
         w.style.fontSize = '9px'; w.style.color = 'var(--green)'; w.style.fontWeight = '700'; w.style.marginTop = '2px';
         w.textContent = '★ WINNER';
         td.appendChild(w);
+      }
+      // Show Missing Warranty Warning
+      if (v.warranty === 'No') {
+        const warn = document.createElement('div');
+        warn.style.fontSize = '9px'; warn.style.color = 'var(--red)'; warn.style.fontWeight = '700'; warn.style.marginTop = '2px';
+        warn.textContent = '⚠ NO WARRANTY';
+        td.appendChild(warn);
       }
     } else {
       td.innerHTML = '<span style="color:#ddd;font-size:10px;">—</span>';
@@ -948,7 +963,10 @@ function generate() {
         if (v.isWinner) {
           cell += `<div style="font-size:9px; color:var(--green); font-weight:700; margin-top:2px;">★ WINNER</div>`;
         }
-        
+        if (v.warranty === 'No') {
+          cell += `<div style="font-size:9px; color:var(--red); font-weight:700; margin-top:2px;">⚠ NO WARR.</div>`;
+        }
+
         tableHtml += `<td style="vertical-align:top; padding:6px;">${cell}</td>`;
       });
       
@@ -975,6 +993,7 @@ function generate() {
           { key: 'leadtime', label: 'Lead Time',            fn: v => v.leadTime   || '—' },
           { key: 'nda',      label: 'NDA',                  fn: v => v.nda        || '—' },
           { key: 'binding',  label: 'Binding Offer',        fn: v => v.binding    || '—' },
+          { key: 'warranty', label: 'Warranty',             fn: v => v.warranty === 'No' ? '<span style="color:var(--red);font-weight:700;">No ⚠</span>' : (v.warranty || '—') },
         ];
 
         fields.forEach(f => {
@@ -1070,9 +1089,9 @@ function exportExcel() {
   wsData.push([]);
   wsData.push(['Category','Description','Qty','Tech Resp.','Proc Resp.','RFQ Doc','',
     'In House','External','Detailed Design','Transport','Installation','Commissioning','',
-    'V1 Name','V1 NDA','V1 Enquiry','V1 Exp.Offer','V1 Offer Rec.','V1 Binding','V1 Validity','V1 Price','V1 Winner',
-    'V2 Name','V2 NDA','V2 Enquiry','V2 Exp.Offer','V2 Offer Rec.','V2 Binding','V2 Validity','V2 Price','V2 Winner',
-    'V3 Name','V3 NDA','V3 Enquiry','V3 Exp.Offer','V3 Offer Rec.','V3 Binding','V3 Validity','V3 Price','V3 Winner',
+    'V1 Name','V1 NDA','V1 Enquiry','V1 Exp.Offer','V1 Offer Rec.','V1 Binding','V1 Warranty','V1 Validity','V1 Price','V1 Winner',
+    'V2 Name','V2 NDA','V2 Enquiry','V2 Exp.Offer','V2 Offer Rec.','V2 Binding','V2 Warranty','V2 Validity','V2 Price','V2 Winner',
+    'V3 Name','V3 NDA','V3 Enquiry','V3 Exp.Offer','V3 Offer Rec.','V3 Binding','V3 Warranty','V3 Validity','V3 Price','V3 Winner',
     'Comments']);
   state.items.forEach(item=>{
     const v=item.vendors;
@@ -1080,9 +1099,9 @@ function exportExcel() {
       item.category, item.desc, item.qty, item.techResp, item.procResp, item.rfqDoc, '',
       item.inHouse?'Yes':'', item.external?'Yes':'', item.detDesign?'Yes':'',
       item.transport?'Yes':'', item.install?'Yes':'', item.commission?'Yes':'', '',
-      v[0]?.name||'', v[0]?.nda||'', v[0]?.enquiry||'', v[0]?.expOffer||'', v[0]?.offerRec||'', v[0]?.binding||'', v[0]?.validity||'', v[0]?.price||'', v[0]?.isWinner?'Yes':'',
-      v[1]?.name||'', v[1]?.nda||'', v[1]?.enquiry||'', v[1]?.expOffer||'', v[1]?.offerRec||'', v[1]?.binding||'', v[1]?.validity||'', v[1]?.price||'', v[1]?.isWinner?'Yes':'',
-      v[2]?.name||'', v[2]?.nda||'', v[2]?.enquiry||'', v[2]?.expOffer||'', v[2]?.offerRec||'', v[2]?.binding||'', v[2]?.validity||'', v[2]?.price||'', v[2]?.isWinner?'Yes':'',
+      v[0]?.name||'', v[0]?.nda||'', v[0]?.enquiry||'', v[0]?.expOffer||'', v[0]?.offerRec||'', v[0]?.binding||'', v[0]?.warranty||'', v[0]?.validity||'', v[0]?.price||'', v[0]?.isWinner?'Yes':'',
+      v[1]?.name||'', v[1]?.nda||'', v[1]?.enquiry||'', v[1]?.expOffer||'', v[1]?.offerRec||'', v[1]?.binding||'', v[1]?.warranty||'', v[1]?.validity||'', v[1]?.price||'', v[1]?.isWinner?'Yes':'',
+      v[2]?.name||'', v[2]?.nda||'', v[2]?.enquiry||'', v[2]?.expOffer||'', v[2]?.offerRec||'', v[2]?.binding||'', v[2]?.warranty||'', v[2]?.validity||'', v[2]?.price||'', v[2]?.isWinner?'Yes':'',
       item.comments
     ]);
   });
@@ -1122,15 +1141,16 @@ function importExcel(input) {
         if (!r[0] && !r[1]) continue; // skip blank rows
         function parseVendor(o) {
           return {
-            name:     r[o]   || '',
-            nda:      r[o+1] || '',
-            enquiry:  r[o+2] || '',
-            expOffer: r[o+3] || '',
-            offerRec: r[o+4] || '',
-            binding:  r[o+5] || '',
-            validity: r[o+6] || '',
-            price:    r[o+7] || '',
-            isWinner: r[o+8] === 'Yes',
+            name:     r[o]    || '',
+            nda:      r[o+1]  || '',
+            enquiry:  r[o+2]  || '',
+            expOffer: r[o+3]  || '',
+            offerRec: r[o+4]  || '',
+            binding:  r[o+5]  || '',
+            warranty: r[o+6]  || '',
+            validity: r[o+7]  || '',
+            price:    r[o+8]  || '',
+            isWinner: r[o+9] === 'Yes',
           };
         }
         items.push({
@@ -1146,7 +1166,7 @@ function importExcel(input) {
           transport:  r[10] === 'Yes',
           install:    r[11] === 'Yes',
           commission: r[12] === 'Yes',
-          vendors:    [parseVendor(14), parseVendor(23), parseVendor(32)],
+          vendors:    [parseVendor(14), parseVendor(24), parseVendor(34)],
           comments:   r[41] || '',
         });
       }
