@@ -246,10 +246,23 @@ label input[readonly] { background: var(--bg); color: var(--muted); cursor: defa
   transition: all .15s;
 }
 .btn-del-factory:hover { border-color: var(--red); color: var(--red); }
-.factory-kpis { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 14px; }
-.factory-kpis label { font-size: 10px; }
+.factory-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px 8px;
+  margin-bottom: 16px;
+}
+.factory-kpis label {
+  font-size: 9.5px;
+  letter-spacing: -0.2px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: 100%;
+}
 .factory-kpis label input {
   font-size: 12px; padding: 6px 8px;
+  margin-top: 5px;
 }
 .factory-stack { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 .fsr {
@@ -1225,8 +1238,8 @@ function renderFactories() {
       ['unspecRisk','Unspec. Risk %'],
       ['warr',      'Warranty %'],
       ['sga',       'SG&A %'],
-      ['exu',       'EXU %'],
-      ['ba',        'BA %'],
+      ['exu',       'HQ EXU %'],
+      ['ba',        'HQ BA %'],
       ['ebit',      'EBIT %'],
     ].map(([key, lbl]) =>
       `<label>${lbl}
