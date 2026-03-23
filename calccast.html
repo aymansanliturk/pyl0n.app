@@ -232,6 +232,34 @@ input[type="number"] { font-family: 'DM Mono', monospace; }
   display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s; line-height: 1;
 }
 .btn-add-below:hover { border-color: var(--green); background: #f0fdf4; }
+
+/* ── Collapsible Group Headers ── */
+.group-header {
+  background: var(--accent-l, #e8eef7);
+  cursor: pointer;
+  user-select: none;
+}
+.group-header td {
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  border-bottom: 2px solid var(--border);
+  border-top: 2px solid var(--border);
+}
+.group-header:hover { background: #dce5f2; }
+.group-toggle-icon {
+  display: inline-block;
+  width: 14px;
+  text-align: center;
+  margin-right: 6px;
+  transition: transform 0.2s;
+}
+.group-header.is-collapsed .group-toggle-icon {
+  transform: rotate(-90deg);
+}
 </style>
 </head>
 <body>
@@ -548,6 +576,7 @@ function applyState(s) {
   if (tbody) { tbody.innerHTML = ''; _rowCounter = 0; }
   (s.costRows || []).forEach(row => addCostRow(row));
   calculateModel();
+  updateGroups();
 }
 
 function getResourceCastTotal() {
@@ -781,6 +810,52 @@ function _collectGuarRows() {
 }
 
 /* ══ Cost Table ════════════════════════════════════════════════════════ */
+
+/* ── Collapsible Group Logic ── */
+let _collapsedGroups = new Set();
+
+function updateGroups() {
+  const tbody = document.getElementById('cost-tbody');
+  if (!tbody) return;
+
+  // Remove existing purely visual group headers
+  document.querySelectorAll('#cost-tbody .group-header').forEach(el => el.remove());
+
+  let lastCat = null;
+  const rows = Array.from(tbody.querySelectorAll('.cost-row'));
+
+  rows.forEach(row => {
+    const catSel = row.querySelector('.sel-category');
+    if (!catSel) return;
+    const cat = catSel.value;
+
+    if (cat !== lastCat) {
+      const header = document.createElement('tr');
+      header.className = 'group-header';
+      if (_collapsedGroups.has(cat)) header.classList.add('is-collapsed');
+
+      header.innerHTML = `
+        <td colspan="13" onclick="toggleGroup('${_esc(cat)}')">
+          <span class="group-toggle-icon">▼</span> ${_esc(cat)}
+        </td>
+      `;
+      tbody.insertBefore(header, row);
+      lastCat = cat;
+    }
+
+    row.style.display = _collapsedGroups.has(cat) ? 'none' : '';
+  });
+}
+
+function toggleGroup(cat) {
+  if (_collapsedGroups.has(cat)) {
+    _collapsedGroups.delete(cat);
+  } else {
+    _collapsedGroups.add(cat);
+  }
+  updateGroups();
+}
+
 const CATEGORIES = [
   'Transformers', 'Shunt Reactors', '400kV / 245–275kV / 66–145kV GIS',
   'Control & Protection & Telecom', 'STATCOM', 'MV Switchgear / AIS Switchgear',
@@ -812,7 +887,7 @@ function addCostRow(data = {}, insertAfter = null) {
 
   tr.innerHTML = `
     <td class="td-num"><span class="drag-handle" title="Drag to reorder">⋮⋮</span> <span class="row-num"></span><input type="hidden" class="inp-rfq-id" value="${_esc(data.rfqId || '')}"></td>
-    <td><select class="calc-sel sel-category" oninput="calculateModel()">${catOpts(data.category)}</select></td>
+    <td><select class="calc-sel sel-category" onchange="calculateModel(); updateGroups()">${catOpts(data.category)}</select></td>
     <td>
       <div style="display:flex;align-items:center;">
         ${rfqBadge}
@@ -850,6 +925,7 @@ function addCostRow(data = {}, insertAfter = null) {
   _attachDragEvents(tr);
   _renumberRows();
   calculateModel();
+  updateGroups();
 }
 
 function addContingencyRow(data = {}, insertAfter = null) {
@@ -884,12 +960,14 @@ function addContingencyRow(data = {}, insertAfter = null) {
   _attachDragEvents(tr);
   _renumberRows();
   calculateModel();
+  updateGroups();
 }
 
 function deleteCostRow(btn) {
   btn.closest('.cost-row').remove();
   _renumberRows();
   calculateModel();
+  updateGroups();
 }
 
 function _renumberRows() {
@@ -921,6 +999,7 @@ function _attachDragEvents(row) {
     document.querySelectorAll('.cost-row').forEach(r => r.classList.remove('drag-over-top', 'drag-over-bottom'));
     _renumberRows();
     calculateModel();
+    updateGroups();
   });
 
   row.addEventListener('dragover', e => {
