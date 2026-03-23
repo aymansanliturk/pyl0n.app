@@ -714,7 +714,9 @@ function calculateModel() {
   // Overhead is the difference between the selling price (without EBIT) and the direct cost
   const priceNoEbit  = totalDirect / kpiNoEbitDivisor;
   const overheadCost = priceNoEbit - totalDirect;
-  const profitEUR      = customerPrice - overheadCost;
+
+  // Profit is Customer Price minus BOTH Direct Cost and Overhead Cost
+  const profitEUR      = customerPrice - (totalDirect + overheadCost);
   const profitPct      = customerPrice > 0 ? (profitEUR / customerPrice) * 100 : 0;
 
   // ── 5. Update summary UI ─────────────────────────────────────────────
