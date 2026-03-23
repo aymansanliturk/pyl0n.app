@@ -1803,13 +1803,24 @@ function generateExecutiveReport() {
       }
     });
   }
-  let rfqRec = 0, rfqPend = 0; const rfqList = [];
+  let rfqRec = 0, rfqPend = 0, dnpShortfalls = 0; const rfqList = [];
   if (rq) {
+    const reqDnp = parseInt(rq.dnpMonths) || 0;
     (rq.items || []).forEach(item => {
       let ir = 0, ip = 0;
-      (item.vendors || []).forEach(v => { if (v.binding === 'Yes' || v.offerRec) ir++; else ip++; });
+      let hasDnpIssue = false;
+      (item.vendors || []).forEach(v => {
+        if (v.binding === 'Yes' || v.offerRec) ir++; else ip++;
+        // Check if winning quote has a DNP shortfall
+        if (v.isWinner) {
+          if (!v.dnp || parseInt(v.dnp) < reqDnp) {
+            hasDnpIssue = true;
+            dnpShortfalls++;
+          }
+        }
+      });
       rfqRec += ir; rfqPend += ip;
-      rfqList.push({ name: item.desc || '—', rec: ir, pend: ip, total: ir + ip });
+      rfqList.push({ name: item.desc || '—', rec: ir, pend: ip, total: ir + ip, dnpWarn: hasDnpIssue });
     });
   }
   // ── GRAPH GENERATORS (Pure CSS) ───────────────────────────────────
@@ -1967,9 +1978,13 @@ function generateExecutiveReport() {
       </div>
       <div>
         <div style="font-size:9px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#6b6860;margin-bottom:7px;">Procurement Packages</div>
+        ${dnpShortfalls > 0 ? `<div style="font-size:9px;color:#c0392b;font-weight:700;margin-bottom:6px;">⚠ ${dnpShortfalls} winning package${dnpShortfalls > 1 ? 's have' : ' has'} DNP shortfalls.</div>` : ''}
         <table style="width:100%;border-collapse:collapse;font-size:10px;">
           <tr style="background:#f5f4f0;"><th style="padding:6px;text-align:left;">Package</th><th style="padding:6px;text-align:center;">Status</th></tr>
-          ${rfqList.map(rq => `<tr style="border-bottom:1px solid #e0ddd6;"><td style="padding:6px;">${esc(rq.name)}</td><td style="padding:6px;text-align:center;font-family:'DM Mono';">${rq.rec}/${rq.total} Rec</td></tr>`).join('')}
+          ${rfqList.map(rq => {
+            const dnpBadge = rq.dnpWarn ? `<span style="margin-left:6px;background:#fff3e0;color:#b36a00;font-size:7px;padding:1px 4px;border-radius:10px;font-weight:700;">⚠ DNP</span>` : '';
+            return `<tr style="border-bottom:1px solid #e0ddd6;"><td style="padding:6px;">${esc(rq.name)}${dnpBadge}</td><td style="padding:6px;text-align:center;font-family:'DM Mono';">${rq.rec}/${rq.total} Rec</td></tr>`;
+          }).join('')}
         </table>
       </div>
     </div>
