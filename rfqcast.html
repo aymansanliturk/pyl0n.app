@@ -256,6 +256,7 @@ input:focus, select:focus { border-color:var(--accent); background:#fff; }
     <div class="fields f4" style="margin-top:12px;">
       <label>Offer Due Date <input type="date" id="offer-due"></label>
       <label>Validity Required (Months) <input type="number" id="validity-months" value="3" min="1" max="36"></label>
+      <label>DNP Required (Months) <input type="number" id="dnp-months" value="24" min="0" step="1" title="Defect Notification Period"></label>
       <label>Revision <input type="text" id="doc-rev" value="Rev. 0"></label>
       <label>Date <input type="text" id="doc-date" value=""></label>
     </div>
@@ -604,12 +605,8 @@ function buildVendorBlock(v, i, requiredMonths, rfqId) {
           </select>
         </label>
         <label style="font-size:9.5px;font-weight:500;color:var(--muted);display:flex;flex-direction:column;gap:3px;">
-          Warranty Included
-          <select class="v-field vf-input" data-vi="${i}" data-key="warranty">
-            <option value="">—</option>
-            <option value="Yes" ${v.warranty==='Yes'?'selected':''}>Yes</option>
-            <option value="No"  ${v.warranty==='No'?'selected':''}>No</option>
-          </select>
+          DNP Offered (Mo.)
+          <input type="number" class="v-field vf-input" data-vi="${i}" data-key="dnp" value="${v.dnp||''}" placeholder="e.g. 24" min="0" step="1">
         </label>
         <label style="font-size:9.5px;font-weight:500;color:var(--muted);display:flex;flex-direction:column;gap:3px;">
           Enquiry Sent
@@ -709,12 +706,23 @@ function updateVendorPills(tr, vendors) {
         w.textContent = '★ WINNER';
         td.appendChild(w);
       }
-      // Show Missing Warranty Warning
-      if (v.warranty === 'No') {
-        const warn = document.createElement('div');
-        warn.style.fontSize = '9px'; warn.style.color = 'var(--red)'; warn.style.fontWeight = '700'; warn.style.marginTop = '2px';
-        warn.textContent = '⚠ NO WARRANTY';
-        td.appendChild(warn);
+      // Show DNP Warning
+      const reqDnp = parseInt(document.getElementById('dnp-months').value) || 0;
+      if (v.dnp !== undefined && v.dnp !== '') {
+        const offDnp = parseInt(v.dnp);
+        if (offDnp < reqDnp) {
+          const w = document.createElement('div');
+          w.style.fontSize = '9px'; w.style.color = 'var(--amber)'; w.style.fontWeight = '700'; w.style.marginTop = '2px';
+          w.textContent = `⚠ DNP SHORT (${offDnp}m)`;
+          w.title = `Required: ${reqDnp}m`;
+          td.appendChild(w);
+        }
+      } else if (v.price || v.offerRec || v.binding === 'Yes') {
+         // Warn if they submitted an offer but didn't state DNP
+         const w = document.createElement('div');
+         w.style.fontSize = '9px'; w.style.color = 'var(--red)'; w.style.fontWeight = '700'; w.style.marginTop = '2px';
+         w.textContent = `⚠ NO DNP`;
+         td.appendChild(w);
       }
     } else {
       td.innerHTML = '<span style="color:#ddd;font-size:10px;">—</span>';
@@ -844,6 +852,7 @@ function collectState() {
     projNum:  document.getElementById('proj-num').value,
     offerDue: document.getElementById('offer-due').value,
     validityMonths: document.getElementById('validity-months').value,
+    dnpMonths: document.getElementById('dnp-months').value,
     rev:      document.getElementById('doc-rev').value,
     date:     document.getElementById('doc-date').value,
     items:    getItems(),
@@ -869,6 +878,7 @@ function applyState(s) {
   document.getElementById('proj-num').value        = s.projNum  || '';
   document.getElementById('offer-due').value       = s.offerDue || '';
   document.getElementById('validity-months').value = s.validityMonths || '3';
+  if (s.dnpMonths !== undefined) { const el = document.getElementById('dnp-months'); if (el) el.value = s.dnpMonths; }
   document.getElementById('doc-rev').value         = s.rev  || '';
   document.getElementById('doc-date').value        = s.date || '';
   if (s.format) setFormat(s.format);
@@ -889,8 +899,8 @@ function generate() {
 
   document.getElementById('out-title').textContent = state.projName || 'Supplier RFQ Overview';
   document.getElementById('out-sub').textContent   = '';
-  document.getElementById('out-meta').innerHTML    =
-    `${state.offerDue ? 'Offer Due: ' + state.offerDue + '<br>' : ''}Validity: ${requiredMonths} months<br>${state.rev}${state.date ? '<br>'+state.date : ''}`;
+  document.getElementById('out-meta').innerHTML =
+    `${state.offerDue ? 'Offer Due: ' + state.offerDue + '<br>' : ''}Validity Req: ${requiredMonths}m<br>DNP Req: ${state.dnpMonths||24}m<br>${state.rev}${state.date ? '<br>'+state.date : ''}`;
 
   // Summary stats
   let totalVendors = 0, totalReceived = 0, totalBinding = 0, totalExpired = 0, totalWarn = 0;
@@ -963,8 +973,11 @@ function generate() {
         if (v.isWinner) {
           cell += `<div style="font-size:9px; color:var(--green); font-weight:700; margin-top:2px;">★ WINNER</div>`;
         }
-        if (v.warranty === 'No') {
-          cell += `<div style="font-size:9px; color:var(--red); font-weight:700; margin-top:2px;">⚠ NO WARR.</div>`;
+        const reqDnp = parseInt(state.dnpMonths) || 0;
+        if (v.dnp !== undefined && v.dnp !== '') {
+          if (parseInt(v.dnp) < reqDnp) cell += `<div style="font-size:9px; color:var(--amber); font-weight:700; margin-top:2px;">⚠ DNP SHORT (${v.dnp}m)</div>`;
+        } else if (v.price || v.binding === 'Yes') {
+          cell += `<div style="font-size:9px; color:var(--red); font-weight:700; margin-top:2px;">⚠ NO DNP</div>`;
         }
 
         tableHtml += `<td style="vertical-align:top; padding:6px;">${cell}</td>`;
@@ -993,7 +1006,14 @@ function generate() {
           { key: 'leadtime', label: 'Lead Time',            fn: v => v.leadTime   || '—' },
           { key: 'nda',      label: 'NDA',                  fn: v => v.nda        || '—' },
           { key: 'binding',  label: 'Binding Offer',        fn: v => v.binding    || '—' },
-          { key: 'warranty', label: 'Warranty',             fn: v => v.warranty === 'No' ? '<span style="color:var(--red);font-weight:700;">No ⚠</span>' : (v.warranty || '—') },
+          { key: 'dnp', label: 'DNP Offered', fn: v => {
+              const req = parseInt(state.dnpMonths) || 0;
+              const off = parseInt(v.dnp);
+              if (!v.dnp && (v.price || v.binding === 'Yes')) return '<span style="color:var(--red);font-weight:700;">No DNP ⚠</span>';
+              if (off < req) return `<span style="color:var(--amber);font-weight:700;">${off}m (Short) ⚠</span>`;
+              return v.dnp ? `${v.dnp}m` : '—';
+            }
+          },
         ];
 
         fields.forEach(f => {
@@ -1089,9 +1109,9 @@ function exportExcel() {
   wsData.push([]);
   wsData.push(['Category','Description','Qty','Tech Resp.','Proc Resp.','RFQ Doc','',
     'In House','External','Detailed Design','Transport','Installation','Commissioning','',
-    'V1 Name','V1 NDA','V1 Enquiry','V1 Exp.Offer','V1 Offer Rec.','V1 Binding','V1 Warranty','V1 Validity','V1 Price','V1 Winner',
-    'V2 Name','V2 NDA','V2 Enquiry','V2 Exp.Offer','V2 Offer Rec.','V2 Binding','V2 Warranty','V2 Validity','V2 Price','V2 Winner',
-    'V3 Name','V3 NDA','V3 Enquiry','V3 Exp.Offer','V3 Offer Rec.','V3 Binding','V3 Warranty','V3 Validity','V3 Price','V3 Winner',
+    'V1 Name','V1 NDA','V1 Enquiry','V1 Exp.Offer','V1 Offer Rec.','V1 Binding','V1 DNP (Mo.)','V1 Validity','V1 Price','V1 Winner',
+    'V2 Name','V2 NDA','V2 Enquiry','V2 Exp.Offer','V2 Offer Rec.','V2 Binding','V2 DNP (Mo.)','V2 Validity','V2 Price','V2 Winner',
+    'V3 Name','V3 NDA','V3 Enquiry','V3 Exp.Offer','V3 Offer Rec.','V3 Binding','V3 DNP (Mo.)','V3 Validity','V3 Price','V3 Winner',
     'Comments']);
   state.items.forEach(item=>{
     const v=item.vendors;
@@ -1099,9 +1119,9 @@ function exportExcel() {
       item.category, item.desc, item.qty, item.techResp, item.procResp, item.rfqDoc, '',
       item.inHouse?'Yes':'', item.external?'Yes':'', item.detDesign?'Yes':'',
       item.transport?'Yes':'', item.install?'Yes':'', item.commission?'Yes':'', '',
-      v[0]?.name||'', v[0]?.nda||'', v[0]?.enquiry||'', v[0]?.expOffer||'', v[0]?.offerRec||'', v[0]?.binding||'', v[0]?.warranty||'', v[0]?.validity||'', v[0]?.price||'', v[0]?.isWinner?'Yes':'',
-      v[1]?.name||'', v[1]?.nda||'', v[1]?.enquiry||'', v[1]?.expOffer||'', v[1]?.offerRec||'', v[1]?.binding||'', v[1]?.warranty||'', v[1]?.validity||'', v[1]?.price||'', v[1]?.isWinner?'Yes':'',
-      v[2]?.name||'', v[2]?.nda||'', v[2]?.enquiry||'', v[2]?.expOffer||'', v[2]?.offerRec||'', v[2]?.binding||'', v[2]?.warranty||'', v[2]?.validity||'', v[2]?.price||'', v[2]?.isWinner?'Yes':'',
+      v[0]?.name||'', v[0]?.nda||'', v[0]?.enquiry||'', v[0]?.expOffer||'', v[0]?.offerRec||'', v[0]?.binding||'', v[0]?.dnp||'', v[0]?.validity||'', v[0]?.price||'', v[0]?.isWinner?'Yes':'',
+      v[1]?.name||'', v[1]?.nda||'', v[1]?.enquiry||'', v[1]?.expOffer||'', v[1]?.offerRec||'', v[1]?.binding||'', v[1]?.dnp||'', v[1]?.validity||'', v[1]?.price||'', v[1]?.isWinner?'Yes':'',
+      v[2]?.name||'', v[2]?.nda||'', v[2]?.enquiry||'', v[2]?.expOffer||'', v[2]?.offerRec||'', v[2]?.binding||'', v[2]?.dnp||'', v[2]?.validity||'', v[2]?.price||'', v[2]?.isWinner?'Yes':'',
       item.comments
     ]);
   });
@@ -1147,7 +1167,7 @@ function importExcel(input) {
             expOffer: r[o+3]  || '',
             offerRec: r[o+4]  || '',
             binding:  r[o+5]  || '',
-            warranty: r[o+6]  || '',
+            dnp:      r[o+6]  || '',
             validity: r[o+7]  || '',
             price:    r[o+8]  || '',
             isWinner: r[o+9] === 'Yes',
