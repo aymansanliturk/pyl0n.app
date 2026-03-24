@@ -1910,14 +1910,14 @@ function suiteWrite() {
     // Sync execution-phase tasks from ALL projects
     (state.projects || []).forEach((proj, pIdx) => {
       [...(proj.execTasks || [])].forEach(t => {
-        // Create a unique key per project to allow same-named phases in different projects
-        const uniqueKey = `${proj.id}_${t.name}`;
+        // pIdx used as project key — collectState() has no id field on projects
+        const uniqueKey = `${pIdx}_${t.name}`;
         if (t.type === 'bar' && t.name && !seen.has(uniqueKey)) {
           seen.add(uniqueKey);
           phases.push({
             id: 'tc_' + phases.length,
             name: t.name,
-            project: proj.name || `Project ${pIdx + 1}`, // Tag with project name
+            project: proj.title || `Project ${pIdx + 1}`, // proj.title matches collectState()
             sm: t.sm + 1, sy: t.sy, em: t.em + 1, ey: t.ey
           });
         }
