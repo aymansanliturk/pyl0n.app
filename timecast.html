@@ -210,7 +210,7 @@
   .si-dot.diamond { transform: rotate(45deg); border-radius: 1px; }
   .si-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .si-handle { color: #ccc; font-size: 12px; flex-shrink: 0; }
-  .sidebar-actions { margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .sidebar-actions { display: flex; flex-direction: column; gap: 8px; padding-bottom: 16px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
   .sb-btn { width: 100%; padding: 9px 12px; border-radius: 6px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; border: none; text-align: center; }
   .sb-btn-primary { background: var(--accent); color: #fff; }
   .sb-btn-primary:hover { background: var(--accent2); }
@@ -469,16 +469,12 @@
 
     <!-- Reorder sidebar -->
     <div class="reorder-sidebar no-print">
-      <div class="sidebar-brand">
-        <div class="sb-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round">
-            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-            <rect x="5" y="4" width="5" height="4" rx="1" fill="white" stroke="none"/>
-            <rect x="11" y="10" width="8" height="4" rx="1" fill="white" stroke="none"/>
-            <rect x="7" y="16" width="4" height="4" rx="1" fill="white" stroke="none"/>
-          </svg>
-        </div>
-        <span class="sb-name">Timecast</span>
+      <div class="sidebar-actions">
+        <button class="sb-btn sb-btn-primary" onclick="refreshChart()">↻ Refresh Chart</button>
+        <button class="sb-btn sb-btn-ghost" onclick="goBack()">← Back to Editor</button>
+        <button class="sb-btn sb-btn-ghost" id="sb-print-btn" onclick="window.print()">🖨 Print</button>
+        <button class="sb-btn sb-btn-ghost" onclick="exportPDF()">⬇ PDF</button>
+        <div id="sb-screen-note" style="display:none;font-size:9.5px;color:var(--faint);text-align:center;line-height:1.5;padding:4px 0;">Screen Only mode — save or share<br>this HTML file directly.</div>
       </div>
 
       <div style="font-size:10px;color:var(--faint);margin-bottom:8px;line-height:1.5;">
@@ -489,14 +485,6 @@
       </div>
 
       <div id="sidebar-lists"></div>
-
-      <div class="sidebar-actions">
-        <button class="sb-btn sb-btn-primary" onclick="refreshChart()">↻ Refresh Chart</button>
-        <button class="sb-btn sb-btn-ghost" onclick="goBack()">← Back to Editor</button>
-        <button class="sb-btn sb-btn-ghost" id="sb-print-btn" onclick="window.print()">🖨 Print</button>
-        <button class="sb-btn sb-btn-ghost" onclick="exportPDF()">⬇ PDF</button>
-        <div id="sb-screen-note" style="display:none;font-size:9.5px;color:var(--faint);text-align:center;line-height:1.5;padding:4px 0;">Screen Only mode — save or share<br>this HTML file directly.</div>
-      </div>
     </div>
 
     <!-- Chart area -->
@@ -1917,21 +1905,28 @@ function updateLogoUI() {
 function suiteWrite() {
   try {
     const state = collectState();
-    const proj  = (state.projects || [])[0] || {};
     const seen  = new Set(), phases = [];
-    // Sync execution-phase tasks (bars only) as named phases for ResourceCast
-    [...(proj.execTasks || [])].forEach(t => {
-      if (t.type === 'bar' && t.name && !seen.has(t.name)) {
-        seen.add(t.name);
-        phases.push({ id: 'tc_' + phases.length, name: t.name,
-          sm: t.sm + 1, sy: t.sy, em: t.em + 1, ey: t.ey });
-      }
+    // Sync execution-phase tasks from ALL projects
+    (state.projects || []).forEach((proj, pIdx) => {
+      [...(proj.execTasks || [])].forEach(t => {
+        // Create a unique key per project to allow same-named phases in different projects
+        const uniqueKey = `${proj.id}_${t.name}`;
+        if (t.type === 'bar' && t.name && !seen.has(uniqueKey)) {
+          seen.add(uniqueKey);
+          phases.push({
+            id: 'tc_' + phases.length,
+            name: t.name,
+            project: proj.name || `Project ${pIdx + 1}`, // Tag with project name
+            sm: t.sm + 1, sy: t.sy, em: t.em + 1, ey: t.ey
+          });
+        }
+      });
     });
     phases.sort((a, b) => a.sy !== b.sy ? a.sy - b.sy : a.sm - b.sm);
     phases.forEach((p, i) => p.id = 'tc_' + i);
 
     const prev = SuiteManager.read();
-    const candidateName = (state.chartTitle || proj.title || '').trim();
+    const candidateName = (state.chartTitle || ((state.projects || [])[0] || {}).title || '').trim();
     const payload = { phases: phases.length ? phases : (prev.phases || []) };
     if (candidateName && candidateName !== 'Project Name') payload.projectName = candidateName;
     SuiteManager.write(payload, 'timecast');
