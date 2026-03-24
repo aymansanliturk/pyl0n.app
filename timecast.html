@@ -477,14 +477,15 @@
         <div id="sb-screen-note" style="display:none;font-size:9.5px;color:var(--faint);text-align:center;line-height:1.5;padding:4px 0;">Screen Only mode — save or share<br>this HTML file directly.</div>
       </div>
 
-      <div style="font-size:10px;color:var(--faint);margin-bottom:8px;line-height:1.5;">
-        Drag rows to reorder, then hit <strong style="color:var(--accent)">Refresh</strong> to update the chart.
-      </div>
-      <div style="font-size:9.5px;color:var(--faint);margin-bottom:14px;line-height:1.5;padding:7px 8px;background:#f5f7fc;border-radius:6px;border:1px solid #dde8f7;">
-        ↔ Hover a bar and drag its <strong style="color:var(--accent)">edge handles</strong> to adjust start or end dates directly on the chart.
-      </div>
-
       <div id="sidebar-lists"></div>
+      <div style="margin-top: auto; padding-top: 16px;">
+        <div style="font-size:10px;color:var(--faint);margin-bottom:8px;line-height:1.5;">
+          Drag rows to reorder, then hit <strong style="color:var(--accent)">Refresh</strong> to update the chart.
+        </div>
+        <div style="font-size:9.5px;color:var(--faint);margin-bottom:0;line-height:1.5;padding:7px 8px;background:#f5f7fc;border-radius:6px;border:1px solid #dde8f7;">
+          ↔ Hover a bar and drag its <strong style="color:var(--accent)">edge handles</strong> to adjust start or end dates directly on the chart.
+        </div>
+      </div>
     </div>
 
     <!-- Chart area -->
@@ -1909,14 +1910,14 @@ function suiteWrite() {
     // Sync execution-phase tasks from ALL projects
     (state.projects || []).forEach((proj, pIdx) => {
       [...(proj.execTasks || [])].forEach(t => {
-        // Create a unique key per project to allow same-named phases in different projects
-        const uniqueKey = `${proj.id}_${t.name}`;
+        // pIdx used as project key — collectState() has no id field on projects
+        const uniqueKey = `${pIdx}_${t.name}`;
         if (t.type === 'bar' && t.name && !seen.has(uniqueKey)) {
           seen.add(uniqueKey);
           phases.push({
             id: 'tc_' + phases.length,
             name: t.name,
-            project: proj.name || `Project ${pIdx + 1}`, // Tag with project name
+            project: proj.title || `Project ${pIdx + 1}`, // proj.title matches collectState()
             sm: t.sm + 1, sy: t.sy, em: t.em + 1, ey: t.ey
           });
         }
