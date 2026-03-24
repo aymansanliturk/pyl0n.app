@@ -368,6 +368,27 @@
     .gantt-outer        { page-break-inside: avoid; }
     body { background: #fff; }
   }
+
+  /* ── Full Chart Export Override ── */
+  .exporting-capture .gantt-outer {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+  .exporting-capture .yr-gap,
+  .exporting-capture .mo-gap,
+  .exporting-capture .mo-notes-gap,
+  .exporting-capture .yr-cell,
+  .exporting-capture .mo-cell,
+  .exporting-capture .proj-hdr-lbl,
+  .exporting-capture .sec-div-lbl,
+  .exporting-capture .sec-div-notes,
+  .exporting-capture .row-lbl,
+  .exporting-capture .row-notes {
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
+    z-index: 1 !important;
+  }
 </style>
 </head>
 <body>
@@ -1333,6 +1354,8 @@ function updateLogoUI() {
     }
 
     projects.forEach((proj, pi) => {
+      // FIX: Skip rendering the project header if both phases are hidden/empty
+      if (proj.bidTasks.length === 0 && proj.execTasks.length === 0) return;
       if (multiProj) {
         const phLbl=el('div','proj-hdr-lbl',`● ${proj.name.toUpperCase()}`);
         phLbl.style.background=proj.color;
@@ -1892,6 +1915,8 @@ function updateLogoUI() {
     shell.style.flexDirection = 'unset';
     area.style.width = '100%';
     area.style.padding = '10mm 12mm';
+    // UNROLL THE GANTT CHART FOR FULL CAPTURE
+    document.body.classList.add('exporting-capture');
 
     // Capture with scale: 3 for ultra high-res (similar to TIFF clarity)
     html2canvas(document.getElementById('output'), {
@@ -1908,6 +1933,9 @@ function updateLogoUI() {
       hideEls.forEach(el => el.style.display = '');
       shell.style.cssText = oldShellCSS;
       area.style.cssText = oldAreaCSS;
+
+      // RESTORE SCROLLING
+      document.body.classList.remove('exporting-capture');
     });
   }
 
@@ -1922,12 +1950,14 @@ function updateLogoUI() {
       html2canvas: {
         scale: 2, useCORS: true,
         onclone: d => {
-          // Remove every interactive / non-data element from the cloned DOM
+          // UNROLL THE GANTT CHART IN THE PDF CLONE
+          d.body.classList.add('exporting-capture');
+
           d.querySelectorAll(
             '.no-print, .print-bar, #toolbar, ' +
             '.reorder-sidebar, .sidebar-actions'
           ).forEach(el => el.remove());
-          // Rebalance layout: make the chart fill the full page width
+
           const shell = d.querySelector('.output-shell');
           if (shell) { shell.style.display = 'block'; shell.style.flexDirection = 'unset'; }
           const area  = d.querySelector('.chart-area');
