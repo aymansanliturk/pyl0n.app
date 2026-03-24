@@ -582,78 +582,138 @@ function _updateInfoPanel() {
   document.getElementById('sum-cost').textContent = fmtK(d.totalCost) + 'EUR';
 }
 
-/* ══ Simulation stub (completed in Part 2) ═════════════════════════════ */
-function simulate() {
-  /* Full implementation added in Part 2.
-     For now, initialise blank charts so the canvas is ready. */
-  _updateInfoPanel();
-  _initChartsIfNeeded();
+/* ══ Math helpers ══════════════════════════════════════════════════════ */
+function distributeCost(total, duration, curveType) {
+  const weights = [];
+  let sum = 0;
+  for (let m = 1; m <= duration; m++) {
+    let w = 1;
+    if      (curveType === 'front') w = duration - m + 1;
+    else if (curveType === 'back')  w = m;
+    else if (curveType === 'bell')  w = Math.sin(Math.PI * (m - 1) / (duration - 1 || 1));
+    weights.push(w);
+    sum += w;
+  }
+  return weights.map(w => total * (w / (sum || 1)));
 }
 
-/* ══ Chart initialisation stubs ════════════════════════════════════════ */
-let _chartCF  = null;
-let _chartExp = null;
+/* ══ Simulation engine ═════════════════════════════════════════════════ */
+let chartInst1 = null;
+let chartInst2 = null;
 
-function _initChartsIfNeeded() {
-  const isDark   = document.documentElement.getAttribute('data-theme') === 'dark';
-  const gridCol  = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
-  const tickCol  = isDark ? '#6b6860' : '#a8a49e';
-  const labelCol = isDark ? '#e8e6e1' : '#1a1916';
+function simulate() {
+  const N = _simData.duration || 60;
+  const labels = Array.from({ length: N }, (_, i) => `M${i + 1}`);
 
-  const commonScaleOpts = {
-    grid:  { color: gridCol, drawBorder: false },
-    ticks: { color: tickCol, font: { family: "'DM Mono', monospace", size: 9 } },
-    border: { color: gridCol },
-  };
-  const commonPlugins = {
-    legend: { labels: { color: labelCol, font: { family: "'DM Sans', sans-serif", size: 10 }, boxWidth: 12 } },
-    tooltip: {
-      mode: 'index', intersect: false,
-      callbacks: { label: ctx => ' ' + fmtK(ctx.parsed.y) + 'EUR' },
-    },
-  };
+  const arrPayments    = new Array(N).fill(0);
+  const arrTotalCost   = new Array(N).fill(0);
+  const arrCumCashflow = new Array(N).fill(0);
+  const arrSunkDC      = new Array(N).fill(0);
+  const arrSunkFC      = new Array(N).fill(0);
+  const arrCancPenalty = new Array(N).fill(0);
 
-  if (!_chartCF) {
-    _chartCF = new Chart(document.getElementById('cashflowChart').getContext('2d'), {
+  const dcMonthly = distributeCost(_simData.directCost, N, _simState.dcCurve);
+  const fcMonthly = distributeCost(_simData.funcCost,   N, _simState.fcCurve);
+
+  _simState.milestones.forEach(ms => {
+    const idx = Math.max(1, Math.min(N, Math.floor(ms.m))) - 1;
+    arrPayments[idx] += _simData.contractValue * (ms.p / 100);
+  });
+
+  let cumCash = 0, cumDC = 0, cumFC = 0;
+  let minValley = 0, maxExposure = 0;
+  const startPct = _simState.cancStart / 100;
+  const endPct   = _simState.cancEnd   / 100;
+
+  for (let i = 0; i < N; i++) {
+    const monthlyCost = dcMonthly[i] + fcMonthly[i];
+    arrTotalCost[i]   = -monthlyCost;
+
+    cumCash += arrPayments[i] - monthlyCost;
+    arrCumCashflow[i] = cumCash;
+    if (cumCash < minValley) minValley = cumCash;
+
+    cumDC += dcMonthly[i];
+    cumFC += fcMonthly[i];
+    arrSunkDC[i] = cumDC;
+    arrSunkFC[i] = cumFC;
+
+    const currentCancPct = startPct + (endPct - startPct) * (i / (N - 1 || 1));
+    const penaltyValue   = _simData.contractValue * currentCancPct;
+    arrCancPenalty[i]    = penaltyValue;
+
+    const exposure = (cumDC + cumFC) - penaltyValue;
+    if (exposure > maxExposure) maxExposure = exposure;
+  }
+
+  document.getElementById('sum-valley').textContent   = fmtEUR(minValley);
+  document.getElementById('sum-exposure').textContent = fmtEUR(maxExposure);
+
+  updateCharts(labels, arrPayments, arrTotalCost, arrCumCashflow, arrSunkDC, arrSunkFC, arrCancPenalty);
+}
+
+/* ══ Chart rendering ═══════════════════════════════════════════════════ */
+function updateCharts(labels, payments, costs, cumCash, sunkDC, sunkFC, penalty) {
+  if (!chartInst1) {
+    const ctx1 = document.getElementById('cashflowChart').getContext('2d');
+    chartInst1 = new Chart(ctx1, {
       type: 'bar',
-      data: { labels: [], datasets: [
-        { type: 'bar',  label: 'Monthly Net Cash Flow', data: [], backgroundColor: [], borderRadius: 2, order: 2 },
-        { type: 'line', label: 'Cumulative Cash Position', data: [], borderColor: '#2c4e87',
-          backgroundColor: 'rgba(44,78,135,0.07)', fill: true, borderWidth: 2,
-          pointRadius: 0, tension: 0.35, order: 1 },
-      ]},
+      data: { labels, datasets: [] },
       options: {
         responsive: true, maintainAspectRatio: false,
-        animation: { duration: 250 },
-        plugins: commonPlugins,
-        scales: {
-          x: { ...commonScaleOpts, ticks: { ...commonScaleOpts.ticks, maxRotation: 45, autoSkip: true, maxTicksLimit: 20 } },
-          y: { ...commonScaleOpts, ticks: { ...commonScaleOpts.ticks, callback: v => fmtK(v) + 'k' } },
+        plugins: {
+          title: { display: true, text: 'Project Cash Flow (Cash Valley)', font: { family: 'DM Sans', size: 12 } },
+          legend: { labels: { font: { family: 'DM Sans', size: 10 }, boxWidth: 12 } },
+          tooltip: { mode: 'index', intersect: false,
+            callbacks: { label: ctx => ' ' + fmtK(ctx.parsed.y) + 'EUR' } },
         },
+        scales: { y: { stacked: true }, x: { stacked: true, ticks: { autoSkip: true, maxTicksLimit: 20 } } },
+      },
+    });
+
+    const ctx2 = document.getElementById('exposureChart').getContext('2d');
+    chartInst2 = new Chart(ctx2, {
+      type: 'line',
+      data: { labels, datasets: [] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          title: { display: true, text: 'Cancellation Exposure Gap', font: { family: 'DM Sans', size: 12 } },
+          legend: { labels: { font: { family: 'DM Sans', size: 10 }, boxWidth: 12 } },
+          tooltip: { mode: 'index', intersect: false,
+            callbacks: { label: ctx => ' ' + fmtK(ctx.parsed.y) + 'EUR' } },
+        },
+        scales: { y: { stacked: false }, x: { ticks: { autoSkip: true, maxTicksLimit: 20 } } },
+        interaction: { mode: 'index', intersect: false },
       },
     });
   }
 
-  if (!_chartExp) {
-    _chartExp = new Chart(document.getElementById('exposureChart').getContext('2d'), {
-      type: 'line',
-      data: { labels: [], datasets: [
-        { label: 'Cumulative Cost Liability', data: [], borderColor: '#c0392b',
-          backgroundColor: 'rgba(192,57,43,0.13)', fill: true, borderWidth: 2, pointRadius: 0, tension: 0.35 },
-        { label: 'Cancellation Value (receivable)', data: [], borderColor: '#107c41',
-          backgroundColor: 'transparent', borderWidth: 2.5, borderDash: [5,3], pointRadius: 0, tension: 0.35 },
-      ]},
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        animation: { duration: 250 },
-        plugins: commonPlugins,
-        scales: {
-          x: { ...commonScaleOpts, ticks: { ...commonScaleOpts.ticks, maxRotation: 45, autoSkip: true, maxTicksLimit: 20 } },
-          y: { ...commonScaleOpts, min: 0, ticks: { ...commonScaleOpts.ticks, callback: v => fmtK(v) + 'k' } },
-        },
-      },
-    });
-  }
+  /* Update labels in case duration changed */
+  chartInst1.data.labels = labels;
+  chartInst2.data.labels = labels;
+
+  chartInst1.data.datasets = [
+    { type: 'line', label: 'Cumulative Cash Flow', data: cumCash,
+      borderColor: '#2c4e87', backgroundColor: '#2c4e87', borderWidth: 2, tension: 0.3,
+      pointRadius: 0, yAxisID: 'y' },
+    { type: 'bar',  label: 'Payments (In)',  data: payments, backgroundColor: '#107c41' },
+    { type: 'bar',  label: 'Costs (Out)',    data: costs,    backgroundColor: '#c0392b' },
+  ];
+  chartInst1.update();
+
+  chartInst2.data.datasets = [
+    { type: 'line', label: 'Cancellation Penalty (Revenue)', data: penalty,
+      borderColor: '#107c41', backgroundColor: 'transparent',
+      borderWidth: 2, borderDash: [5, 5], pointRadius: 0 },
+    { type: 'line', label: 'Sunk Functional Cost', data: sunkFC,
+      borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.5)',
+      fill: true, stack: 'Stack 0', pointRadius: 0 },
+    { type: 'line', label: 'Sunk Direct Cost', data: sunkDC,
+      borderColor: '#2c4e87', backgroundColor: 'rgba(44,78,135,0.5)',
+      fill: true, stack: 'Stack 0', pointRadius: 0 },
+  ];
+  chartInst2.update();
 }
 
 /* ══ Boot ══════════════════════════════════════════════════════════════ */
