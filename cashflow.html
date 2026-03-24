@@ -325,19 +325,20 @@ label {
 
     <!-- ── Charts ── -->
     <div id="charts-panel" style="display:flex;flex-direction:column;gap:24px;">
-
       <div class="section">
         <div class="chart-title-row">Cash Flow Analysis</div>
         <div class="chart-sub">Monthly net cash flow (bars) · Cumulative cash position (line)</div>
-        <canvas id="cashflowChart" height="250"></canvas>
+        <div style="position: relative; height: 320px; width: 100%;">
+          <canvas id="cashflowChart"></canvas>
+        </div>
       </div>
-
       <div class="section">
         <div class="chart-title-row">Cancellation Risk Exposure</div>
         <div class="chart-sub">Cumulative cost liability vs. contractual cancellation value receivable</div>
-        <canvas id="exposureChart" height="250"></canvas>
+        <div style="position: relative; height: 320px; width: 100%;">
+          <canvas id="exposureChart"></canvas>
+        </div>
       </div>
-
     </div><!-- /charts-panel -->
 
   </div><!-- /two-col -->
