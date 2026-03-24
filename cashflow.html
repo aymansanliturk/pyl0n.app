@@ -467,7 +467,7 @@ function fmtK(n) {
 
 /* ══ Data Ingestion ════════════════════════════════════════════════════ */
 function loadSuiteData() {
-  let contractValue = 0, directCost = 0, funcCost = 0;
+  let contractValue = 0, directCost = 0, riskCost = 0, funcCost = 0;
   let duration = 60, startMonth = 0, startYear = new Date().getFullYear();
   let projectName = 'Sample Project', isLive = false;
 
@@ -523,7 +523,8 @@ function loadSuiteData() {
 
       contractValue = torder * (1 + neg);
       directCost    = tdirect;
-
+      /* Risk Cost = Direct Cost scaled by Risk KPI */
+      riskCost = (tdirect / (1 - risk)) - tdirect;
       /* funcCost = SG&A + EXU + BA provision in EUR */
       const kpiNoEbit    = risk + warr + sga + exu + ba;
       const kpiNoEbitDiv = kpiNoEbit >= 1 ? 0.01 : (1 - kpiNoEbit);
@@ -555,6 +556,7 @@ function loadSuiteData() {
   if (contractValue === 0) {
     contractValue = 10_000_000;
     directCost    = 7_200_000;
+    riskCost      =   500_000;
     funcCost      =   360_000;
     isLive        = false;
   }
@@ -562,8 +564,9 @@ function loadSuiteData() {
   _simData = {
     contractValue,
     directCost,
+    riskCost,
     funcCost,
-    totalCost: directCost,
+    totalCost: directCost + riskCost + funcCost,
     duration,
     startMonth,
     startYear,
@@ -615,43 +618,51 @@ function simulate() {
   const N = _simData.duration || 60;
   const labels = Array.from({ length: N }, (_, i) => `M${i + 1}`);
 
-  const arrPayments    = new Array(N).fill(0);
-  const arrTotalCost   = new Array(N).fill(0);
+  // Arrays for Cumulative Chart
+  const arrCumPayments = new Array(N).fill(0);
+  const arrCumCosts    = new Array(N).fill(0);
   const arrCumCashflow = new Array(N).fill(0);
+  // Arrays for Exposure
   const arrSunkDC      = new Array(N).fill(0);
   const arrSunkFC      = new Array(N).fill(0);
   const arrCancPenalty = new Array(N).fill(0);
-
-  const dcMonthly = distributeCost(_simData.directCost, N, _simState.dcCurve);
-  const fcMonthly = distributeCost(_simData.funcCost,   N, _simState.fcCurve);
-
+  // Distribute Costs
+  const dcMonthly   = distributeCost(_simData.directCost, N, _simState.dcCurve);
+  // Distribute Risk using the same curve as Direct Cost
+  const riskMonthly = distributeCost(_simData.riskCost, N, _simState.dcCurve);
+  const fcMonthly   = distributeCost(_simData.funcCost,  N, _simState.fcCurve);
+  // Map Payments
+  const monthlyPayments = new Array(N).fill(0);
   _simState.milestones.forEach(ms => {
     const idx = Math.max(1, Math.min(N, Math.floor(ms.m))) - 1;
-    arrPayments[idx] += _simData.contractValue * (ms.p / 100);
+    monthlyPayments[idx] += _simData.contractValue * (ms.p / 100);
   });
 
-  let cumCash = 0, cumDC = 0, cumFC = 0;
+  let cumCash = 0, cumDC = 0, cumFC = 0, cumPay = 0, cumCostTotal = 0;
   let minValley = 0, maxExposure = 0;
   const startPct = _simState.cancStart / 100;
   const endPct   = _simState.cancEnd   / 100;
 
   for (let i = 0; i < N; i++) {
-    const monthlyCost = dcMonthly[i] + fcMonthly[i];
-    arrTotalCost[i]   = -monthlyCost;
-
-    cumCash += arrPayments[i] - monthlyCost;
+    // 1. Cumulative Payments
+    cumPay += monthlyPayments[i];
+    arrCumPayments[i] = cumPay;
+    // 2. Cumulative Costs (Direct + Risk + Func)
+    const monthlyCost = dcMonthly[i] + riskMonthly[i] + fcMonthly[i];
+    cumCostTotal += monthlyCost;
+    arrCumCosts[i] = -cumCostTotal; // Show as negative curve
+    // 3. Cumulative Net Cash Flow
+    cumCash += monthlyPayments[i] - monthlyCost;
     arrCumCashflow[i] = cumCash;
     if (cumCash < minValley) minValley = cumCash;
-
-    cumDC += dcMonthly[i];
+    // 4. Exposure Math
+    cumDC += dcMonthly[i] + riskMonthly[i]; // Treat risk as direct exposure
     cumFC += fcMonthly[i];
     arrSunkDC[i] = cumDC;
     arrSunkFC[i] = cumFC;
-
     const currentCancPct = startPct + (endPct - startPct) * (i / (N - 1 || 1));
     const penaltyValue   = _simData.contractValue * currentCancPct;
     arrCancPenalty[i]    = penaltyValue;
-
     const exposure = (cumDC + cumFC) - penaltyValue;
     if (exposure > maxExposure) maxExposure = exposure;
   }
@@ -659,11 +670,11 @@ function simulate() {
   document.getElementById('sum-valley').textContent   = fmtEUR(minValley);
   document.getElementById('sum-exposure').textContent = fmtEUR(maxExposure);
 
-  updateCharts(labels, arrPayments, arrTotalCost, arrCumCashflow, arrSunkDC, arrSunkFC, arrCancPenalty);
+  updateCharts(labels, arrCumPayments, arrCumCosts, arrCumCashflow, arrSunkDC, arrSunkFC, arrCancPenalty);
 }
 
 /* ══ Chart rendering ═══════════════════════════════════════════════════ */
-function updateCharts(labels, payments, costs, cumCash, sunkDC, sunkFC, penalty) {
+function updateCharts(labels, cumPayments, cumCosts, cumCash, sunkDC, sunkFC, penalty) {
   if (!chartInst1) {
     const ctx1 = document.getElementById('cashflowChart').getContext('2d');
     chartInst1 = new Chart(ctx1, {
@@ -677,7 +688,7 @@ function updateCharts(labels, payments, costs, cumCash, sunkDC, sunkFC, penalty)
           tooltip: { mode: 'index', intersect: false,
             callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmtK(ctx.raw)}EUR` } },
         },
-        scales: { y: { stacked: true }, x: { stacked: true, ticks: { autoSkip: true, maxTicksLimit: 20 } } },
+        scales: { y: { stacked: false }, x: { stacked: false, ticks: { autoSkip: true, maxTicksLimit: 20 } } },
       },
     });
 
@@ -704,11 +715,13 @@ function updateCharts(labels, payments, costs, cumCash, sunkDC, sunkFC, penalty)
   chartInst2.data.labels = labels;
 
   chartInst1.data.datasets = [
-    { type: 'line', label: 'Cumulative Cash Flow', data: cumCash,
-      borderColor: '#2c4e87', backgroundColor: '#2c4e87', borderWidth: 2, tension: 0.3,
+    { type: 'line', label: 'Cumulative Cash Flow (Net)', data: cumCash,
+      borderColor: '#2c4e87', backgroundColor: '#2c4e87', borderWidth: 2, tension: 0.4,
       pointRadius: 0, yAxisID: 'y' },
-    { type: 'bar',  label: 'Payments (In)',  data: payments, backgroundColor: '#107c41' },
-    { type: 'bar',  label: 'Costs (Out)',    data: costs,    backgroundColor: '#c0392b' },
+    { type: 'line', label: 'Cumulative Payments (In)', data: cumPayments,
+      borderColor: '#107c41', backgroundColor: 'rgba(16, 124, 65, 0.1)', borderWidth: 2, tension: 0.4, fill: true, pointRadius: 0 },
+    { type: 'line', label: 'Cumulative Costs (Out)', data: cumCosts,
+      borderColor: '#c0392b', backgroundColor: 'rgba(192, 57, 43, 0.1)', borderWidth: 2, tension: 0.4, fill: true, pointRadius: 0 },
   ];
   chartInst1.update();
 
