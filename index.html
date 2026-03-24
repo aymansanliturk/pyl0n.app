@@ -1039,7 +1039,16 @@ function ppSelectChange() {
   if (!proj) return;
   const nameEl = document.getElementById('pp-name');
   if (nameEl) nameEl.value = proj.name;
-  if (proj.syncSnapshot) {
+
+  // Clear current tools to prevent data bleeding
+  ['timecast', 'resourcecast', 'orgcast', 'rfqcast', 'dorcast', 'riskcast', 'calccast', 'lettercast'].forEach(k => {
+    localStorage.removeItem('bidcast_state_' + k);
+  });
+
+  if (proj.fullState) {
+    Object.keys(proj.fullState).forEach(k => localStorage.setItem(k, proj.fullState[k]));
+  } else if (proj.syncSnapshot) {
+    // Legacy support
     try {
       const next = { ...proj.syncSnapshot, _ts: Date.now(), _src: 'index' };
       localStorage.setItem('bidcast_suite_sync', JSON.stringify(next));
@@ -1049,6 +1058,16 @@ function ppSelectChange() {
   ppPopulateSelect();
   ppFlashSync();
   refreshStats();
+}
+
+function _captureFullState() {
+  const state = {};
+  ['timecast', 'resourcecast', 'orgcast', 'rfqcast', 'dorcast', 'riskcast', 'calccast', 'lettercast'].forEach(k => {
+    const v = localStorage.getItem('bidcast_state_' + k);
+    if (v) state['bidcast_state_' + k] = v;
+  });
+  state['bidcast_suite_sync'] = localStorage.getItem('bidcast_suite_sync') || '{}';
+  return state;
 }
 
 /** Save current workspace under the active project slot, or create new. */
@@ -1061,12 +1080,12 @@ function ppSave() {
   }
   const projects   = ppGetProjects();
   const activeId   = ppGetActiveId();
-  const syncSnapshot = SuiteManager.read();
+  const fullState  = _captureFullState();
 
   if (activeId) {
     const idx = projects.findIndex(p => p.id === activeId);
     if (idx >= 0) {
-      projects[idx] = { ...projects[idx], name, savedAt: Date.now(), syncSnapshot };
+      projects[idx] = { ...projects[idx], name, savedAt: Date.now(), fullState };
       ppPutProjects(projects);
       ppPopulateSelect();
       ppFlashSync();
@@ -1079,7 +1098,7 @@ function ppSave() {
     return;
   }
   const id = 'proj_' + Date.now();
-  projects.push({ id, name, savedAt: Date.now(), syncSnapshot });
+  projects.push({ id, name, savedAt: Date.now(), fullState });
   ppPutProjects(projects);
   ppSetActiveId(id);
   ppPopulateSelect();
@@ -1095,6 +1114,11 @@ function ppNew() {
   ppSetActiveId('');
   const nameEl = document.getElementById('pp-name');
   if (nameEl) nameEl.value = '';
+
+  // Wipe all tool states for a fresh slate
+  ['timecast', 'resourcecast', 'orgcast', 'rfqcast', 'dorcast', 'riskcast', 'calccast', 'lettercast'].forEach(k => {
+    localStorage.removeItem('bidcast_state_' + k);
+  });
   SuiteManager.write({ projectName: '', phases: [], team: [] }, 'index');
   ppPopulateSelect();
   ppFlashSync();
@@ -1663,16 +1687,59 @@ function masterImport(input) {
       if (!archive || typeof archive !== 'object') throw new Error('Not a valid archive file');
       const keys = Object.keys(archive).filter(k => k.startsWith('bidcast_'));
       if (!keys.length) throw new Error('No bidcast data found in file');
-      if (!confirm('Restore ' + keys.length + ' data keys from archive?\nAll current workspace data will be cleared and replaced.')) return;
-      // Full clean-up: remove every existing bidcast_ key before restoring
-      Object.keys(localStorage).filter(k => k.startsWith('bidcast_')).forEach(k => localStorage.removeItem(k));
-      keys.forEach(k => { if (typeof archive[k] === 'string') localStorage.setItem(k, archive[k]); });
-      ppLoad();
+
+      // 1. Auto-save current work if it has a name to prevent data loss
+      if (document.getElementById('pp-name')?.value.trim()) { ppSave(); }
+
+      const projects = ppGetProjects();
+      if (projects.length >= MAX_PROJECTS) {
+        alert(`Maximum ${MAX_PROJECTS} projects reached. Please delete a project before importing.`);
+        return;
+      }
+
+      // 2. Extract tool states from the archive
+      const importedState = {};
+      keys.forEach(k => {
+        if (k.startsWith('bidcast_state_') || k === 'bidcast_suite_sync') {
+          if (typeof archive[k] === 'string') importedState[k] = archive[k];
+        }
+      });
+
+      // Restore logos if present
+      if (archive['bidcast_logo']) localStorage.setItem('bidcast_logo', archive['bidcast_logo']);
+      if (archive['bidcast_customer_logo']) localStorage.setItem('bidcast_customer_logo', archive['bidcast_customer_logo']);
+
+      // 3. Determine name for imported project
+      let importedName = 'Imported Project';
+      try {
+        const parsedSync = JSON.parse(importedState['bidcast_suite_sync'] || '{}');
+        if (parsedSync.projectName) importedName = parsedSync.projectName + ' (Imported)';
+      } catch(e) {}
+
+      // 4. Clear current local storage tool keys
+      ['timecast', 'resourcecast', 'orgcast', 'rfqcast', 'dorcast', 'riskcast', 'calccast', 'lettercast'].forEach(k => {
+        localStorage.removeItem('bidcast_state_' + k);
+      });
+
+      // 5. Apply imported state to local storage
+      Object.keys(importedState).forEach(k => {
+        localStorage.setItem(k, importedState[k]);
+      });
+
+      // 6. Save as new project slot
+      const newId = 'proj_' + Date.now();
+      projects.push({ id: newId, name: importedName, savedAt: Date.now(), fullState: importedState });
+      ppPutProjects(projects);
+      ppSetActiveId(newId);
+      document.getElementById('pp-name').value = importedName;
+
       ppPopulateSelect();
       ppUpdateLogo();
       _updateBrandPanel();
       refreshStats();
       ppFlashSync();
+
+      alert('Archive imported successfully as a new project!');
     } catch (err) {
       alert('Import failed: ' + err.message);
     } finally {
