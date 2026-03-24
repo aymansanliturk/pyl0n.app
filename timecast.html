@@ -7,6 +7,7 @@
 <style id="page-size-style">@page { size: A3 landscape; margin: 12mm; }</style>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -235,7 +236,7 @@
   .yr-gap  { background: #f3f2ee; border-bottom: 1px solid #e5e2db; border-right: 1px solid #e5e2db; position: sticky; left: 0; top: 0; z-index: 40; }
   .yr-cell { background: #f3f2ee; font-family: 'DM Mono', monospace; font-size: 7.5px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--faint); text-align: center; padding: 4px 2px; border-bottom: 1px solid #e5e2db; border-right: 1px solid #e5e2db; display: flex; align-items: center; justify-content: center; position: sticky; top: 0; z-index: 20; }
   .mo-gap  { background: #f8f7f4; font-size: 8px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--muted); padding: 5px 10px; border-bottom: 1px solid var(--border); border-right: 1.5px solid #ccc9c1; display: flex; align-items: center; position: sticky; left: 0; top: 22px; z-index: 40; }
-  .mo-notes-gap { background: #f8f7f4; font-size: 7px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: var(--faint); padding: 5px 4px; border-bottom: 1px solid var(--border); border-right: 1.5px solid #ccc9c1; display: flex; align-items: center; position: sticky; left: 155px; top: 22px; z-index: 40; /* FIXED LEFT OFFSET */}
+  .mo-notes-gap { background: #f8f7f4; font-size: 7px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: var(--faint); padding: 5px 4px; border-bottom: 1px solid var(--border); border-right: 1.5px solid #ccc9c1; display: flex; align-items: center; position: sticky; left: 240px; top: 22px; z-index: 40; /* FIXED LEFT OFFSET */}
   .mo-cell { background: #f8f7f4; font-family: 'DM Mono', monospace; font-size: 8.5px; font-weight: 600; color: #6b6860; text-align: center; padding: 5px 2px; border-bottom: 1px solid var(--border); border-right: 1px solid #ece9e2; display: flex; align-items: center; justify-content: center; position: sticky; top: 22px; z-index: 20; }
   .mo-cell.today-col { background: #fff5f5; }
   .mo-cell.today-col .mo-txt { color: var(--today); font-weight: 700; }
@@ -244,16 +245,16 @@
   .proj-hdr-cell { height: 22px; border-bottom: 1px solid rgba(0,0,0,0.06); position: relative; }
 
   .sec-div-lbl { font-size: 8px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 0 10px; border-right: 1.5px solid #ccc9c1; border-bottom: 1px solid var(--border); height: 22px; display: flex; align-items: center; gap: 6px; position: sticky; left: 0; z-index: 10; background: var(--surface); }
-  .sec-div-notes { border-right: 1.5px solid #ccc9c1; border-bottom: 1px solid var(--border); height: 22px; position: sticky; left: 155px; z-index: 10; background: var(--surface); }
+  .sec-div-notes { border-right: 1.5px solid #ccc9c1; border-bottom: 1px solid var(--border); height: 22px; position: sticky; left: 240px; z-index: 10; background: var(--surface); }
   .sec-div-cell { border-bottom: 1px solid var(--border); height: 22px; position: relative; }
   .today-line { position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; background: var(--today); z-index: 10; transform: translateX(-50%); }
 
-  .row-lbl { font-size: 10.5px; font-weight: 500; color: var(--text); padding: 0 10px; border-right: 1.5px solid #ccc9c1; border-bottom: 1px solid #e8e5de; height: 38px; display: flex; align-items: center; white-space: nowrap; gap: 5px; overflow: hidden; position: sticky; left: 0; z-index: 10; background: #fff; }
+  .row-lbl { font-size: 10.5px; font-weight: 500; color: var(--text); padding: 0 10px; border-right: 1.5px solid #ccc9c1; border-bottom: 1px solid #e8e5de; height: 38px; display: flex; align-items: center; gap: 5px; white-space: normal; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; position: sticky; left: 0; z-index: 10; background: #fff; }
   .row-lbl.alt { background: #faf9f7; }
   .row-lbl.bid { background: #f5f8fd; }
   .row-lbl.bid.alt { background: #edf2f9; }
 
-  .row-notes { font-size: 7px; color: var(--faint); padding: 2px 5px; border-right: 1.5px solid #ccc9c1; border-bottom: 1px solid #e8e5de; height: 38px; display: flex; align-items: center; overflow: hidden; line-height: 1.3; word-break: break-word; position: sticky; left: 155px; z-index: 10; background: #fff; }
+  .row-notes { font-size: 7px; color: var(--faint); padding: 2px 5px; border-right: 1.5px solid #ccc9c1; border-bottom: 1px solid #e8e5de; height: 38px; display: flex; align-items: center; overflow: hidden; line-height: 1.3; word-break: break-word; position: sticky; left: 240px; z-index: 10; background: #fff; }
   .row-notes.alt { background: #faf9f7; }
   .row-notes.bid { background: #f5f8fd; }
   .row-notes.bid.alt { background: #edf2f9; }
@@ -474,6 +475,7 @@
         <button class="sb-btn sb-btn-ghost" onclick="goBack()">← Back to Editor</button>
         <button class="sb-btn sb-btn-ghost" id="sb-print-btn" onclick="window.print()">🖨 Print</button>
         <button class="sb-btn sb-btn-ghost" onclick="exportPDF()">⬇ PDF</button>
+        <button class="sb-btn sb-btn-ghost" style="background:#4f46e5;color:#fff;" onclick="exportPNG()">🖼 PNG</button>
         <div id="sb-screen-note" style="display:none;font-size:9.5px;color:var(--faint);text-align:center;line-height:1.5;padding:4px 0;">Screen Only mode — save or share<br>this HTML file directly.</div>
       </div>
 
@@ -1225,9 +1227,9 @@ function updateLogoUI() {
     // Grid
     const gantt = document.getElementById('gantt');
     gantt.innerHTML = '';
-    const notesCols = hasNotes ? ' 64px' : '';
+    const notesCols = hasNotes ? ' 80px' : '';
     const colTpl = scale === 'weekly' ? `minmax(28px,1fr)` : scale === 'quarterly' ? `minmax(60px,1fr)` : `minmax(36px,1fr)`;
-    gantt.style.gridTemplateColumns = `155px${notesCols} repeat(${n}, ${colTpl})`;
+    gantt.style.gridTemplateColumns = `240px${notesCols} repeat(${n}, ${colTpl})`;
 
     // Year row
     const yrGap = el('div','yr-gap');
@@ -1453,7 +1455,7 @@ function updateLogoUI() {
     const { sm, sy, em, ey } = chartState;
     const scale  = chartState.viewScale || viewScale || 'monthly';
     const units  = buildUnits(sm, sy, em, ey, scale);
-    const labelW = 155 + (chartState._hasNotes ? 64 : 0);
+    const labelW = 240 + (chartState._hasNotes ? 80 : 0);
     const availW = rect.width - labelW;
     if (availW <= 0 || units.length === 0) return -1;
     const colW  = availW / units.length;
@@ -1869,6 +1871,45 @@ function updateLogoUI() {
     }
     setTimeout(_snapshot, 300);
   })();
+
+  // ── PDF Export ──
+  // ── PNG Export ──
+  function exportPNG() {
+    const state = collectState();
+    const name = (state.chartTitle || 'timecast').replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
+
+    // Hide UI elements
+    const hideEls = document.querySelectorAll('.no-print, .print-bar, #toolbar, .reorder-sidebar, .sidebar-actions');
+    hideEls.forEach(el => el.style.display = 'none');
+
+    // Expand chart area for capture
+    const shell = document.querySelector('.output-shell');
+    const area  = document.querySelector('.chart-area');
+    const oldShellCSS = shell.style.cssText;
+    const oldAreaCSS = area.style.cssText;
+
+    shell.style.display = 'block';
+    shell.style.flexDirection = 'unset';
+    area.style.width = '100%';
+    area.style.padding = '10mm 12mm';
+
+    // Capture with scale: 3 for ultra high-res (similar to TIFF clarity)
+    html2canvas(document.getElementById('output'), {
+      scale: 3,
+      useCORS: true,
+      backgroundColor: '#ffffff'
+    }).then(canvas => {
+      const link = document.createElement('a');
+      link.download = name + '_highres.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+
+      // Restore UI
+      hideEls.forEach(el => el.style.display = '');
+      shell.style.cssText = oldShellCSS;
+      area.style.cssText = oldAreaCSS;
+    });
+  }
 
   // ── PDF Export ──
   function exportPDF() {
