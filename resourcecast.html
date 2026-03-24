@@ -906,26 +906,38 @@ function updateLogoUI() {
       if (totEurCell) totEurCell.textContent = totalEur ? fmtEUR(totalEur)     : '—';
     });
 
+    // Get active filter
+    const activeFilter = document.getElementById('rc-proj-filter')?.value || 'ALL';
+
     // Build tfoot — hours row + % weight row
     const colTotCells = cols.map(col => {
-      const v     = colTotals[col.key];
+      const v = colTotals[col.key];
       const isTot = col.type === 'agg';
-      return `<td class="mg-tot-cell${isTot?' phase-tot':''}">${v ? fmtN(v) : '—'}</td>`;
+      const ph2proj = phases.find(p => p.id === col.phaseId)?.project || '';
+      const pAttr = ph2proj ? ` data-proj="${esc(ph2proj)}"` : '';
+      const hide = (activeFilter !== 'ALL' && ph2proj !== activeFilter) ? 'display:none;' : '';
+      return `<td class="mg-tot-cell phase-cell${isTot?' phase-tot':''}"${pAttr} style="${hide}">${v ? fmtN(v) : '—'}</td>`;
     }).join('');
 
     const colPctCells = cols.map(col => {
-      const v     = colTotals[col.key];
+      const v = colTotals[col.key];
       const isTot = col.type === 'agg';
-      const pct   = grandH > 0 && v ? (v / grandH * 100).toFixed(0) + '%' : '—';
-      return `<td class="mg-tot-cell mg-pct-cell${isTot?' phase-tot':''}">${pct}</td>`;
+      const pct = grandH > 0 && v ? (v / grandH * 100).toFixed(0) + '%' : '—';
+      const ph2proj = phases.find(p => p.id === col.phaseId)?.project || '';
+      const pAttr = ph2proj ? ` data-proj="${esc(ph2proj)}"` : '';
+      const hide = (activeFilter !== 'ALL' && ph2proj !== activeFilter) ? 'display:none;' : '';
+      return `<td class="mg-tot-cell mg-pct-cell phase-cell${isTot?' phase-tot':''}"${pAttr} style="${hide}">${pct}</td>`;
     }).join('');
 
     const FTE_BASE = 160;
     const colFteCells = cols.map(col => {
-      const v     = colTotals[col.key];
+      const v = colTotals[col.key];
       const isTot = col.type === 'agg';
-      const fte   = v ? (v / FTE_BASE).toFixed(1) : null;
-      return `<td class="mg-tot-cell${isTot?' phase-tot':''}">${fte ? fte + ' FTE' : '—'}</td>`;
+      const fte = v ? (v / FTE_BASE).toFixed(1) : null;
+      const ph2proj = phases.find(p => p.id === col.phaseId)?.project || '';
+      const pAttr = ph2proj ? ` data-proj="${esc(ph2proj)}"` : '';
+      const hide = (activeFilter !== 'ALL' && ph2proj !== activeFilter) ? 'display:none;' : '';
+      return `<td class="mg-tot-cell phase-cell${isTot?' phase-tot':''}"${pAttr} style="${hide}">${fte ? fte + ' FTE' : '—'}</td>`;
     }).join('');
     const grandFte = grandH ? (grandH / FTE_BASE).toFixed(1) + ' FTE' : '—';
 
