@@ -357,15 +357,6 @@ label {
           </label>
         </div>
 
-        <div style="font-size:9px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--accent); margin-bottom:12px; margin-top:24px;">Cancellation Terms</div>
-        <div class="fields f2">
-          <label>Initial Penalty % (M1)
-            <input type="number" id="sim-canc-start" value="10" min="0" max="100" oninput="updateSimState('cancStart', this.value)">
-          </label>
-          <label>Final Penalty % (End)
-            <input type="number" id="sim-canc-end" value="100" min="0" max="100" oninput="updateSimState('cancEnd', this.value)">
-          </label>
-        </div>
       </div>
 
       <!-- Per-item cost phasing (populated by renderItemDist()) -->
@@ -384,7 +375,7 @@ label {
       </div>
       <div class="section">
         <div class="chart-title-row">Cancellation Risk Exposure</div>
-        <div class="chart-sub">Cumulative cost liability vs. contractual cancellation value receivable</div>
+        <div class="chart-sub">Cumulative sunk costs vs. DC committed (cancellation cover) · Gap = uncovered functional overhead</div>
         <div style="position: relative; height: 320px; width: 100%;">
           <canvas id="exposureChart"></canvas>
         </div>
@@ -444,11 +435,9 @@ let _simState = {
     { m: 45, p: 30 },
     { m: 60, p: 10 },
   ],
-  dcCurve:   'front',
-  fcCurve:   'linear',
-  cancStart: 10,
-  cancEnd:   100,
-  itemDist:  {}, // per-item cost distribution configs: { [itemId]: { type, milestones } }
+  dcCurve:  'front',
+  fcCurve:  'linear',
+  itemDist: {}, // per-item cost distribution configs: { [itemId]: { type, milestones } }
 };
 
 function renderMilestones() {
@@ -494,11 +483,6 @@ function loadState() {
   const fcEl = document.getElementById('sim-fc-curve');
   if (fcEl) fcEl.value = _simState.fcCurve || 'linear';
 
-  const stEl = document.getElementById('sim-canc-start');
-  if (stEl) stEl.value = _simState.cancStart !== undefined ? _simState.cancStart : 10;
-
-  const endEl = document.getElementById('sim-canc-end');
-  if (endEl) endEl.value = _simState.cancEnd !== undefined ? _simState.cancEnd : 100;
 }
 
 function updateMilestone(idx, field, val) {
@@ -781,8 +765,6 @@ function simulate() {
 
   let cumCash = 0, cumDC = 0, cumFC = 0, cumPay = 0, cumCostTotal = 0;
   let minValley = 0, maxExposure = 0;
-  const startPct = _simState.cancStart / 100;
-  const endPct   = _simState.cancEnd   / 100;
 
   for (let i = 0; i < N; i++) {
     // 1. Cumulative Payments
@@ -799,12 +781,12 @@ function simulate() {
     // 4. Exposure Math
     cumDC += dcMonthly[i] + riskMonthly[i]; // Treat risk as direct exposure
     cumFC += fcMonthly[i];
-    arrSunkDC[i] = cumDC;
-    arrSunkFC[i] = cumFC;
-    const currentCancPct = startPct + (endPct - startPct) * (i / (N - 1 || 1));
-    const penaltyValue   = _simData.contractValue * currentCancPct;
-    arrCancPenalty[i]    = penaltyValue;
-    const exposure = (cumDC + cumFC) - penaltyValue;
+    arrSunkDC[i]      = cumDC;
+    arrSunkFC[i]      = cumFC;
+    // Cancellation cover = cumulative DC committed (mirrors per-item schedules)
+    arrCancPenalty[i] = cumDC;
+    // Exposure = functional overhead not covered by cancellation clause
+    const exposure = cumFC;
     if (exposure > maxExposure) maxExposure = exposure;
   }
 
@@ -867,7 +849,7 @@ function updateCharts(labels, cumPayments, cumCosts, cumCash, sunkDC, sunkFC, pe
   chartInst1.update();
 
   chartInst2.data.datasets = [
-    { type: 'line', label: 'Cancellation Penalty (Revenue)', data: penalty,
+    { type: 'line', label: 'DC Committed (Cancellation Cover)', data: penalty,
       borderColor: '#107c41', backgroundColor: 'transparent',
       borderWidth: 2, borderDash: [5, 5], pointRadius: 0 },
     { type: 'line', label: 'Sunk Functional Cost', data: sunkFC,
