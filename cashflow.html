@@ -416,6 +416,33 @@ function renderMilestones() {
   if (typeof simulate === 'function') simulate();
 }
 
+function saveState() {
+  localStorage.setItem('bidcast_state_cashflow', JSON.stringify(_simState));
+  SuiteManager.write({ cashflow_updated: Date.now() }, 'cashflow');
+}
+function loadState() {
+  try {
+    const raw = localStorage.getItem('bidcast_state_cashflow');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      _simState = { ..._simState, ...parsed }; // Merge loaded state
+    }
+  } catch(e) { console.warn('CashFlow: Could not load state', e); }
+
+  // Sync HTML inputs to match loaded state
+  const dcEl = document.getElementById('sim-dc-curve');
+  if (dcEl) dcEl.value = _simState.dcCurve || 'front';
+
+  const fcEl = document.getElementById('sim-fc-curve');
+  if (fcEl) fcEl.value = _simState.fcCurve || 'linear';
+
+  const stEl = document.getElementById('sim-canc-start');
+  if (stEl) stEl.value = _simState.cancStart !== undefined ? _simState.cancStart : 10;
+
+  const endEl = document.getElementById('sim-canc-end');
+  if (endEl) endEl.value = _simState.cancEnd !== undefined ? _simState.cancEnd : 100;
+}
+
 function updateMilestone(idx, field, val) {
   let parsedVal = parseFloat(val) || 0;
   if (field === 'm') {
@@ -425,21 +452,26 @@ function updateMilestone(idx, field, val) {
   }
   if (field === 'p' && parsedVal < 0) parsedVal = 0;
   _simState.milestones[idx][field] = parsedVal;
+
+  saveState(); // ADDED
   renderMilestones();
 }
 
 function addMilestone() {
   _simState.milestones.push({ m: _simData.duration || 60, p: 0 });
+  saveState(); // ADDED
   renderMilestones();
 }
 
 function removeMilestone(idx) {
   _simState.milestones.splice(idx, 1);
+  saveState(); // ADDED
   renderMilestones();
 }
 
 function updateSimState(key, val) {
   _simState[key] = isNaN(parseFloat(val)) ? val : parseFloat(val);
+  saveState(); // ADDED
   if (typeof simulate === 'function') simulate();
 }
 
@@ -575,6 +607,7 @@ function loadSuiteData() {
   };
 
   _updateInfoPanel();
+  loadState(); // LOAD SAVED PARAMETERS BEFORE RENDERING
   renderMilestones();
 }
 
@@ -746,9 +779,9 @@ document.addEventListener('DOMContentLoaded', () => {
   loadSuiteData();
   simulate();
 
-  /* Live cross-tab refresh when CalcCast or TimeCast saves */
+  /* Live cross-tab refresh when CalcCast, TimeCast, or CashFlow saves */
   window.addEventListener('storage', e => {
-    if (e.key === 'bidcast_state_calccast' || e.key === 'bidcast_state_timecast') {
+    if (e.key === 'bidcast_state_calccast' || e.key === 'bidcast_state_timecast' || e.key === 'bidcast_state_cashflow') {
       loadSuiteData();
       simulate();
     }
