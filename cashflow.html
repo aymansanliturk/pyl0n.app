@@ -180,6 +180,53 @@ body {
 @media (max-width: 1100px) { .two-col { grid-template-columns: 1fr; } }
 @media (max-width: 700px)  { .stat-grid { grid-template-columns: 1fr 1fr; } }
 
+/* ── Item Distribution Panel ── */
+.item-dist-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 0; border-bottom: 1px solid var(--border);
+}
+.item-dist-row:last-child { border-bottom: none; }
+.item-dist-info { flex: 1; min-width: 0; }
+.item-dist-name {
+  font-size: 11px; font-weight: 600; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.item-dist-val { font-size: 10px; color: var(--faint); font-family: 'DM Mono', monospace; }
+.item-dist-sel {
+  font-family: 'DM Sans', sans-serif; font-size: 11px; color: var(--text);
+  background: var(--input-bg); border: 1px solid var(--border);
+  border-radius: 6px; padding: 5px 8px; outline: none; flex-shrink: 0;
+}
+.item-dist-sel:focus { border-color: var(--accent); }
+.item-ms-wrap {
+  padding: 8px 0 4px 12px; border-left: 2px solid var(--accent);
+  margin: 2px 0 8px;
+}
+.item-ms-hdr {
+  display: flex; gap: 8px; font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.5px; color: var(--faint); margin-bottom: 4px;
+}
+.item-ms-hdr span:first-child { width: 70px; }
+.item-ms-row { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; }
+.item-ms-inp {
+  width: 70px; padding: 4px 6px; font-size: 11px; font-family: 'DM Mono', monospace;
+  border: 1px solid var(--border); border-radius: 5px;
+  background: var(--input-bg); color: var(--text); outline: none;
+}
+.item-ms-inp:focus { border-color: var(--accent); }
+.item-ms-del {
+  background: none; border: none; cursor: pointer;
+  color: var(--faint); font-size: 13px; padding: 2px 4px; line-height: 1;
+}
+.item-ms-del:hover { color: var(--red); }
+.item-ms-total { font-size: 10px; font-family: 'DM Mono', monospace; margin-top: 4px; }
+.item-ms-add {
+  font-size: 10px; font-family: inherit; font-weight: 600; color: var(--accent);
+  background: none; border: 1px dashed var(--accent); border-radius: 5px;
+  padding: 3px 8px; cursor: pointer; margin-top: 4px; display: inline-block;
+}
+.item-ms-add:hover { background: var(--accent); color: #fff; }
+
 /* ── Field grids (matching CalcCast) ── */
 .fields { display: grid; gap: 12px; margin-bottom: 0; }
 .f2 { grid-template-columns: 1fr 1fr; }
@@ -293,7 +340,7 @@ label {
 
         <div style="font-size:9px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--accent); margin-bottom:12px; margin-top:24px;">Cost Distribution Curves</div>
         <div class="fields f2">
-          <label>Direct Cost Profile
+          <label>Default Cost Profile (Fallback)
             <select id="sim-dc-curve" onchange="updateSimState('dcCurve', this.value)">
               <option value="linear">Linear (Even)</option>
               <option value="front" selected>Front-Loaded</option>
@@ -320,6 +367,9 @@ label {
           </label>
         </div>
       </div>
+
+      <!-- Per-item cost phasing (populated by renderItemDist()) -->
+      <div id="item-dist-section"></div>
 
     </div><!-- /controls-panel -->
 
@@ -498,6 +548,10 @@ function fmtK(n) {
   return sign + val.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + ' k';
 }
 
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 /* ══ Data Ingestion ════════════════════════════════════════════════════ */
 function loadSuiteData() {
   let contractValue = 0, directCost = 0, riskCost = 0, funcCost = 0;
@@ -621,6 +675,7 @@ function loadSuiteData() {
   _updateInfoPanel();
   loadState(); // LOAD SAVED PARAMETERS BEFORE RENDERING
   renderMilestones();
+  renderItemDist();
 }
 
 function _updateInfoPanel() {
@@ -806,6 +861,109 @@ function updateCharts(labels, cumPayments, cumCosts, cumCash, sunkDC, sunkFC, pe
       fill: true, stack: 'Stack 0', pointRadius: 0 },
   ];
   chartInst2.update();
+}
+
+/* ══ Per-item cost distribution UI ════════════════════════════════════ */
+function renderItemDist() {
+  const section = document.getElementById('item-dist-section');
+  if (!section) return;
+  const items = _simData.costItems || [];
+  if (!items.length) { section.innerHTML = ''; return; }
+
+  let html = `<div class="section">
+    <div class="section-title">Item Cost Schedules</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">
+      Set a payment schedule per cost item. Items with no custom config use the Default Cost Profile.
+    </div>`;
+
+  items.forEach(item => {
+    const cfg  = (_simState.itemDist && _simState.itemDist[item.id]) || {};
+    const type = cfg.type || 'linear';
+    const sid  = esc(item.id);
+    const jid  = JSON.stringify(item.id);
+
+    html += `<div class="item-dist-row">
+      <div class="item-dist-info">
+        <div class="item-dist-name" title="${esc(item.label)}">${esc(item.label)}</div>
+        <div class="item-dist-val">${fmtK(item.total)} EUR</div>
+      </div>
+      <select class="item-dist-sel" onchange="updateItemDist(${jid}, this.value)">
+        <option value="linear"${type==='linear'?' selected':''}>Linear</option>
+        <option value="front"${type==='front'?' selected':''}>Front-Loaded</option>
+        <option value="back"${type==='back'?' selected':''}>Back-Loaded</option>
+        <option value="bell"${type==='bell'?' selected':''}>Bell Curve</option>
+        <option value="milestones"${type==='milestones'?' selected':''}>Milestones</option>
+      </select>
+    </div>`;
+
+    if (type === 'milestones') {
+      const milestones = cfg.milestones || [];
+      let msTotal = 0;
+      milestones.forEach(ms => { msTotal += ms.p || 0; });
+      html += `<div class="item-ms-wrap">
+        <div class="item-ms-hdr"><span>Month</span><span>Pay %</span></div>`;
+      milestones.forEach((ms, idx) => {
+        html += `<div class="item-ms-row">
+          <input class="item-ms-inp" type="number" value="${ms.m}" min="1" max="${_simData.duration||120}"
+            onchange="updateItemMilestone(${jid},${idx},'m',this.value)">
+          <input class="item-ms-inp" type="number" value="${ms.p}" min="0" max="100" step="1"
+            onchange="updateItemMilestone(${jid},${idx},'p',this.value)">
+          <button class="item-ms-del" onclick="removeItemMilestone(${jid},${idx})">✕</button>
+        </div>`;
+      });
+      html += `<div class="item-ms-total" style="color:${msTotal===100?'var(--green)':'var(--red)'}">Total: ${msTotal}%</div>
+        <button class="item-ms-add" onclick="addItemMilestone(${jid})">+ Add</button>
+      </div>`;
+    }
+  });
+
+  html += '</div>';
+  section.innerHTML = html;
+}
+
+function _ensureItemDist(itemId) {
+  if (!_simState.itemDist) _simState.itemDist = {};
+  if (!_simState.itemDist[itemId]) _simState.itemDist[itemId] = { type: 'linear', milestones: [] };
+}
+
+function updateItemDist(itemId, type) {
+  _ensureItemDist(itemId);
+  _simState.itemDist[itemId].type = type;
+  // Seed one milestone when switching to milestone mode for the first time
+  if (type === 'milestones' && !(_simState.itemDist[itemId].milestones || []).length) {
+    _simState.itemDist[itemId].milestones = [{ m: Math.round((_simData.duration || 60) / 2), p: 100 }];
+  }
+  saveState();
+  renderItemDist();
+  simulate();
+}
+
+function addItemMilestone(itemId) {
+  _ensureItemDist(itemId);
+  (_simState.itemDist[itemId].milestones = _simState.itemDist[itemId].milestones || [])
+    .push({ m: _simData.duration || 60, p: 0 });
+  saveState();
+  renderItemDist();
+  simulate();
+}
+
+function removeItemMilestone(itemId, idx) {
+  _ensureItemDist(itemId);
+  (_simState.itemDist[itemId].milestones || []).splice(idx, 1);
+  saveState();
+  renderItemDist();
+  simulate();
+}
+
+function updateItemMilestone(itemId, idx, field, val) {
+  _ensureItemDist(itemId);
+  let v = parseFloat(val) || 0;
+  if (field === 'm') v = Math.max(1, Math.min(_simData.duration || 120, v));
+  if (field === 'p' && v < 0) v = 0;
+  (_simState.itemDist[itemId].milestones || [])[idx][field] = v;
+  saveState();
+  renderItemDist();
+  simulate();
 }
 
 /* ══ Boot ══════════════════════════════════════════════════════════════ */
