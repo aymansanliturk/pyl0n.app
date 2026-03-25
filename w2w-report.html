@@ -6,6 +6,7 @@
 <title>W2W Report · PYL0N</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -464,12 +465,20 @@ table.w2w-tbl tr.w2w-row-spacer td { height: 6px; background: var(--bg); padding
 
   <!-- ── Tab 2: Project Scope ─────────────────────────────────────────────── -->
   <div id="tab-scope" class="tab-panel">
-    <div class="card">
-      <div class="card-title"><div class="card-title-bar"></div>Aggregated Direct Cost by Category</div>
-      <div id="scope-wrap">
-        <div class="empty-state">
-          <h3>No CalcCast data found</h3>
-          <p>Open CalcCast, add cost rows, then click ↻ Refresh.</p>
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title"><div class="card-title-bar"></div>Aggregated Direct Cost by Category</div>
+        <div id="scope-wrap">
+          <div class="empty-state">
+            <h3>No CalcCast data found</h3>
+            <p>Open CalcCast, add cost rows, then click ↻ Refresh.</p>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><div class="card-title-bar"></div>Fixed vs Estimated Scope</div>
+        <div style="position: relative; height: 300px; width: 100%; display: flex; align-items: center; justify-content: center;">
+          <canvas id="scopePieChart"></canvas>
         </div>
       </div>
     </div>
@@ -731,6 +740,8 @@ const SuiteManager = (() => {
 let _ccState     = {};   // raw CalcCast localStorage state
 let _directCost  = 0;    // total EUR direct cost (included rows only)
 let _byCategory  = {};   // { categoryName: totalEUR }
+let _fixedDC     = 0;    // EUR sum of rows explicitly marked fixed
+let _estimatedDC = 0;    // EUR sum of all other included rows
 let _lastResults = null; // last computeKpis() result (Scenario A)
 
 /* ══ W2W Report local persistence (factories survive CalcCast Refresh) ════ */
@@ -775,6 +786,8 @@ function loadCalcCastData() {
   const computed  = aggregateDirectCost(_ccState);
   _directCost     = computed.totalDC;
   _byCategory     = computed.byCategory;
+  _fixedDC        = computed.fixedDC;
+  _estimatedDC    = computed.estimatedDC;
 
   updateAll();
   renderScope();
@@ -796,6 +809,8 @@ function aggregateDirectCost(s) {
 
   let totalDC       = 0;
   let runningBase   = 0;          // for contingency % calculation
+  let fixedDC       = 0;
+  let estimatedDC   = 0;
   const byCategory  = {};
 
   (s.costRows || []).forEach(row => {
@@ -803,7 +818,8 @@ function aggregateDirectCost(s) {
       if (row.scope !== 'excluded') {
         const pct     = parseFloat(row.contingencyPct) || 0;
         const costEUR = runningBase * (pct / 100);
-        totalDC += costEUR;
+        totalDC     += costEUR;
+        estimatedDC += costEUR; // contingency is always estimated
         _addToCat(byCategory, 'Contingency', costEUR);
       }
       return;
@@ -815,12 +831,15 @@ function aggregateDirectCost(s) {
     const fxRate  = fx[row.currency]           || 1;
     const costEUR = qty * unit * fxRate;
 
-    totalDC      += costEUR;
-    runningBase  += costEUR;
+    const isFixed = (row.estFix || '').toLowerCase() === 'fixed';
+    if (isFixed) { fixedDC += costEUR; } else { estimatedDC += costEUR; }
+
+    totalDC     += costEUR;
+    runningBase += costEUR;
     _addToCat(byCategory, row.category || 'Uncategorized', costEUR);
   });
 
-  return { totalDC, byCategory };
+  return { totalDC, byCategory, fixedDC, estimatedDC };
 }
 
 function _addToCat(map, cat, val) {
@@ -933,6 +952,7 @@ function updateOverview(r) {
 }
 
 /* ══ Tab 2: Project Scope ══════════════════════════════════════════════════ */
+let scopeChartInst = null;
 function renderScope() {
   const wrap = $('scope-wrap');
   if (!wrap) return;
@@ -991,6 +1011,43 @@ function renderScope() {
         </tr>
       </tfoot>
     </table>`;
+
+  // Pie chart — Fixed vs Estimated
+  const ctx = document.getElementById('scopePieChart');
+  if (!ctx) return;
+  if (scopeChartInst) { scopeChartInst.destroy(); scopeChartInst = null; }
+  if (_fixedDC === 0 && _estimatedDC === 0) return;
+
+  const pieTotal = _fixedDC + _estimatedDC;
+  scopeChartInst = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Fixed Scope', 'Estimated Scope'],
+      datasets: [{
+        data: [_fixedDC, _estimatedDC],
+        backgroundColor: ['#107c41', '#f59e0b'],
+        borderWidth: 0,
+        hoverOffset: 4,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '70%',
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { family: 'DM Sans', size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: context => {
+              const val = context.raw;
+              const pct = ((val / pieTotal) * 100).toFixed(1);
+              return ` ${context.label}: ${fmtK(val)} (${pct}%)`;
+            },
+          },
+        },
+      },
+    },
+  });
 }
 
 /* ══ Tab 3: KPI Stack ══════════════════════════════════════════════════════ */
