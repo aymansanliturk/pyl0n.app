@@ -1218,7 +1218,7 @@ function addFactory() {
   _w2wState.factories.push({
     id:  Date.now(),
     category: cat,
-    kpis: { rw: 5, sga: 4, exu: 3, ba: 2, ebit: 8 },
+    kpis: { specRisk: 2, unspecRisk: 3, warr: 1, sga: 4, exu: 3, ba: 2, ebit: 8 },
   });
   saveW2WState();
   renderFactories();
@@ -1242,27 +1242,37 @@ function updateFactoryKpi(id, key, val) {
 }
 
 function _computeFactory(dc, kpis) {
-  // fallback for older states that might have saved specRisk
-  const rw = kpis.rw != null ? kpis.rw : ((kpis.specRisk||0) + (kpis.unspecRisk||0) + (kpis.warr||0));
+  // Backward compat: legacy states stored a single combined 'rw' with no split
+  const hasLegacyRw = kpis.rw != null && kpis.specRisk == null;
 
-  const afterRisk = dc        * (1 + rw / 100);
-  const afterSGA  = afterRisk * (1 + (kpis.sga||0) / 100);
-  const afterEXU  = afterSGA  * (1 + (kpis.exu||0) / 100);
-  const afterBA   = afterEXU  * (1 + (kpis.ba||0) / 100);
+  let specProv, unspecProv, warrProv, riskProv, afterRisk;
+  if (hasLegacyRw) {
+    afterRisk  = dc * (1 + kpis.rw / 100);
+    riskProv   = afterRisk - dc;
+    specProv   = null; unspecProv = null; warrProv = null;
+  } else {
+    specProv   = dc * (kpis.specRisk   || 0) / 100;
+    unspecProv = dc * (kpis.unspecRisk || 0) / 100;
+    warrProv   = dc * (kpis.warr       || 0) / 100;
+    riskProv   = specProv + unspecProv + warrProv;
+    afterRisk  = dc + riskProv;
+  }
+
+  const afterSGA  = afterRisk * (1 + (kpis.sga||0)  / 100);
+  const afterEXU  = afterSGA  * (1 + (kpis.exu||0)  / 100);
+  const afterBA   = afterEXU  * (1 + (kpis.ba||0)   / 100);
   const transfer  = afterBA   * (1 + (kpis.ebit||0) / 100);
-  const riskProv = afterRisk - dc;
-  const sgaProv  = afterSGA  - afterRisk;
-  const exuProv  = afterEXU  - afterSGA;
-  const baProv   = afterBA   - afterEXU;
-  const ebitProv = transfer  - afterBA;
+  const sgaProv  = afterSGA - afterRisk;
+  const exuProv  = afterEXU - afterSGA;
+  const baProv   = afterBA  - afterEXU;
+  const ebitProv = transfer - afterBA;
 
   const salesMargin = transfer - dc;
   const funcCost    = sgaProv + exuProv + baProv;
   const profit      = ebitProv;
   return {
     dc, afterRisk, afterSGA, afterEXU, afterBA, transfer,
-    riskProv,
-    specProv: null, unspecProv: null, warrProv: null, // Set to null to grey out
+    riskProv, specProv, unspecProv, warrProv,
     sgaProv, exuProv, baProv, ebitProv,
     salesMargin, funcCost, profit,
   };
@@ -1320,11 +1330,13 @@ function renderFactories() {
       : '';
 
     const kpiFields = [
-      ['rw',   'Risk+Warr %'],
-      ['sga',  'SG&A %'],
-      ['exu',  'HQ EXU %'],
-      ['ba',   'HQ BA %'],
-      ['ebit', 'EBIT %'],
+      ['specRisk',   'Spec. Risk %'],
+      ['unspecRisk', 'Unspec. Risk %'],
+      ['warr',       'Warranty %'],
+      ['sga',        'SG&A %'],
+      ['exu',        'HQ EXU %'],
+      ['ba',         'HQ BA %'],
+      ['ebit',       'EBIT %'],
     ].map(([key, lbl]) =>
       `<label>${lbl}
         <input type="number" value="${f.kpis[key] || 0}" min="0" step="0.1"
@@ -1385,14 +1397,10 @@ function renderW2WTable() {
   ba.salesMargin = ba.transfer - ba.dc;
   ba.funcCost    = ba.sgaProv + ba.exuProv + ba.baProv;
   ba.profit      = ba.ebitProv;
-  // Split BA Risk using global KPI percentages
-  const gSpec   = parseFloat(document.getElementById('w-spec-risk')?.value) || 0;
-  const gUnspec = parseFloat(document.getElementById('w-unspec-risk')?.value) || 0;
-  const gWarr   = parseFloat(document.getElementById('w-warranty')?.value) || 0;
-  const gTotalRisk = gSpec + gUnspec + gWarr;
-  ba.specProv   = gTotalRisk > 0 ? ba.riskProv * (gSpec / gTotalRisk) : 0;
-  ba.unspecProv = gTotalRisk > 0 ? ba.riskProv * (gUnspec / gTotalRisk) : 0;
-  ba.warrProv   = gTotalRisk > 0 ? ba.riskProv * (gWarr / gTotalRisk) : 0;
+  // BA risk sub-rows: sum directly from per-factory values (null = legacy factory, treated as 0)
+  ba.specProv   = results.reduce((s, x) => s + (x.r.specProv   || 0), 0);
+  ba.unspecProv = results.reduce((s, x) => s + (x.r.unspecProv || 0), 0);
+  ba.warrProv   = results.reduce((s, x) => s + (x.r.warrProv   || 0), 0);
 
   // ── Helper: format a pair of cells (kEUR, %) relative to revenue ──
   function cells(val, rev, cls = '') {
