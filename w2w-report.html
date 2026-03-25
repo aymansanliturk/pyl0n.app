@@ -1237,6 +1237,8 @@ function updateFactoryKpi(id, key, val) {
   saveW2WState();
   // Re-render only the results portion of this card to avoid losing focus
   _refreshFactoryStack(id);
+  // Rebuild the W2W summary table with updated per-factory KPIs
+  renderW2WTable();
 }
 
 function _computeFactory(dc, kpis) {
