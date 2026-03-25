@@ -391,6 +391,7 @@ let _simState = {
   fcCurve:   'linear',
   cancStart: 10,
   cancEnd:   100,
+  itemDist:  {}, // per-item cost distribution configs: { [itemId]: { type, milestones } }
 };
 
 function renderMilestones() {
@@ -502,6 +503,7 @@ function loadSuiteData() {
   let contractValue = 0, directCost = 0, riskCost = 0, funcCost = 0;
   let duration = 60, startMonth = 0, startYear = new Date().getFullYear();
   let projectName = 'Sample Project', isLive = false;
+  let costItems = []; // per-item breakdown from CalcCast
 
   /* ── CalcCast ─────────────────────────────────────────────────────── */
   try {
@@ -539,7 +541,16 @@ function loadSuiteData() {
         const rate  = fx[r.currency]          || 1;
         const rowC  = excl ? 0 : qty * unit * rate;
         const rowS  = excl ? 0 : rowC / kpiDiv;
-        if (!excl) runBase += rowC;
+        if (!excl) {
+          runBase += rowC;
+          if (rowC > 0) {
+            // Stable ID: prefer rfqId, then description+category slug, then position
+            const id = r.rfqId ||
+              ((r.category || '') + '|' + (r.description || '')).trim() ||
+              String(costItems.length);
+            costItems.push({ id, label: r.description || r.category || 'Item', total: rowC });
+          }
+        }
         tdirect += rowC;
         torder  += rowS;
       });
@@ -604,6 +615,7 @@ function loadSuiteData() {
     startYear,
     projectName,
     isLive,
+    costItems, // per-item breakdown for per-item distribution
   };
 
   _updateInfoPanel();
@@ -643,6 +655,21 @@ function distributeCost(total, duration, curveType) {
   return weights.map(w => total * (w / (sum || 1)));
 }
 
+/* Distribute a single cost item using its saved config, falling back to dcCurve */
+function distributeItem(itemId, total, N) {
+  const cfg = (_simState.itemDist && _simState.itemDist[itemId]) || {};
+  const type = cfg.type || _simState.dcCurve || 'linear';
+  if (type === 'milestones' && cfg.milestones && cfg.milestones.length) {
+    const arr = new Array(N).fill(0);
+    cfg.milestones.forEach(ms => {
+      const idx = Math.max(1, Math.min(N, Math.floor(ms.m))) - 1;
+      arr[idx] += total * (ms.p / 100);
+    });
+    return arr;
+  }
+  return distributeCost(total, N, type);
+}
+
 /* ══ Simulation engine ═════════════════════════════════════════════════ */
 let chartInst1 = null;
 let chartInst2 = null;
@@ -659,9 +686,18 @@ function simulate() {
   const arrSunkDC      = new Array(N).fill(0);
   const arrSunkFC      = new Array(N).fill(0);
   const arrCancPenalty = new Array(N).fill(0);
-  // Distribute Costs
-  const dcMonthly   = distributeCost(_simData.directCost, N, _simState.dcCurve);
-  // Distribute Risk using the same curve as Direct Cost
+  // Distribute Costs — sum per-item distributions
+  const dcMonthly = new Array(N).fill(0);
+  if (_simData.costItems && _simData.costItems.length) {
+    _simData.costItems.forEach(item => {
+      const monthly = distributeItem(item.id, item.total, N);
+      for (let i = 0; i < N; i++) dcMonthly[i] += monthly[i];
+    });
+  } else {
+    // Fallback when no CalcCast data: use blanket dcCurve on directCost total
+    distributeCost(_simData.directCost, N, _simState.dcCurve).forEach((v, i) => { dcMonthly[i] += v; });
+  }
+  // Risk cost is a KPI margin (not a line item) — always uses dcCurve
   const riskMonthly = distributeCost(_simData.riskCost, N, _simState.dcCurve);
   const fcMonthly   = distributeCost(_simData.funcCost,  N, _simState.fcCurve);
   // Map Payments
