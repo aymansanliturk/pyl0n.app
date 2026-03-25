@@ -593,6 +593,7 @@ function loadSuiteData() {
       const kpiDiv  = kpiAll >= 1 ? 0.01 : (1 - kpiAll);
 
       let tdirect = 0, torder = 0, runBase = 0;
+      const _costByCategory = new Map();
 
       (s.costRows || []).forEach(r => {
         if (!r) return;
@@ -605,16 +606,16 @@ function loadSuiteData() {
         if (!excl) {
           runBase += rowC;
           if (rowC > 0) {
-            // Stable ID: prefer rfqId, then description+category slug, then position
-            const id = r.rfqId ||
-              ((r.category || '') + '|' + (r.description || '')).trim() ||
-              String(costItems.length);
-            costItems.push({ id, label: r.description || r.category || 'Item', total: rowC });
+            const cat = (r.category || 'Uncategorised').trim();
+            const existing = _costByCategory.get(cat);
+            if (existing) { existing.total += rowC; }
+            else { _costByCategory.set(cat, { id: cat, label: cat, total: rowC }); }
           }
         }
         tdirect += rowC;
         torder  += rowS;
       });
+      costItems = [..._costByCategory.values()];
 
       (s.guarRows || []).forEach(r => {
         if (!r) return;
