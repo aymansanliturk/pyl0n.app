@@ -19,6 +19,8 @@ This file documents the codebase structure, conventions, and workflows for AI as
 | `riskcast.html` | RiskCast | Risk & opportunity register with scoring matrix |
 | `calccast.html` | CalcCast | Cost breakdown calculator; receives winning quotes pushed from RFQCast |
 | `lettercast.html` | LetterCast | Commercial cover letter / offer document generator with dynamic sections |
+| `cashflow.html` | CashFlow | Monthly cash-flow simulation with per-item cost distribution and cancellation curve |
+| `w2w-report.html` | W2W Report | Wall-to-Wall financial report; factory-level KPI breakdown consolidated into a business area summary table |
 | `favicon.svg` | — | Brand favicon |
 | `logo.svg` | — | Brand logo (34×34px grid) |
 
@@ -40,6 +42,7 @@ Each tool lives entirely within a single `.html` file:
 No local node_modules. Libraries are loaded from CDN:
 - **XLSX** `v0.18.5` or `v0.20.3` — Excel import/export via `cdnjs.cloudflare.com`
 - **html2pdf.js** `v0.10.1` — PDF generation via `cdnjs.cloudflare.com`
+- **Chart.js** (latest) — Canvas charts via `cdn.jsdelivr.net`; used in `cashflow.html` and `w2w-report.html`
 - **Google Fonts** — DM Sans, DM Mono typefaces
 
 ### Client-Side Storage
@@ -255,6 +258,37 @@ python3 -m http.server 8080  # then visit http://localhost:8080
 - Summary pills count by severity; opportunity rows always count as "gain"
 - Excel export columns: `#, Type, Category, Topic, Cause, Risk Description, Impact Description, Likelihood, Impact (I), Score, Level, Mitigation Plan, Status`
 
+### CashFlow (`cashflow.html`)
+- Monthly cash-flow simulator for a bid project; reads live data from CalcCast (`bidcast_state_calccast`) and TimeCast (`bidcast_state_timecast`)
+- State key: `bidcast_state_cashflow` — persisted via `saveState()` / `loadState()`
+- **`_simState`** (persisted): `{ milestones[], dcCurve, fcCurve, itemDist: {} }` — user inputs only
+- **`_simData`** (derived, not persisted): loaded fresh from suite each time via `loadSuiteData()`; contains `costItems[]` — CalcCast rows aggregated by category using a `Map` (category name is the stable item ID)
+- **Per-item cost distribution**: `distributeItem(itemId, total, N)` — looks up `_simState.itemDist[itemId]`; dispatches to `distributeCost()` (linear/front-loaded/back-loaded/bell) or applies user-defined milestone array. Falls back to global `dcCurve` if no config exists for that item.
+- **Cancellation curve**: `arrCancPenalty[i] = cumDC` — derived automatically from per-item cost schedules; no separate Cancellation Terms inputs
+- **Three Chart.js charts**: main cashflow bars (`chartInst`), forecast (`chartInst2`), per-item cost breakdown stacked bar (`chartInst3`, `#breakdownChart`)
+- `ITEM_COLORS` — 15-colour palette cycling for breakdown chart
+- `renderItemDist()` — builds Item Cost Schedules section in the editor; uses `esc(JSON.stringify(item.id))` pattern for safe inline `onchange` handlers when item IDs contain spaces or special chars
+- `_ensureItemDist(id)` — lazy-initialises an item's distribution config to `{ type:'linear' }` on first access
+
+### W2W Report (`w2w-report.html`)
+- Wall-to-Wall (LoA) financial report; reads CalcCast data from `bidcast_state_calccast`
+- State key: `bidcast_state_w2w` — persisted via `saveW2WState()` / `loadW2WState()`
+- **Two KPI tiers**:
+  1. **Project-level** (selling unit): Specified Risk %, Unspecified Risk %, SG&A %, HQ Adders EXU %, HQ Adders BA %, EBIT %, Negotiation %, Warranty % — used in the main overview tab
+  2. **Factory-level**: exactly 5 KPIs per factory — `rw` (Risk+Warranty combined), `sga`, `exu`, `ba`, `ebit` — stored in `_w2wState.factories[].kpis`
+- **`_computeFactory(dc, kpis)`**: sequential markup: `dc → afterRisk → afterSGA → afterEXU → afterBA → transfer`. Returns `{ dc, afterRisk, afterSGA, afterEXU, afterBA, transfer, riskProv, sgaProv, exuProv, baProv, ebitProv, salesMargin, funcCost, profit }`
+- **`renderW2WTable()`**: consolidated table with one column per factory + Business Area Summary. `%` column for each provision row divides by its own markup base (not revenue) so values match the entered KPI exactly:
+  - Risk+Warranty %: `riskProv / dc`
+  - SG&A %: `sgaProv / afterRisk`
+  - HQ Adders-EXU %: `exuProv / afterSGA`
+  - HQ Adders-BA %: `baProv / afterEXU`
+  - EBIT %: `ebitProv / afterBA`
+- `row()` helper in `renderW2WTable()` accepts optional `baseFn` to override the % denominator for provision rows
+- **Fixed vs Estimated split**: CalcCast rows carry `estFix` field (`"Fixed"` or `"Estimated"`); `aggregateDirectCost()` accumulates `fixedDC` / `estimatedDC`; a doughnut chart (`scopeChartInst`, `#scopePieChart`) renders in the Project Scope tab
+- `_byCategory` — object keyed by CalcCast category name → total EUR value; drives factory DC lookup
+- Dark mode supported via `[data-theme="dark"]` on `<html>`
+- External dependency: Chart.js (CDN)
+
 ## Function Index by File
 
 Shared functions present in every tool (not repeated below):
@@ -441,9 +475,11 @@ Shared functions present in every tool (not repeated below):
 
 ### calccast.html
 
+Each cost row includes an `estFix` field (`"Fixed"` or `"Estimated"`) indicating the pricing type. This field is consumed by `w2w-report.html` to split the direct cost into fixed vs estimated for the doughnut chart.
+
 | Function | Description |
 |----------|-------------|
-| `addCostRow(data)` | Creates a cost breakdown row with category, description, scope, supplier, units, qty, unit price, currency |
+| `addCostRow(data)` | Creates a cost breakdown row with category, description, scope, supplier, units, qty, unit price, currency, `estFix` (Fixed/Estimated) |
 | `removeCostRow(btn)` | Deletes a cost row and recalculates totals |
 | `_collectCostRows()` | Extracts all cost row data; reads `rfqId` via explicit null guard to prevent duplication on RFQCast push |
 | `calcTotals()` | Recalculates subtotals and grand total across all cost rows |
@@ -463,3 +499,41 @@ Shared functions present in every tool (not repeated below):
 | `importExcel()` | Parses Excel file and loads risk rows |
 | `exportExcel()` | Generates Excel workbook; columns: `#, Type, Category, Topic, Cause, Risk Description, Impact Description, Likelihood, Impact (I), Score, Level, Mitigation Plan, Status` |
 | `esc()` | HTML-escapes string for safe DOM insertion |
+
+### cashflow.html
+
+| Function | Description |
+|----------|-------------|
+| `loadSuiteData()` | Reads CalcCast + TimeCast state; aggregates cost rows by category into `_simData.costItems[]` via `Map` |
+| `saveState()` / `loadState()` | Persist/restore `_simState` to `bidcast_state_cashflow`; `loadState()` also syncs HTML inputs |
+| `simulate()` | Runs monthly simulation; sums per-item `distributeItem()` arrays for DC; sets `arrCancPenalty[i] = cumDC` |
+| `distributeItem(itemId, total, N)` | Returns monthly cost array for one item; dispatches to `distributeCost()` or milestone interpolation |
+| `distributeCost(type, total, N)` | Spreads total over N months using linear / front-loaded / back-loaded / bell curve profiles |
+| `renderItemDist()` | Builds Item Cost Schedules section in editor; uses `esc(JSON.stringify(id))` for safe inline handlers |
+| `updateItemDist(jid, key, val)` | Updates a field in `_simState.itemDist[id]` and re-simulates |
+| `addItemMilestone(jid)` | Appends a new milestone row to an item's distribution config |
+| `removeItemMilestone(jid, idx)` | Removes a milestone row by index |
+| `updateItemMilestone(jid, idx, field, val)` | Updates milestone month or percent value |
+| `_ensureItemDist(id)` | Lazy-initialises item dist config to `{ type:'linear' }` if not yet set |
+| `updateCharts()` | Rebuilds all three Chart.js charts with latest simulation data |
+| `ITEM_COLORS` | 15-colour array cycling for the per-item breakdown stacked bar chart |
+
+### w2w-report.html
+
+| Function | Description |
+|----------|-------------|
+| `loadCalcCastData()` | Reads `bidcast_state_calccast`; calls `aggregateDirectCost()`, populates `_directCost`, `_byCategory`, `_fixedDC`, `_estimatedDC` |
+| `aggregateDirectCost(s)` | Iterates CalcCast rows; converts currencies via FX rates; accumulates per-category totals and fixed/estimated split |
+| `computeKpis(dc, risk, sga, exu, ba, ebit, neg)` | Project-level sequential markup computation for the selling unit overview |
+| `_computeFactory(dc, kpis)` | Factory-level sequential markup: `dc → afterRisk → afterSGA → afterEXU → afterBA → transfer` using 5 KPIs (`rw`, `sga`, `exu`, `ba`, `ebit`) |
+| `addFactory()` | Pushes a new factory entry with default KPIs `{ rw:5, sga:4, exu:3, ba:2, ebit:8 }` to `_w2wState.factories` |
+| `removeFactory(id)` | Removes a factory entry by id |
+| `updateFactoryKpi(id, key, val)` | Updates a single KPI on a factory, saves state, refreshes stack and table |
+| `renderFactories()` | Renders factory cards with 5 KPI inputs and step-by-step value stack; calls `renderW2WTable()` |
+| `_refreshFactoryStack(id)` | Re-renders the value stack for one factory card without rebuilding all cards |
+| `_factoryStackHTML(r)` | Generates the HTML for the stepped value display (Base DC → transfer price) |
+| `renderW2WTable()` | Builds consolidated W2W table; provision `%` divides by its own markup base via `baseFn` option on `row()` |
+| `renderScope()` | Renders Project Scope tab with category cost table and Fixed vs Estimated doughnut chart |
+| `updateAll()` | Recalculates project-level KPIs and updates all overview cards |
+| `saveW2WState()` / `loadW2WState()` | Persist/restore `_w2wState` to `bidcast_state_w2w` |
+| `updateFactoryKpi()` | Also calls `renderW2WTable()` so the consolidated table stays in sync with card edits |
