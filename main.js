@@ -18,8 +18,10 @@ function createWindow() {
       // Allow localStorage to persist across sessions
       partition: 'persist:pyl0n',
     },
-    // Use favicon.svg as window icon where supported
-    icon: path.join(__dirname, 'favicon.svg'),
+    // Use platform-appropriate icon
+    icon: path.join(__dirname, 'build',
+      process.platform === 'win32'  ? 'icon.ico'  :
+      process.platform === 'darwin' ? 'icon.icns' : 'icon.png'),
     show: false, // show after ready-to-show to avoid flash
     backgroundColor: '#f5f4f0',
     titleBarStyle: 'default',

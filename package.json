@@ -5,10 +5,11 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "icons": "python3 scripts/generate-icons.py",
     "build:win": "electron-builder --win",
     "build:mac": "electron-builder --mac",
     "build:linux": "electron-builder --linux",
-    "build": "electron-builder --win --mac"
+    "build": "electron-builder --win --mac --linux"
   },
   "devDependencies": {
     "electron": "^33.0.0",
@@ -17,32 +18,57 @@
   "build": {
     "appId": "com.pyl0n.suite",
     "productName": "PYL0N",
-    "copyright": "Copyright © 2025 PYL0N",
+    "copyright": "Copyright © 2026 PYL0N",
     "files": [
       "*.html",
       "*.svg",
       "vendor/**",
       "main.js",
-      "preload.js"
+      "preload.js",
+      "build/icon.*"
     ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
     "win": {
       "target": [{ "target": "nsis", "arch": ["x64"] }],
-      "icon": "build/icon.ico"
+      "icon": "build/icon.ico",
+      "publisherName": "PYL0N"
     },
     "mac": {
-      "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }],
+      "target": [
+        { "target": "dmg",  "arch": ["x64", "arm64"] },
+        { "target": "zip",  "arch": ["x64", "arm64"] }
+      ],
       "icon": "build/icon.icns",
-      "category": "public.app-category.business"
+      "category": "public.app-category.business",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
     },
     "linux": {
-      "target": "AppImage",
-      "icon": "build/icon.png"
+      "target": [{ "target": "AppImage", "arch": ["x64"] }],
+      "icon": "build/icon.png",
+      "category": "Office"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "shortcutName": "PYL0N"
+    },
+    "dmg": {
+      "title": "PYL0N ${version}",
+      "icon": "build/icon.icns",
+      "iconSize": 80,
+      "contents": [
+        { "x": 130, "y": 220 },
+        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+      ],
+      "window": { "width": 540, "height": 380 }
     }
   }
 }
