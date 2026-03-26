@@ -6,17 +6,23 @@
   "scripts": {
     "start": "electron .",
     "icons": "python3 scripts/generate-icons.py",
-    "build:win": "electron-builder --win",
-    "build:mac": "electron-builder --mac",
-    "build:linux": "electron-builder --linux",
-    "build": "electron-builder --win --mac --linux"
+    "obfuscate": "node scripts/obfuscate.js",
+    "obfuscate:verify": "node scripts/obfuscate.js --verify",
+    "prebuild:win": "node scripts/obfuscate.js",
+    "prebuild:mac": "node scripts/obfuscate.js",
+    "prebuild:linux": "node scripts/obfuscate.js",
+    "build:win": "electron-builder --win --config.directories.app=dist-src",
+    "build:mac": "electron-builder --mac --config.directories.app=dist-src",
+    "build:linux": "electron-builder --linux --config.directories.app=dist-src",
+    "build": "electron-builder --win --mac --linux --config.directories.app=dist-src"
   },
   "dependencies": {
     "electron-updater": "^6.3.0"
   },
   "devDependencies": {
     "electron": "^33.0.0",
-    "electron-builder": "^25.0.0"
+    "electron-builder": "^25.0.0",
+    "javascript-obfuscator": "^4.1.0"
   },
   "build": {
     "appId": "com.pyl0n.suite",
@@ -28,6 +34,8 @@
       "vendor/**",
       "main.js",
       "preload.js",
+      "auth.js",
+      "azure-config.json",
       "build/icon.*"
     ],
     "directories": {

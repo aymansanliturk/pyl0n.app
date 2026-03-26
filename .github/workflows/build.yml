@@ -25,7 +25,7 @@ jobs:
         run: npm ci
 
       - name: Build macOS DMG (x64 + arm64)
-        run: npm run build:mac
+        run: npm run build:mac   # runs obfuscate automatically via prebuild:mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

@@ -1,40 +1,45 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-// ── Session 2: native file dialog API ────────────────────────────────────────
-// Exposes a minimal electronAPI surface to the renderer (HTML pages).
-// All Node/Electron APIs remain sandboxed — only these explicit methods
-// are accessible from page scripts via window.electronAPI.
 contextBridge.exposeInMainWorld('electronAPI', {
 
+  // ── File dialogs ────────────────────────────────────────────────────────────
+
   // Save a file via native Save dialog
-  // options: { defaultPath, filters: [{ name, extensions }] }
-  // Returns: { canceled, filePath } — filePath is undefined if canceled
   saveFile: (options) => ipcRenderer.invoke('dialog:saveFile', options),
 
   // Open a file via native Open dialog
-  // options: { filters: [{ name, extensions }], properties: ['openFile'] }
-  // Returns: { canceled, filePaths } — filePaths is [] if canceled
   openFile: (options) => ipcRenderer.invoke('dialog:openFile', options),
 
-  // Write data to an absolute file path (used after saveFile resolves)
-  // encoding: 'utf8' (default) for text/JSON/HTML, 'base64' for binary (xlsx, pdf)
-  // Returns: { success, error }
+  // Write data to an absolute file path
+  // encoding: 'utf8' (default) | 'base64' (for xlsx, pdf)
   writeFile: (filePath, data, encoding) => ipcRenderer.invoke('fs:writeFile', filePath, data, encoding),
 
-  // Read data from an absolute file path (used after openFile resolves)
-  // Returns: { success, data, error }
+  // Read data from an absolute file path
   readFile: (filePath) => ipcRenderer.invoke('fs:readFile', filePath),
 
-  // Get the Electron / app version for display
+  // ── App info ────────────────────────────────────────────────────────────────
+
   getVersion: () => ipcRenderer.invoke('app:getVersion'),
 
-  // Auto-update: manually check for a newer version
+  // ── Azure AD authentication ─────────────────────────────────────────────────
+
+  // Get signed-in user from cached token: { name, email, oid, tid } or null
+  getUser: () => ipcRenderer.invoke('auth:getUser'),
+
+  // Open Microsoft login window and return user object on success
+  login: () => ipcRenderer.invoke('auth:login'),
+
+  // Sign out and clear stored token
+  logout: () => ipcRenderer.invoke('auth:logout'),
+
+  // Signal main process that login succeeded (used by login.html)
+  authSuccess: () => ipcRenderer.send('auth:success'),
+
+  // ── Auto-update ─────────────────────────────────────────────────────────────
+
   checkForUpdates: () => ipcRenderer.invoke('app:checkForUpdates'),
+  installUpdate:   () => ipcRenderer.invoke('app:installUpdate'),
 
-  // Auto-update: quit and install a downloaded update immediately
-  installUpdate: () => ipcRenderer.invoke('app:installUpdate'),
-
-  // Listen for 'update:ready' event pushed from main process
-  // callback receives { version } — call this once on page load
+  // Listen for update-ready event pushed from main process
   onUpdateReady: (callback) => ipcRenderer.on('update:ready', (_e, info) => callback(info)),
 });

@@ -1,4 +1,7 @@
 node_modules/
 dist/
+dist-src/
 vendor/
 # Keep build/ icon assets — do NOT ignore build/
+# azure-config.json is committed as a template (with placeholder values only)
+# Never commit the real clientId/tenantId — edit the file after installing
