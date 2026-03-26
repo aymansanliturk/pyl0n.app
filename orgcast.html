@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="vendor/pyl0n-native.js"></script>
 <style id="page-size-style">@page { size: A4 landscape; margin: 10mm; }</style>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -752,14 +753,11 @@ function updateLogoUI() {
     return suite;
   }
 
-  function saveJSON() {
+  async function saveJSON() {
     const state = collectState();
     localStorage.setItem('bidcast_state_orgcast', JSON.stringify(state));
     const name  = (state.title||'orgchart').replace(/[^a-z0-9_-]/gi,'_').toLowerCase();
-    const blob  = new Blob([JSON.stringify(_suiteBundle(state),null,2)], {type:'application/json'});
-    const a     = document.createElement('a');
-    a.href = URL.createObjectURL(blob); a.download = name+'_suite.json'; a.click();
-    URL.revokeObjectURL(a.href);
+    await nativeSaveText(name+'_suite.json', JSON.stringify(_suiteBundle(state),null,2), 'JSON Files', 'json');
     const c = document.getElementById('save-confirm');
     c.style.display='inline'; setTimeout(()=>c.style.display='none',2000);
     _writeBackup();
@@ -806,20 +804,17 @@ function updateLogoUI() {
     refreshParentDropdowns();
   }
 
-  function exportHTML() {
+  async function exportHTML() {
     const state   = collectState();
     const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(state))));
     const src     = document.documentElement.outerHTML;
     const inject  = ['<scr','ipt>','window.addEventListener("DOMContentLoaded",function(){var s=JSON.parse(decodeURIComponent(escape(atob("',encoded,'"))));applyState(s);});','</scr','ipt>'].join('');
     const out     = src.replace('</body>', inject+'\n</body>');
     const name    = (state.title||'orgchart').replace(/[^a-z0-9_-]/gi,'_').toLowerCase();
-    const blob    = new Blob([out],{type:'text/html'});
-    const a       = document.createElement('a');
-    a.href=URL.createObjectURL(blob); a.download=name+'_orgcast.html'; a.click();
-    URL.revokeObjectURL(a.href);
+    await nativeSaveHTML(name+'_orgcast.html', out);
   }
 
-  function exportExcel() {
+  async function exportExcel() {
     const state  = collectState();
     const people = getPeople();
     const nameMap = {};
@@ -850,7 +845,7 @@ function updateLogoUI() {
     XLSX.utils.book_append_sheet(wb, meta, 'Info');
 
     const name = (state.title || 'orgcast').replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
-    XLSX.writeFile(wb, name + '_orgcast.xlsx');
+    await nativeSaveXLSX(wb, name + '_orgcast.xlsx');
   }
 
   function setParentByRole(childRole, parentRole) {
@@ -980,26 +975,22 @@ function updateLogoUI() {
   })();
 
   // ── PDF Export ──
-  function exportPDF() {
+  async function exportPDF() {
     const state = collectState();
     const name = (state.title || 'orgcast').replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
     const fmt = (state.format || 'A4').toUpperCase();
-    html2pdf().set({
-      margin: 0, filename: name + '.pdf',
+    const opts = {
+      margin: 0,
+      filename: name + '_orgcast.pdf',
       image: { type: 'jpeg', quality: 0.97 },
-      html2canvas: {
-        scale: 2, useCORS: true,
-        onclone: d => {
-          d.querySelectorAll(
-            '.no-print, .print-bar, .persist-bar, .suite-nav, .config-bar'
-          ).forEach(el => el.remove());
-          // Ensure org chart SVG fills the full page width
-          const wrap = d.querySelector('#output');
-          if (wrap) { wrap.style.width = '100%'; wrap.style.padding = '10mm 12mm'; }
-        },
-      },
+      html2canvas: { scale: 2, useCORS: true, onclone: d => {
+        d.querySelectorAll('.no-print, .print-bar, .persist-bar, .suite-nav, .config-bar').forEach(el => el.remove());
+        const wrap = d.querySelector('#output');
+        if (wrap) { wrap.style.width = '100%'; wrap.style.padding = '10mm 12mm'; }
+      }},
       jsPDF: { unit: 'mm', format: fmt === 'A3' ? 'a3' : 'a4', orientation: 'landscape' }
-    }).from(document.getElementById('output')).save();
+    };
+    await nativeSavePDF(document.getElementById('output'), name + '_orgcast.pdf', opts);
   }
 
   // ── PNG Export ──
@@ -1021,11 +1012,22 @@ function updateLogoUI() {
       backgroundColor: '#ffffff',
       useCORS: true,
       logging: false
-    }).then(cvs => {
-      const a = document.createElement('a');
-      a.download = name + '-export.png';
-      a.href = cvs.toDataURL('image/png');
-      a.click();
+    }).then(async cvs => {
+      if (window.electronAPI) {
+        const { canceled, filePath } = await window.electronAPI.saveFile({
+          defaultPath: name + '-export.png',
+          filters: [{ name: 'PNG Images', extensions: ['png'] }],
+        });
+        if (!canceled && filePath) {
+          const b64 = cvs.toDataURL('image/png').split(',')[1];
+          await window.electronAPI.writeFile(filePath, b64, 'base64');
+        }
+      } else {
+        const a = document.createElement('a');
+        a.download = name + '-export.png';
+        a.href = cvs.toDataURL('image/png');
+        a.click();
+      }
     }).catch(() => {
       alert('PNG export failed. Try the PDF export instead.');
     });

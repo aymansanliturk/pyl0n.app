@@ -1,3 +1,4 @@
 node_modules/
 dist/
 vendor/
+# Keep build/ icon assets — do NOT ignore build/

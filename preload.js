@@ -17,8 +17,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openFile: (options) => ipcRenderer.invoke('dialog:openFile', options),
 
   // Write data to an absolute file path (used after saveFile resolves)
+  // encoding: 'utf8' (default) for text/JSON/HTML, 'base64' for binary (xlsx, pdf)
   // Returns: { success, error }
-  writeFile: (filePath, data) => ipcRenderer.invoke('fs:writeFile', filePath, data),
+  writeFile: (filePath, data, encoding) => ipcRenderer.invoke('fs:writeFile', filePath, data, encoding),
 
   // Read data from an absolute file path (used after openFile resolves)
   // Returns: { success, data, error }

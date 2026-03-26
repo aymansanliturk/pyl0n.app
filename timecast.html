@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="vendor/pyl0n-native.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1747,16 +1748,11 @@ function updateLogoUI() {
     return suite;
   }
 
-  function saveJSON() {
+  async function saveJSON() {
     const state = collectState();
     localStorage.setItem('bidcast_state_timecast', JSON.stringify(state));
     const name  = (state.chartTitle || 'timecast').replace(/[^a-z0-9_-]/gi,'_').toLowerCase();
-    const blob  = new Blob([JSON.stringify(_suiteBundle(state), null, 2)], {type:'application/json'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = name + '_suite.json';
-    a.click();
-    URL.revokeObjectURL(a.href);
+    await nativeSaveText(name+'_suite.json', JSON.stringify(_suiteBundle(state),null,2), 'JSON Files', 'json');
     const c = document.getElementById('save-confirm');
     if (c) { c.style.display='inline'; setTimeout(()=>c.style.display='none', 2000); }
     _writeBackup();
@@ -1783,19 +1779,14 @@ function updateLogoUI() {
     input.value = '';
   }
 
-  function exportHTML() {
+  async function exportHTML() {
     const state   = collectState();
     const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(state))));
     const src     = document.documentElement.outerHTML;
     const inject  = ['<scr','ipt>','window.addEventListener("DOMContentLoaded",function(){var s=JSON.parse(decodeURIComponent(escape(atob("',encoded,'"))));applyState(s);});','</scr','ipt>'].join('');
     const out     = src.replace('</body>', inject + '\n</body>');
     const name    = (state.chartTitle || 'timecast').replace(/[^a-z0-9_-]/gi,'_').toLowerCase();
-    const blob    = new Blob([out], {type:'text/html'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = name + '_timecast.html';
-    a.click();
-    URL.revokeObjectURL(a.href);
+    await nativeSaveHTML(name+'_timecast.html', out);
   }
 
   function goBack() {
@@ -1940,12 +1931,13 @@ function updateLogoUI() {
   }
 
   // ── PDF Export ──
-  function exportPDF() {
+  async function exportPDF() {
     const state = collectState();
     const name = (state.chartTitle || 'timecast').replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
     const fmt = (state.format || 'A3').toUpperCase();
-    html2pdf().set({
-      margin: 0, filename: name + '.pdf',
+    const opts = {
+      margin: 0,
+      filename: name + '_timecast.pdf',
       image: { type: 'jpeg', quality: 0.97 },
       html2canvas: {
         scale: 2, useCORS: true,
@@ -1965,7 +1957,8 @@ function updateLogoUI() {
         },
       },
       jsPDF: { unit: 'mm', format: fmt === 'A2' ? 'a2' : fmt === 'A4' ? 'a4' : 'a3', orientation: 'landscape' }
-    }).from(document.getElementById('output')).save();
+    };
+    await nativeSavePDF(document.getElementById('output'), name+'_timecast.pdf', opts);
   }
 
 /* ── SUITE SYNC ── */

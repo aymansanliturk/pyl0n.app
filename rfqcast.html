@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="vendor/pyl0n-native.js"></script>
 <style id="page-size-style">@page { size: A3 landscape; margin: 8mm; }</style>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1057,14 +1058,11 @@ function _suiteBundle(ownState) {
   return suite;
 }
 
-function saveJSON() {
+async function saveJSON() {
   const state = collectState();
   localStorage.setItem('bidcast_state_rfqcast', JSON.stringify(state));
   const name  = (state.projName||'rfq').replace(/[^a-z0-9_-]/gi,'_').toLowerCase();
-  const blob  = new Blob([JSON.stringify(_suiteBundle(state),null,2)],{type:'application/json'});
-  const a = document.createElement('a');
-  a.href=URL.createObjectURL(blob); a.download=name+'_suite.json'; a.click();
-  URL.revokeObjectURL(a.href);
+  await nativeSaveText(name+'_suite.json', JSON.stringify(_suiteBundle(state),null,2), 'JSON Files', 'json');
   const c = document.getElementById('save-confirm');
   if (c) { c.style.display = 'inline'; setTimeout(() => c.style.display = 'none', 2000); }
   _writeBackup();
@@ -1088,21 +1086,18 @@ function loadJSON(input) {
   reader.readAsText(file); input.value='';
 }
 
-function exportHTML() {
+async function exportHTML() {
   const state   = collectState();
   const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(state))));
   const src     = document.documentElement.outerHTML;
   const inject  = ['<scr','ipt>','window.addEventListener("DOMContentLoaded",function(){var s=JSON.parse(decodeURIComponent(escape(atob("',encoded,'"))));applyState(s);});','</scr','ipt>'].join('');
   const out     = src.replace('</body>', inject+'\n</body>');
   const name    = (state.projName||'rfq').replace(/[^a-z0-9_-]/gi,'_').toLowerCase();
-  const blob    = new Blob([out],{type:'text/html'});
-  const a = document.createElement('a');
-  a.href=URL.createObjectURL(blob); a.download=name+'_rfqcast.html'; a.click();
-  URL.revokeObjectURL(a.href);
+  await nativeSaveHTML(name+'_rfqcast.html', out);
 }
 
 // ── Excel Export ──
-function exportExcel() {
+async function exportExcel() {
   const state=collectState();
   const wb=XLSX.utils.book_new();
   const wsData=[];
@@ -1130,7 +1125,7 @@ function exportExcel() {
   const ws=XLSX.utils.aoa_to_sheet(wsData);
   XLSX.utils.book_append_sheet(wb,ws,'Procurement Overview');
   const name=(state.projName||'rfq').replace(/[^a-z0-9_-]/gi,'_').toLowerCase();
-  XLSX.writeFile(wb,name+'_rfqcast.xlsx');
+  await nativeSaveXLSX(wb,name+'_rfqcast.xlsx');
 }
 
 function importExcel(input) {
@@ -1293,16 +1288,18 @@ document.addEventListener('keydown', e => {
   setTimeout(_snapshot, 300);
 })();
 
-function exportPDF() {
+async function exportPDF() {
   const state = collectState();
   const name = (state.projName || 'rfqcast').replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
   const fmt = (state.format || 'A3').toUpperCase();
-  html2pdf().set({
-    margin: 0, filename: name + '.pdf',
+  const opts = {
+    margin: 0,
+    filename: name + '_rfqcast.pdf',
     image: { type: 'jpeg', quality: 0.97 },
     html2canvas: { scale: 2, useCORS: true, onclone: d => { d.querySelectorAll('.no-print, .print-bar, .persist-bar, .suite-nav, .config-bar').forEach(el => el.remove()); const out = d.querySelector('#output'); if (out) { out.style.width = '100%'; out.style.padding = '10mm 12mm'; } } },
     jsPDF: { unit: 'mm', format: fmt === 'A4' ? 'a4' : 'a3', orientation: 'landscape' }
-  }).from(document.getElementById('output')).save();
+  };
+  await nativeSavePDF(document.getElementById('output'), name+'_rfqcast.pdf', opts);
 }
 
 // Init

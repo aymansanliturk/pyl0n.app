@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="vendor/pyl0n-native.js"></script>
 <style id="page-size-style">@page { size: A3 landscape; margin: 10mm; }</style>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -854,16 +855,11 @@ function applyState(s) {
 }
 
 /* ══ Persistence ════════════════════════════════════════════════════ */
-function saveJSON() {
+async function saveJSON() {
   const state = collectState();
   localStorage.setItem('bidcast_state_riskcast', JSON.stringify(state));
   const name  = (state.title || 'risk').replace(/[^a-z0-9_-]/gi,'_').toLowerCase();
-  const blob  = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-  const a     = document.createElement('a');
-  a.href      = URL.createObjectURL(blob);
-  a.download  = name + '_riskcast.json';
-  a.click();
-  URL.revokeObjectURL(a.href);
+  await nativeSaveText(name + '_riskcast.json', JSON.stringify(state, null, 2), 'JSON Files', 'json');
   const c = document.getElementById('save-confirm');
   if (c) { c.style.display = 'inline'; setTimeout(() => c.style.display = 'none', 2000); }
   _writeBackup();
@@ -889,27 +885,23 @@ function loadJSON(input) {
   reader.readAsText(file); input.value = '';
 }
 
-function exportHTML() {
+async function exportHTML() {
   const state   = collectState();
   const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(state))));
   const src     = document.documentElement.outerHTML;
   const injected = src.replace('</body>',
     `<script>try{applyState(JSON.parse(decodeURIComponent(escape(atob("${encoded}")))))}catch(e){}<\/script></body>`);
-  const blob = new Blob([injected], { type: 'text/html' });
-  const a    = document.createElement('a');
-  a.href     = URL.createObjectURL(blob);
-  a.download = (state.title||'risk').replace(/[^a-z0-9_-]/gi,'_').toLowerCase() + '_riskcast.html';
-  a.click();
-  URL.revokeObjectURL(a.href);
+  const name = (state.title||'risk').replace(/[^a-z0-9_-]/gi,'_').toLowerCase();
+  await nativeSaveHTML(name + '_riskcast.html', injected);
 }
 
 /* ══ Export ═════════════════════════════════════════════════════════ */
-function exportPDF() {
+async function exportPDF() {
   const state = collectState();
   const name = (state.projName || 'riskcast').replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
-  html2pdf().set({
+  const opts = {
     margin: 10,
-    filename: 'riskcast-export.pdf',
+    filename: name + '_riskcast.pdf',
     image: { type: 'jpeg', quality: 0.97 },
     html2canvas: { scale: 0.85, useCORS: true, onclone: d => {
       d.querySelectorAll('.no-print, .print-bar').forEach(el => el.remove());
@@ -917,10 +909,11 @@ function exportPDF() {
       if (out) { out.style.display = 'block'; out.style.padding = '0'; }
     }},
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-  }).from(document.getElementById('output')).save();
+  };
+  await nativeSavePDF(document.getElementById('output'), name + '_riskcast.pdf', opts);
 }
 
-function exportExcel() {
+async function exportExcel() {
   const state = collectState();
   const wb    = XLSX.utils.book_new();
 
@@ -984,7 +977,7 @@ function exportExcel() {
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Summary');
 
   const name = (state.title||'risk').replace(/[^a-z0-9_-]/gi,'_').toLowerCase();
-  XLSX.writeFile(wb, name + '_riskcast.xlsx');
+  await nativeSaveXLSX(wb, name + '_riskcast.xlsx');
 }
 
 /* ══ Generate output — grouped by Category ══════════════════════════ */

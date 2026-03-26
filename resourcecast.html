@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="vendor/pyl0n-native.js"></script>
 <style id="page-size-style">@page { size: A3 landscape; margin: 8mm; }
 </style>
 <style>
@@ -1438,14 +1439,11 @@ function updateLogoUI() {
     return suite;
   }
 
-  function saveJSON() {
+  async function saveJSON() {
     const state = collectState();
     localStorage.setItem('bidcast_state_resourcecast', JSON.stringify(state));
     const name  = (state.projName||'resourcecast').replace(/[^a-z0-9_-]/gi,'_').toLowerCase();
-    const blob  = new Blob([JSON.stringify(_suiteBundle(state),null,2)],{type:'application/json'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob); a.download = name+'_suite.json'; a.click();
-    URL.revokeObjectURL(a.href);
+    await nativeSaveText(name+'_suite.json', JSON.stringify(_suiteBundle(state),null,2), 'JSON Files', 'json');
     const c = document.getElementById('save-confirm');
     c.style.display='inline'; setTimeout(()=>c.style.display='none',2000);
     _writeBackup();
@@ -1469,12 +1467,12 @@ function updateLogoUI() {
     reader.readAsText(file); input.value='';
   }
 
-  function exportPDF() {
+  async function exportPDF() {
     const state = collectState();
     const name  = (state.projName || 'resourcecast').replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
-    html2pdf().set({
+    const opts = {
       margin: 0,
-      filename: name + '.pdf',
+      filename: name + '_resourcecast.pdf',
       image: { type: 'jpeg', quality: 0.97 },
       html2canvas: {
         scale: 2, useCORS: true,
@@ -1487,20 +1485,18 @@ function updateLogoUI() {
         },
       },
       jsPDF: { unit: 'mm', format: 'a3', orientation: 'landscape' },
-    }).from(document.getElementById('output')).save();
+    };
+    await nativeSavePDF(document.getElementById('output'), name+'_resourcecast.pdf', opts);
   }
 
-  function exportHTML() {
+  async function exportHTML() {
     const state   = collectState();
     const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(state))));
     const src     = document.documentElement.outerHTML;
     const inject  = ['<scr','ipt>','window.addEventListener("DOMContentLoaded",function(){var s=JSON.parse(decodeURIComponent(escape(atob("',encoded,'"))));applyState(s);});','</scr','ipt>'].join('');
     const out     = src.replace('</body>', inject+'\n</body>');
     const name    = (state.projName||'resourcecast').replace(/[^a-z0-9_-]/gi,'_').toLowerCase();
-    const blob    = new Blob([out],{type:'text/html'});
-    const a = document.createElement('a');
-    a.href=URL.createObjectURL(blob); a.download=name+'_resourcecast.html'; a.click();
-    URL.revokeObjectURL(a.href);
+    await nativeSaveHTML(name+'_resourcecast.html', out);
   }
 
   // ── Excel Import ──
@@ -1611,7 +1607,7 @@ function updateLogoUI() {
   }
 
   // ── Excel Export ──
-  function exportExcel() {
+  async function exportExcel() {
     if (typeof XLSX === 'undefined') { alert('SheetJS not loaded.'); return; }
     const state  = collectState();
     const phases = getPhases();
@@ -1773,7 +1769,7 @@ function updateLogoUI() {
 
     XLSX.utils.book_append_sheet(wb, ws, 'Resource Plan');
     const fname = (state.projName || 'resourcecast').replace(/[^a-z0-9_-]/gi,'_').toLowerCase();
-    XLSX.writeFile(wb, fname + '_resourcecast.xlsx');
+    await nativeSaveXLSX(wb, fname + '_resourcecast.xlsx');
   }
 
   // ── Print helpers ──

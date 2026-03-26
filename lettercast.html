@@ -6,6 +6,7 @@
 <title>LetterCast · PYL0N</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="vendor/pyl0n-native.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -723,14 +724,10 @@ function autoSave() {
   _scheduleSnap();
 }
 
-function saveJSON() {
+async function saveJSON() {
   const s    = collectState();
-  const blob = new Blob([JSON.stringify(s, null, 2)], { type: 'application/json' });
-  const a    = document.createElement('a');
-  a.href     = URL.createObjectURL(blob);
-  a.download = (s.projName || 'LetterCast').replace(/[^a-z0-9]/gi, '_') + '_LetterCast.json';
-  a.click();
-  URL.revokeObjectURL(a.href);
+  const name = (s.projName || 'LetterCast').replace(/[^a-z0-9]/gi, '_');
+  await nativeSaveText(name + '_LetterCast.json', JSON.stringify(s, null, 2), 'JSON Files', 'json');
   const c = document.getElementById('save-confirm');
   if (c) { c.style.display = 'inline'; setTimeout(() => c.style.display = 'none', 2000); }
   _writeBackup();

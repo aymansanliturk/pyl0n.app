@@ -18,8 +18,10 @@ function createWindow() {
       // Allow localStorage to persist across sessions
       partition: 'persist:pyl0n',
     },
-    // Use favicon.svg as window icon where supported
-    icon: path.join(__dirname, 'favicon.svg'),
+    // Use platform-appropriate icon
+    icon: path.join(__dirname, 'build',
+      process.platform === 'win32'  ? 'icon.ico'  :
+      process.platform === 'darwin' ? 'icon.icns' : 'icon.png'),
     show: false, // show after ready-to-show to avoid flash
     backgroundColor: '#f5f4f0',
     titleBarStyle: 'default',
@@ -54,9 +56,14 @@ ipcMain.handle('dialog:openFile', async (_event, options) => {
   return result; // { canceled, filePaths }
 });
 
-ipcMain.handle('fs:writeFile', async (_event, filePath, data) => {
+// encoding: 'utf8' (default) for text/JSON/HTML, 'base64' for binary (xlsx, pdf)
+ipcMain.handle('fs:writeFile', async (_event, filePath, data, encoding = 'utf8') => {
   try {
-    fs.writeFileSync(filePath, data);
+    if (encoding === 'base64') {
+      fs.writeFileSync(filePath, Buffer.from(data, 'base64'));
+    } else {
+      fs.writeFileSync(filePath, data, 'utf8');
+    }
     return { success: true };
   } catch (err) {
     return { success: false, error: err.message };
