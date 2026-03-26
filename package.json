@@ -2,6 +2,7 @@
   "name": "pyl0n",
   "version": "1.0.0",
   "description": "PYL0N Suite — Bid & Project Planning Tools",
+  "author": "PYL0N",
   "main": "main.js",
   "scripts": {
     "start": "electron .",

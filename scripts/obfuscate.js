@@ -51,7 +51,6 @@ const HTML_FILES = [
 
 // Non-HTML files to copy verbatim into dist-src/
 const COPY_FILES = [
-  'package.json',
   'main.js',
   'preload.js',
   'auth.js',
@@ -176,6 +175,20 @@ function main() {
   }
 
   if (!VERIFY) {
+    // Write a stripped package.json for dist-src/ — electron-builder requires
+    // only app metadata here; the build config stays in the root package.json.
+    const rootPkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+    const appPkg = {
+      name:         rootPkg.name,
+      version:      rootPkg.version,
+      description:  rootPkg.description,
+      author:       rootPkg.author || 'PYL0N',
+      main:         rootPkg.main,
+      dependencies: rootPkg.dependencies || {},
+    };
+    fs.writeFileSync(path.join(OUT_DIR, 'package.json'), JSON.stringify(appPkg, null, 2), 'utf8');
+    console.log(`\n  Written: dist-src/package.json (stripped, no build config)`);
+
     // Copy verbatim files
     for (const f of COPY_FILES) {
       const src = path.join(ROOT, f);
@@ -187,7 +200,7 @@ function main() {
       copyDir(path.join(ROOT, d), path.join(OUT_DIR, d));
     }
 
-    console.log(`\n  Copied: ${[...COPY_FILES, ...COPY_DIRS].join(', ')}`);
+    console.log(`  Copied: ${[...COPY_FILES, ...COPY_DIRS].join(', ')}`);
   }
 
   console.log(`\n[obfuscate] Done. ${totalBlocks} script blocks, ` +
