@@ -1376,14 +1376,18 @@ function renderW2WTable() {
     ebitProv:  results.reduce((s, x) => s + x.r.ebitProv,   0),
   };
 
+  ba.afterRisk   = ba.dc       + ba.riskProv;
+  ba.afterSGA    = ba.afterRisk + ba.sgaProv;
+  ba.afterEXU    = ba.afterSGA  + ba.exuProv;
+  ba.afterBA     = ba.afterEXU  + ba.baProv;
   ba.salesMargin = ba.transfer - ba.dc;
   ba.funcCost    = ba.sgaProv + ba.exuProv + ba.baProv;
   ba.profit      = ba.salesMargin - ba.funcCost;
 
-  // ── Helper: format a pair of cells (kEUR, %) relative to revenue ──
-  function cells(val, rev, cls = '') {
+  // ── Helper: format a pair of cells (kEUR, %) relative to a base ──
+  function cells(val, base, cls = '') {
     if (val === null) return `<td class="w2w-grey" colspan="2"></td>`;
-    const pct = rev > 0 ? (val / rev) * 100 : 0;
+    const pct = base > 0 ? (val / base) * 100 : 0;
     return `<td class="w2w-num${cls ? ' '+cls : ''}">${fmtK(val)}</td><td class="w2w-pct${cls ? ' '+cls : ''}">${fmtP(pct)}</td>`;
   }
 
@@ -1397,8 +1401,11 @@ function renderW2WTable() {
   ).join('');
 
   // ── Row builder ──
+  // baseFn(r): optional — returns the denominator for the % column.
+  //   Defaults to r.transfer (revenue). Pass the prior-step base for markup rows
+  //   so the % matches the KPI % the user entered.
   function row(label, valFn, opts = {}) {
-    const { cls = '', sub = false, spacer = false, hi = false, sep = false, total = false } = opts;
+    const { cls = '', sub = false, spacer = false, hi = false, sep = false, total = false, baseFn = null } = opts;
     if (spacer) return `<tr class="w2w-row-spacer"><td colspan="${2 + results.length * 2 + 2}"></td></tr>`;
 
     let rowCls = '';
@@ -1410,13 +1417,14 @@ function renderW2WTable() {
     const cellCls  = sub ? 'w2w-sub' : '';
 
     const subsysCells = results.map(({ r }) => {
-      const val = valFn(r);
-      const rev = r.transfer;
-      return cells(val, rev, cellCls);
+      const val  = valFn(r);
+      const base = baseFn ? baseFn(r) : r.transfer;
+      return cells(val, base, cellCls);
     }).join('');
 
-    const baVal = valFn(ba);
-    const baCells = cells(baVal, ba.transfer, cellCls);
+    const baVal   = valFn(ba);
+    const baBase  = baseFn ? baseFn(ba) : ba.transfer;
+    const baCells = cells(baVal, baBase, cellCls);
 
     return `<tr class="${rowCls}">
       <td class="${labelCls}">${label}</td>
@@ -1458,14 +1466,14 @@ function renderW2WTable() {
         ${row('Sales Margin', r => r.transfer - r.dc, { total: true })}
         ${row('', null, { spacer: true })}
         ${row('Functional Cost', r => r.sgaProv + r.exuProv + r.baProv, { sep: true, total: true })}
-        ${row('SG&A', r => r.sgaProv, { sub: true })}
-        ${row('HQ Adders — EXU', r => r.exuProv, { sub: true })}
-        ${row('HQ Adders — BA', r => r.baProv, { sub: true })}
+        ${row('SG&A',            r => r.sgaProv,  { sub: true, baseFn: r => r.afterRisk })}
+        ${row('HQ Adders — EXU', r => r.exuProv,  { sub: true, baseFn: r => r.afterSGA  })}
+        ${row('HQ Adders — BA',  r => r.baProv,   { sub: true, baseFn: r => r.afterEXU  })}
         ${row('Profit (Sales Margin − Func. Cost)', r => r.profit, { total: true, sep: true })}
         ${row('', null, { spacer: true })}
-        ${row('EBIT Provision', r => r.ebitProv, { sep: true, total: true })}
+        ${row('EBIT Provision',  r => r.ebitProv,  { sep: true, total: true, baseFn: r => r.afterBA })}
         ${row('', null, { spacer: true })}
-        ${row('Risk + Warranty', r => r.riskProv, { sep: true, total: true })}
+        ${row('Risk + Warranty', r => r.riskProv,  { sep: true, total: true, baseFn: r => r.dc      })}
       </tbody>
     </table>`;
 
