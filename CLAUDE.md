@@ -4,7 +4,12 @@ This file documents the codebase structure, conventions, and workflows for AI as
 
 ## Project Overview
 
-**PYL0N** is a self-contained, zero-installation web application suite for bid and project teams. It runs entirely in the browser — no server, no build step, no backend. The suite consists of seven specialized planning tools plus a landing page.
+**PYL0N** is a bid and project planning suite available in two deployment modes:
+- **Browser** — open any `.html` file directly, no installation
+- **Electron desktop app** — packaged `.dmg` (Mac) and `.exe` (Windows) installers built via electron-builder
+- **Azure Static Web App** — hosted on Azure, protected by Azure AD (Entra ID), accessible from any browser with no installation
+
+The suite consists of eleven specialized planning tools plus a landing page.
 
 ## Tools in the Suite
 
@@ -21,14 +26,20 @@ This file documents the codebase structure, conventions, and workflows for AI as
 | `lettercast.html` | LetterCast | Commercial cover letter / offer document generator with dynamic sections |
 | `cashflow.html` | CashFlow | Monthly cash-flow simulation with per-item cost distribution and cancellation curve |
 | `w2w-report.html` | W2W Report | Wall-to-Wall financial report; factory-level KPI breakdown consolidated into a business area summary table |
+| `login.html` | Login screen | Azure AD sign-in page shown on first launch (Electron) or on auth failure |
+| `403.html` | Access denied | Shown by Azure Static Web Apps when a signed-in user lacks access |
 | `favicon.svg` | — | Brand favicon |
 | `logo.svg` | — | Brand logo (34×34px grid) |
 
 ## Architecture
 
-### No Build System
+### Dual-mode: Browser + Electron
 
-This project has no `package.json`, no npm, no bundler, no TypeScript. Every file is a standalone HTML page that runs directly in a browser. Do not introduce build tools unless explicitly requested.
+HTML tools run directly in a browser with no build step. The same files are also packaged into an Electron desktop app. Electron-specific behaviour is always gated:
+```js
+if (window.electronAPI) { /* native dialog */ } else { /* blob download fallback */ }
+```
+Never break the browser fallback path when adding Electron features.
 
 ### Monolithic HTML Files
 
@@ -37,13 +48,32 @@ Each tool lives entirely within a single `.html` file:
 - `<script>` blocks contain all JavaScript (no external JS files)
 - HTML markup, styles, and logic are co-located per tool
 
-### External Dependencies (CDN only)
+### Local Libraries (fully offline)
 
-No local node_modules. Libraries are loaded from CDN:
-- **XLSX** `v0.18.5` or `v0.20.3` — Excel import/export via `cdnjs.cloudflare.com`
-- **html2pdf.js** `v0.10.1` — PDF generation via `cdnjs.cloudflare.com`
-- **Chart.js** (latest) — Canvas charts via `cdn.jsdelivr.net`; used in `cashflow.html` and `w2w-report.html`
-- **Google Fonts** — DM Sans, DM Mono typefaces
+All libraries live in `libs/` — no CDN calls at runtime:
+
+| File | Version | Used by |
+|------|---------|---------|
+| `libs/xlsx.full.min.js` | 0.20.3 | All tools with Excel export/import |
+| `libs/html2pdf.bundle.min.js` | 0.10.1 | PDF export in all tools |
+| `libs/html2canvas.min.js` | 1.4.1 | `timecast.html` PNG export |
+| `libs/chart.js` | latest UMD | `cashflow.html`, `w2w-report.html` |
+| `libs/fonts.css` | — | Local @font-face rules for DM Sans + DM Mono |
+| `libs/fonts/*.woff2` | — | DM Sans (300–700, italic) + DM Mono (400,500) |
+
+Run `node scripts/download-libs.js` once after cloning to populate `libs/`. The `libs/` directory is committed to the repo so clones are immediately offline-capable.
+
+### vendor/pyl0n-native.js
+
+Shared bridge script included in every tool's `<head>`. Provides native OS file dialog wrappers that call `window.electronAPI` when running in Electron, with silent browser blob-download fallback otherwise:
+- `nativeSaveText(filename, content, filterName, ext)`
+- `nativeSaveXLSX(wb, filename)` — uses `XLSX.write(..., {type:'base64'})` + IPC
+- `nativeSavePDF(el, filename, opts)` — html2pdf blob → base64 → IPC
+- `nativeSaveHTML(filename, htmlContent)`
+- `nativeOpenText(extensions, callback, fallbackInput)`
+- `nativeOpenBinary(extensions, callback, fallbackInput)`
+
+All export functions in every tool are `async` and call these helpers.
 
 ### Client-Side Storage
 
@@ -171,38 +201,159 @@ Print layouts target **A4 portrait** or **A3 landscape** depending on the tool.
 
 ## Development Workflow
 
-### Running Locally
+### Running Locally (browser)
 
 No installation required. Open any `.html` file directly in a browser:
-```
+```bash
 open timecast.html
-# or
-python3 -m http.server 8080  # then visit http://localhost:8080
+# or serve all tools:
+python3 -m http.server 8080   # visit http://localhost:8080
 ```
+
+### Running as Electron app (dev mode)
+
+```bash
+npm install        # first time only
+npm start          # opens the app in Electron with DevTools available
+```
+`azure-config.json` must have a real `clientId`/`tenantId` for auth to work.
+If the values are still placeholders (`YOUR-CLIENT-ID-HERE`), auth is skipped and the app opens directly — safe for local development.
 
 ### Making Changes
 
 1. Edit the relevant `.html` file directly
-2. Reload the browser to test
+2. Reload the browser (or restart `npm start`) to test
 3. All CSS and JS is inline — no compilation step
 4. Test export formats (PDF, Excel, JSON, HTML) after logic changes
 
 ### Git Workflow
 
 - Main branch: `master`
-- Feature branches follow the convention: `claude/<description>-<id>`
-- Commit messages use conventional commits format: `feat(tool):`, `fix(tool):`, `refactor:`, etc.
+- Feature branches: `claude/<description>-<id>`
+- Commit messages: conventional commits format — `feat(tool):`, `fix(tool):`, `refactor:`, etc.
 - Commits are signed with SSH key (`/home/claude/.ssh/commit_signing_key.pub`)
+
+### Publishing a Release
+
+```bash
+git add .
+git commit -m "feat: description"
+git push
+git tag v1.x.x
+git push origin v1.x.x
+```
+Pushing a tag triggers GitHub Actions to build `.dmg`, `.exe`, `.AppImage` and publish them as a GitHub Release. The auto-updater in installed copies detects the new release and shows the update banner.
 
 ### What NOT to Do
 
-- Do not introduce a build system (webpack, vite, esbuild) unless explicitly requested
 - Do not add TypeScript — the project is intentionally vanilla JS
 - Do not create separate `.css` or `.js` files — keep styles and scripts inline in each HTML file
 - Do not add a backend or server component unless explicitly requested
-- Do not use `npm install` or create `package.json`
 - Do not add testing frameworks without explicit request
 - Do not use `localStorage` keys outside the `bidcast_` prefix namespace
+- Do not reference CDN URLs for libraries — use `libs/` local paths only
+- Do not break the browser fallback in export functions — always keep the `else` blob-download path
+
+## Electron Desktop App
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `main.js` | Electron main process — BrowserWindow, IPC handlers, auto-updater, auth gate |
+| `preload.js` | contextBridge — exposes `window.electronAPI` to renderer pages |
+| `auth.js` | Azure AD PKCE OAuth2 flow, token storage via `safeStorage`, refresh logic |
+| `login.html` | Sign-in screen shown when no valid cached token exists |
+| `azure-config.json` | IT fills in `clientId` + `tenantId` from their Azure App Registration |
+| `vendor/pyl0n-native.js` | Native file dialog helpers included in every tool |
+
+### IPC Handlers (main.js)
+
+| Channel | Direction | Purpose |
+|---------|-----------|---------|
+| `dialog:saveFile` | renderer → main | Native Save dialog |
+| `dialog:openFile` | renderer → main | Native Open dialog |
+| `fs:writeFile` | renderer → main | Write file; `encoding='base64'` for binary (xlsx, pdf) |
+| `fs:readFile` | renderer → main | Read file as UTF-8 string |
+| `app:getVersion` | renderer → main | Returns app version string |
+| `auth:getUser` | renderer → main | Returns cached user `{name, email, oid, tid}` or null |
+| `auth:login` | renderer → main | Opens Azure AD login window, returns user on success |
+| `auth:logout` | renderer → main | Clears token, opens Azure logout URL |
+| `auth:success` | renderer → main | Signal from `login.html` after successful login |
+| `app:checkForUpdates` | renderer → main | Manually trigger update check |
+| `app:installUpdate` | renderer → main | Quit and install downloaded update |
+| `update:ready` | main → renderer | Pushed when update is downloaded; triggers banner in `index.html` |
+
+### Auth Flow
+
+1. On launch, `startApp()` reads `azure-config.json`
+2. If `clientId` is a placeholder → skip auth, open app directly (dev mode)
+3. If config is real → check `pyl0n_auth.dat` (encrypted via `safeStorage`)
+4. Valid cached token → open main window directly
+5. No token / expired → show `login.html`
+6. User clicks "Sign in with Microsoft" → `auth:login` IPC → PKCE flow in popup window
+7. Azure redirects to `pyl0n://auth?code=...` → token exchanged, stored, main window opens
+8. Token silently refreshed on next launch using `refresh_token`
+
+### Build & Packaging
+
+```bash
+npm run icons          # regenerate build/icon.png/.ico/.icns from SVG geometry
+npm run download-libs  # download all JS libs + fonts into libs/ (run once)
+npm run build:mac      # obfuscate → electron-builder → dist/*.dmg
+npm run build:win      # obfuscate → electron-builder → dist/*.exe
+npm run build:linux    # obfuscate → electron-builder → dist/*.AppImage
+```
+
+`prebuild:*` scripts run `scripts/obfuscate.js` automatically before electron-builder.
+Obfuscated files land in `dist-src/` — originals are never modified.
+
+### JS Obfuscation (scripts/obfuscate.js)
+
+Runs before every production build. Reads all 11 HTML tool files, extracts inline `<script>` blocks, runs each through `javascript-obfuscator` (hexadecimal identifiers, base64 string encoding, control flow flattening, dead code injection), writes results to `dist-src/`. electron-builder then packages from `dist-src/` instead of the repo root.
+
+Options used: `controlFlowFlattening: true` (threshold 0.4), `deadCodeInjection: true` (threshold 0.2), `stringArrayEncoding: ['base64']`, `renameGlobals: false` (keeps HTML `onclick=` references working), `selfDefending: false` (Electron renderer safe).
+
+### Icon Generation (scripts/generate-icons.py)
+
+Pure Python 3 (no dependencies). Renders the PYL0N 4-square navy logo at 16/32/64/128/256/512px using struct+zlib PNG encoding, writes:
+- `build/icon.png` — 512×512, Linux AppImage
+- `build/icon.ico` — multi-size ICO, Windows NSIS
+- `build/icon.icns` — multi-size ICNS, macOS DMG
+
+Run: `npm run icons` or `python3 scripts/generate-icons.py`
+
+## Azure Deployment
+
+### Azure Static Web Apps
+
+The suite deploys to Azure Static Web Apps via `.github/workflows/deploy-web.yml` on every push to `master`. No build step — HTML files are deployed as-is.
+
+`staticwebapp.config.json` enforces:
+- All routes require `authenticated` role
+- Unauthenticated users are redirected to `/.auth/login/aad` (Azure AD)
+- `403.html` is shown for signed-in users without access
+- Security headers: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`
+
+IT controls access via **Entra ID → Enterprise Applications → PYL0N Suite → Users and groups**.
+
+### GitHub Actions Workflows
+
+| File | Trigger | Purpose |
+|------|---------|---------|
+| `.github/workflows/deploy-web.yml` | Push to `master` | Deploy to Azure Static Web Apps |
+| `.github/workflows/build.yml` | Push tag `v*.*.*` | Build `.dmg`/`.exe`/`.AppImage`, publish GitHub Release |
+
+The build workflow runs three parallel jobs (mac/win/linux), then a `release` job that collects all artifacts and creates the GitHub Release with download links.
+
+## Security & Confidentiality
+
+- **GitHub repo is private** — source not publicly visible
+- **JS obfuscation** — inline scripts in the packaged app are unreadable
+- **Azure AD auth** — only users/groups assigned by IT can open the app (web or desktop)
+- **Token encryption** — auth tokens stored via Electron `safeStorage` (OS keychain / DPAPI / libsecret)
+- **No telemetry** — no analytics, no external API calls, no data leaves the browser/machine
+- **Fully offline** — all libraries and fonts in `libs/`; no CDN calls at runtime
 
 ## Tool-Specific Notes
 
