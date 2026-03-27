@@ -7,6 +7,7 @@
   "scripts": {
     "start": "electron .",
     "icons": "python3 scripts/generate-icons.py",
+    "download-libs": "node scripts/download-libs.js",
     "obfuscate": "node scripts/obfuscate.js",
     "obfuscate:verify": "node scripts/obfuscate.js --verify",
     "prebuild:win": "node scripts/obfuscate.js",
@@ -32,6 +33,7 @@
     "files": [
       "*.html",
       "*.svg",
+      "libs/**",
       "vendor/**",
       "main.js",
       "preload.js",

@@ -2,6 +2,7 @@ node_modules/
 dist/
 dist-src/
 vendor/
+# libs/ is NOT ignored — library files are committed for offline use
 # Keep build/ icon assets — do NOT ignore build/
 # azure-config.json is committed as a template (with placeholder values only)
 # Never commit the real clientId/tenantId — edit the file after installing

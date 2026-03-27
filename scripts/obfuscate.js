@@ -59,7 +59,7 @@ const COPY_FILES = [
   'logo.svg',
 ];
 
-const COPY_DIRS = ['vendor', 'build'];
+const COPY_DIRS = ['vendor', 'build', 'libs'];
 
 // javascript-obfuscator options — strong but safe for local-only apps.
 // No domain lock, no debug protection (breaks DevTools error messages).
