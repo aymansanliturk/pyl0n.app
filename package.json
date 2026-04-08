@@ -10,6 +10,7 @@
     "download-libs": "node scripts/download-libs.js",
     "obfuscate": "node scripts/obfuscate.js",
     "obfuscate:verify": "node scripts/obfuscate.js --verify",
+    "prebuild": "node scripts/obfuscate.js",
     "prebuild:win": "node scripts/obfuscate.js",
     "prebuild:mac": "node scripts/obfuscate.js",
     "prebuild:linux": "node scripts/obfuscate.js",
