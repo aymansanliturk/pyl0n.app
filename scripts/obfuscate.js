@@ -47,6 +47,7 @@ const HTML_FILES = [
   'lettercast.html',
   'cashflow.html',
   'w2w-report.html',
+  'cvcast.html',
 ];
 
 // Non-HTML files to copy verbatim into dist-src/
