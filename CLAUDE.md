@@ -9,7 +9,7 @@ This file documents the codebase structure, conventions, and workflows for AI as
 - **Electron desktop app** — packaged `.dmg` (Mac) and `.exe` (Windows) installers built via electron-builder
 - **Azure Static Web App** — hosted on Azure, protected by Azure AD (Entra ID), accessible from any browser with no installation
 
-The suite consists of eleven specialized planning tools plus a landing page.
+The suite consists of twelve specialized planning tools plus a landing page.
 
 ## Tools in the Suite
 
@@ -26,6 +26,7 @@ The suite consists of eleven specialized planning tools plus a landing page.
 | `lettercast.html` | LetterCast | Commercial cover letter / offer document generator with dynamic sections |
 | `cashflow.html` | CashFlow | Monthly cash-flow simulation with per-item cost distribution and cancellation curve |
 | `w2w-report.html` | W2W Report | Wall-to-Wall financial report; factory-level KPI breakdown consolidated into a business area summary table |
+| `cvcast.html` | CVCast | Curriculum vitae / résumé generator with experience, education, skills, languages, and A4 PDF export |
 | `login.html` | Login screen | Azure AD sign-in page shown on first launch (Electron) or on auth failure |
 | `403.html` | Access denied | Shown by Azure Static Web Apps when a signed-in user lacks access |
 | `favicon.svg` | — | Brand favicon |
@@ -440,6 +441,16 @@ The build workflow runs three parallel jobs (mac/win/linux), then a `release` jo
 - Dark mode supported via `[data-theme="dark"]` on `<html>`
 - External dependency: Chart.js (CDN)
 
+### CVCast (`cvcast.html`)
+- Curriculum vitae / résumé generator producing a two-column A4 PDF-ready layout
+- State key: `bidcast_state_cvcast` — persisted via standard `collectState()` / `applyState()`
+- **Dark mode**: toggled via `toggleTheme()` / `_applyTheme()`; preference stored in `localStorage['bidcast_theme']`
+- **Two-column layout**: left sidebar (photo, contact, skills, languages) + right main area (summary, experience, education)
+- Experience rows support `title`, `company`, `period`, and multi-line `description`
+- Language rows support a proficiency level (Native / Fluent / Professional / Basic) rendered as a fill bar via `langPct()`
+- Skills stored as a single comma-separated input
+- PDF export uses `html2pdf.js`; filename derived from `state.name`
+
 ## Function Index by File
 
 Shared functions present in every tool (not repeated below):
@@ -688,3 +699,25 @@ Each cost row includes an `estFix` field (`"Fixed"` or `"Estimated"`) indicating
 | `updateAll()` | Recalculates project-level KPIs and updates all overview cards |
 | `saveW2WState()` / `loadW2WState()` | Persist/restore `_w2wState` to `bidcast_state_w2w` |
 | `updateFactoryKpi()` | Also calls `renderW2WTable()` so the consolidated table stays in sync with card edits |
+
+### cvcast.html
+
+| Function | Description |
+|----------|-------------|
+| `esc(s)` | HTML-escapes string for safe DOM insertion |
+| `gv(id)` / `sv(id, v)` | Get/set value of an element by ID |
+| `addExperience(data)` | Creates an experience row with title, company, period, and description inputs |
+| `getExperiences()` | Extracts all experience data from DOM rows |
+| `langPct(level)` | Maps proficiency level string to a percentage fill for the language bar |
+| `addLanguage(data)` | Creates a language row with name and proficiency level select |
+| `getLanguages()` | Extracts all language data from DOM rows |
+| `generate()` | Renders the two-column CV output (sidebar + main area) and switches to output view |
+| `goBack()` | Switches back from output view to editor |
+| `exportPDF()` | Exports rendered CV as A4 PDF via html2pdf.js; filename derived from `state.name` |
+| `collectState()` / `applyState()` | Standard state serialization; stored under `bidcast_state_cvcast` |
+| `autoSave()` | Debounces to `_scheduleSnap()` for live auto-save |
+| `saveJSON()` / `loadJSON(input)` | Download/restore state as `.json` |
+| `exportHTML()` | Creates a fully self-contained HTML snapshot with state embedded |
+| `_snapshot()` / `_scheduleSnap()` / `undo()` / `redo()` / `_syncUndoUI()` | Undo/redo stack |
+| `toggleTheme()` | Cycles between light and dark mode |
+| `_applyTheme(theme)` | Applies theme class to `<html>` and persists to `bidcast_theme` |
