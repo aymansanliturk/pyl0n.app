@@ -452,12 +452,136 @@ function _applyFilters(){
   });
 }
 
-/* ══ Exports (stubs) ══════════════════════════════════════════════════ */
-function generate()      { alert('Output view coming in next build.'); }
-function goBack()        { document.getElementById('editor').style.display='block'; document.getElementById('output').style.display='none'; }
-async function exportPDF()  { alert('PDF export coming in next build.'); }
-async function exportExcel(){ alert('Excel export coming in next build.'); }
-async function exportHTML() { alert('HTML export coming in next build.'); }
+/* ══ Generate output ══════════════════════════════════════════════════ */
+function generate(){
+  const s       = collectState();
+  const today   = new Date(); today.setHours(0,0,0,0);
+  const logo    = SuiteManager.getLogo();
+  const dateStr = new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+
+  // Counts
+  let open=0,inprog=0,done=0,blocked=0,overdue=0;
+  s.actions.forEach(a=>{
+    if(a.status==='Open')         open++;
+    else if(a.status==='In Progress') inprog++;
+    else if(a.status==='Done')    done++;
+    else if(a.status==='Blocked') blocked++;
+    if(a.status!=='Done'&&a.due&&new Date(a.due)<today) overdue++;
+  });
+
+  function stClass(st){ return st==='Open'?'st-open':st==='In Progress'?'st-inprog':st==='Done'?'st-done':'st-blocked'; }
+  function prioColor(p){ return p==='High'?'#dc2626':p==='Low'?'#15803d':'#b45309'; }
+
+  // Sort: Blocked → Open → In Progress → Done, then by due date
+  const ORDER = {'Blocked':0,'Open':1,'In Progress':2,'Done':3};
+  const sorted = [...s.actions].sort((a,b)=>{
+    const od = (ORDER[a.status]||0)-(ORDER[b.status]||0);
+    if(od!==0) return od;
+    if(a.due&&b.due) return a.due.localeCompare(b.due);
+    return a.due?-1:b.due?1:0;
+  });
+
+  const rows = sorted.map((a,i)=>{
+    const isOverdue = a.status!=='Done'&&a.due&&new Date(a.due)<today;
+    const dueFmt = a.due ? new Date(a.due+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+    return `<tr${isOverdue?' style="background:#fff5f5"':''}>
+      <td>${i+1}</td>
+      <td style="color:var(--muted);font-size:11px">${esc(a.category)}</td>
+      <td>${esc(a.desc)}${a.notes?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(a.notes)}</div>`:''}</td>
+      <td>${esc(a.owner)}</td>
+      <td style="white-space:nowrap${isOverdue?';color:#dc2626;font-weight:600':''}">${dueFmt}${isOverdue?' ⚠':''}</td>
+      <td><span style="font-size:10px;font-weight:700;color:${prioColor(a.priority)}">${a.priority}</span></td>
+      <td><span class="out-status ${stClass(a.status)}">${a.status}</span></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('output').innerHTML=`
+    <div class="out-toolbar">
+      <button class="tb-btn" onclick="goBack()">← Editor</button>
+      <div style="margin-left:auto;display:flex;gap:6px">
+        <button class="tb-btn" onclick="exportPDF()">PDF</button>
+        <button class="tb-btn" onclick="exportExcel()">Excel</button>
+        <button class="tb-btn" onclick="exportHTML()">HTML</button>
+      </div>
+    </div>
+    <div class="out-card" id="out-printable">
+      <div class="out-hdr">
+        <div>
+          ${logo?`<img class="out-logo" src="${logo}">`:''}
+          <div class="out-title">${esc(s.projName||'Action Log')}</div>
+          <div class="out-sub">Generated ${dateStr} &nbsp;·&nbsp; ${s.actions.length} action${s.actions.length!==1?'s':''}</div>
+        </div>
+        <div class="out-pills">
+          ${open>0    ?`<span class="out-status st-open">Open: ${open}</span>`:''}
+          ${inprog>0  ?`<span class="out-status st-inprog">In Progress: ${inprog}</span>`:''}
+          ${blocked>0 ?`<span class="out-status st-blocked">Blocked: ${blocked}</span>`:''}
+          ${overdue>0 ?`<span class="out-status st-blocked">⚠ Overdue: ${overdue}</span>`:''}
+          ${done>0    ?`<span class="out-status st-done">Done: ${done}</span>`:''}
+        </div>
+      </div>
+      ${s.actions.length===0
+        ? `<div style="text-align:center;padding:32px;color:var(--faint)">No actions logged yet.</div>`
+        : `<table class="out-table">
+            <thead><tr>
+              <th>#</th><th>Category</th><th>Action</th>
+              <th>Owner</th><th>Due</th><th>Priority</th><th>Status</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>`}
+      <div class="out-footer">Generated with ActionLog · PYL0N Suite</div>
+    </div>`;
+
+  document.getElementById('editor').style.display='none';
+  document.getElementById('output').style.display='block';
+  window.scrollTo(0,0);
+}
+
+function goBack(){
+  document.getElementById('editor').style.display='block';
+  document.getElementById('output').style.display='none';
+}
+
+/* ══ Exports ══════════════════════════════════════════════════════════ */
+async function exportPDF(){
+  generate();
+  const el   = document.getElementById('out-printable');
+  const name = (document.getElementById('proj-name')?.value||'actionlog').replace(/[^a-zA-Z0-9_-]/g,'_');
+  await nativeSavePDF(el,`ActionLog_${name}.pdf`,{
+    margin:10,image:{type:'jpeg',quality:0.97},
+    html2canvas:{scale:2},jsPDF:{unit:'mm',format:'a4',orientation:'landscape'}
+  });
+}
+
+async function exportExcel(){
+  const s  = collectState();
+  const wb = XLSX.utils.book_new();
+  const today = new Date(); today.setHours(0,0,0,0);
+  const rows = [
+    ['ActionLog — Bid Action Tracker'],
+    ['Project:', s.projName],
+    ['Exported:', new Date().toLocaleDateString('en-GB')],
+    [],
+    ['#','Category','Action','Owner','Due Date','Priority','Status','Overdue?','Notes'],
+  ];
+  s.actions.forEach((a,i)=>{
+    const isOverdue = a.status!=='Done'&&a.due&&new Date(a.due)<today;
+    rows.push([i+1, a.category, a.desc, a.owner, a.due||'', a.priority, a.status, isOverdue?'Yes':'', a.notes]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:4},{wch:13},{wch:46},{wch:16},{wch:12},{wch:10},{wch:13},{wch:10},{wch:30}];
+  XLSX.utils.book_append_sheet(wb,ws,'ActionLog');
+  const name=(s.projName||'actionlog').replace(/[^a-zA-Z0-9_-]/g,'_');
+  await nativeSaveXLSX(wb,`ActionLog_${name}.xlsx`);
+}
+
+async function exportHTML(){
+  const s       = collectState();
+  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(s))));
+  const injected = document.documentElement.outerHTML.replace('</body>',
+    `<script>try{applyState(JSON.parse(decodeURIComponent(escape(atob("${encoded}")))))}catch(e){}<\/script></body>`);
+  const name=(s.projName||'actionlog').replace(/[^a-zA-Z0-9_-]/g,'_');
+  await nativeSaveHTML(`ActionLog_${name}.html`,injected);
+}
 
 async function saveJSON(){
   const s=collectState();
