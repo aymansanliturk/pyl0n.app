@@ -334,6 +334,11 @@
     gap: 8px;
   }
   .archive-row-desc { font-size: 10px; color: var(--muted); line-height: 1.4; flex: 1; }
+  .snap-list  { display:flex; flex-direction:column; gap:4px; margin-top:6px; max-height:188px; overflow-y:auto; }
+  .snap-item  { display:flex; align-items:center; gap:6px; background:var(--bg); border-radius:6px; padding:5px 8px; }
+  .snap-item-name { flex:1; font-size:11px; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .snap-item-ts   { font-size:9px; color:var(--muted); white-space:nowrap; flex-shrink:0; }
+  .snap-empty     { font-size:10px; color:var(--muted); font-style:italic; padding:2px 0; }
 
   /* ── Cards ── */
   .cards-wrap {
@@ -703,6 +708,13 @@
           <div class="archive-row">
             <div class="archive-row-desc">Consolidated executive summary from all suite tools — print-ready PDF.</div>
             <button class="pp-btn" style="border-color:var(--accent);color:var(--accent);font-weight:700;" onclick="generateExecutiveReport()" title="Generate Executive Report">📄 Executive Report</button>
+          </div>
+          <div class="archive-row" style="flex-direction:column;align-items:stretch;gap:4px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div class="archive-row-desc" style="flex:1;"><strong>Snapshots</strong> — freeze a named point-in-time you can restore later.</div>
+              <button class="pp-btn" style="border-color:var(--green);color:var(--green);font-weight:700;flex-shrink:0;" onclick="snapshotFreeze()" title="Save a named snapshot of the current state">📸 Freeze</button>
+            </div>
+            <div id="snap-list" class="snap-list"><div class="snap-empty">No snapshots yet.</div></div>
           </div>
         </div>
       </div>
@@ -1637,6 +1649,69 @@ function customerClearLogo() {
   ppFlashSync();
 }
 
+/* ── Snapshots ── */
+const SNAPSHOTS_KEY = 'bidcast_snapshots';
+const MAX_SNAPSHOTS = 10;
+
+function _getSnapshots() {
+  try { return JSON.parse(localStorage.getItem(SNAPSHOTS_KEY) || '[]'); } catch { return []; }
+}
+function _putSnapshots(arr) { localStorage.setItem(SNAPSHOTS_KEY, JSON.stringify(arr)); }
+
+function snapshotFreeze() {
+  const defaultName = (SuiteManager.read().projectName || 'Snapshot') +
+    ' — ' + new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+  const name = prompt('Snapshot name:', defaultName);
+  if (name === null) return;
+  const snapshots = _getSnapshots();
+  if (snapshots.length >= MAX_SNAPSHOTS) {
+    alert(`Maximum ${MAX_SNAPSHOTS} snapshots reached. Delete one to make room.`);
+    return;
+  }
+  snapshots.unshift({ id: 'snap_' + Date.now(), name: name.trim() || defaultName, savedAt: Date.now(), state: _captureFullState() });
+  _putSnapshots(snapshots);
+  snapshotRenderList();
+}
+
+function snapshotRestore(id) {
+  const snap = _getSnapshots().find(s => s.id === id);
+  if (!snap) return;
+  if (!confirm(`Restore snapshot "${snap.name}"?\nThis will overwrite all current tool states.`)) return;
+  if ((document.getElementById('pp-name')?.value || '').trim()) ppSave();
+  Object.entries(snap.state).forEach(([k, v]) => localStorage.setItem(k, v));
+  try {
+    const s = JSON.parse(snap.state['bidcast_suite_sync'] || '{}');
+    if (s.projectName) document.getElementById('pp-name').value = s.projectName;
+  } catch {}
+  refreshStats();
+  alert(`Snapshot "${snap.name}" restored.`);
+}
+
+function snapshotDelete(id) {
+  const snaps = _getSnapshots();
+  const snap = snaps.find(s => s.id === id);
+  if (!snap || !confirm(`Delete snapshot "${snap.name}"?`)) return;
+  _putSnapshots(snaps.filter(s => s.id !== id));
+  snapshotRenderList();
+}
+
+function snapshotRenderList() {
+  const el = document.getElementById('snap-list');
+  if (!el) return;
+  const snaps = _getSnapshots();
+  if (!snaps.length) { el.innerHTML = '<div class="snap-empty">No snapshots yet.</div>'; return; }
+  el.innerHTML = snaps.map(s => {
+    const ts   = new Date(s.savedAt).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+    const name = s.name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return `<div class="snap-item">
+      <div class="snap-item-name" title="${name}">${name}</div>
+      <div class="snap-item-ts">${ts}</div>
+      <button class="pp-btn" style="padding:2px 8px;font-size:10px;" onclick="snapshotRestore('${s.id}')">Restore</button>
+      <button class="pp-btn danger" style="padding:2px 8px;font-size:10px;" onclick="snapshotDelete('${s.id}')">✕</button>
+    </div>`;
+  }).join('');
+}
+
 /* ── Master Export / Import ── */
 async function masterExport() {
   const archive = {};
@@ -2101,6 +2176,7 @@ document.addEventListener('DOMContentLoaded', () => {
   ppLoad();
   ppPopulateSelect();
   refreshStats();
+  snapshotRenderList();
 
   // Assert master dashboard dominance: broadcast stored project name to all
   // open tools immediately so they align with the dashboard on startup.
