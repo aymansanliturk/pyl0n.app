@@ -344,12 +344,15 @@
   }
   .cards {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    grid-template-columns: repeat(4, 1fr);
     gap: 16px;
     max-width: 1400px;
     margin: 0 auto;
   }
 
+  @media (max-width: 1100px) {
+    .cards { grid-template-columns: repeat(3, 1fr); }
+  }
   @media (max-width: 900px) {
     header { padding: 14px 24px; }
     .hero { padding: 60px 24px 80px; }
@@ -722,9 +725,9 @@
 <div class="cards">
 
   <div class="group-label">
-    <span class="group-label-text">Connected Suite</span>
+    <span class="group-label-text">Core Workflow</span>
     <span class="group-label-line"></span>
-    <span class="group-label-sub">↻ phases &amp; team sync automatically across these three tools</span>
+    <span class="group-label-sub">↻ phases, team &amp; costs sync automatically across these tools</span>
   </div>
 
   <a href="timecast.html" class="card" style="--card-color:#4f46e5;">
@@ -816,7 +819,7 @@
   </a>
 
   <div class="group-label" style="margin-top:8px;">
-    <span class="group-label-text">Standalone Tools</span>
+    <span class="group-label-text">Bid Support</span>
     <span class="group-label-line"></span>
   </div>
 
@@ -888,6 +891,65 @@
     <div class="card-desc">Compose professional A4 commercial offer letters with dynamic sections, dual logos, and one-click PDF export.</div>
     <div class="card-footer">
       <span class="feat-tag" id="badge-lettercast">A4 Print · PDF · JSON</span>
+      <span class="card-arrow">→</span>
+    </div>
+  </a>
+
+  <div class="group-label" style="margin-top:8px;">
+    <span class="group-label-text">Simulation &amp; Intelligence</span>
+    <span class="group-label-line"></span>
+  </div>
+
+  <a href="cashflow.html" class="card" style="--card-color:#7c3aed;">
+    <div class="card-icon" style="background:#faf5ff;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="13" width="4" height="7" rx="1"/>
+        <rect x="9" y="9" width="4" height="11" rx="1"/>
+        <rect x="16" y="5" width="4" height="15" rx="1"/>
+        <path d="M3 12 Q7 8 12 8 Q17 8 21 4" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div class="card-name">CashFlow</div>
+    <div class="card-tagline">Monthly Cash Simulation</div>
+    <div class="card-desc">Simulate monthly cash-flow, model payment milestones, and visualise cancellation penalty curves across the bid timeline.</div>
+    <div class="card-footer">
+      <span class="feat-tag" id="badge-cashflow">Cash · Forecast</span>
+      <span class="sync-pill">↻ Suite</span>
+      <span class="card-arrow">→</span>
+    </div>
+  </a>
+
+  <a href="w2w-report.html" class="card" style="--card-color:#475569;">
+    <div class="card-icon" style="background:#f8fafc;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <polyline points="8 14 10 17 14 12 17 17"/>
+      </svg>
+    </div>
+    <div class="card-name">W2W Report</div>
+    <div class="card-tagline">Wall-to-Wall Analysis</div>
+    <div class="card-desc">Consolidated factory-level financial report with sequential KPI stack (Risk → SG&amp;A → HQ Adders → EBIT) and scope breakdown.</div>
+    <div class="card-footer">
+      <span class="feat-tag" id="badge-w2wreport">KPI Stack · EBIT</span>
+      <span class="sync-pill">↻ Suite</span>
+      <span class="card-arrow">→</span>
+    </div>
+  </a>
+
+  <a href="bidscore.html" class="card" style="--card-color:#0891b2;">
+    <div class="card-icon" style="background:#ecfeff;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9"/>
+        <circle cx="12" cy="12" r="5"/>
+        <circle cx="12" cy="12" r="1.5" fill="#0891b2" stroke="none"/>
+      </svg>
+    </div>
+    <div class="card-name">BidScore</div>
+    <div class="card-tagline">Bid / No-Bid Decision</div>
+    <div class="card-desc">Score your bid on strategic, commercial, technical, and risk criteria with weighted scoring and an automatic Bid / Conditional / No-Bid recommendation.</div>
+    <div class="card-footer">
+      <span class="feat-tag" id="badge-bidscore">Weighted Score · Decision</span>
       <span class="card-arrow">→</span>
     </div>
   </a>
@@ -1563,7 +1625,20 @@ function refreshStats() {
 
   // ── Completeness rings ────────────────────────────────────────────
   const lc = _load('lettercast');
-  const lcSecs = lc && Array.isArray(lc.sections) ? lc.sections.length : 0;
+  const cf = _load('cashflow');
+  const w2 = _load('w2w');
+  const bs = _load('bidscore');
+  const lcSecs  = lc && Array.isArray(lc.sections)   ? lc.sections.length   : 0;
+  const cfMiles = cf && Array.isArray(cf.milestones)  ? cf.milestones.length : 0;
+  const w2Facts = w2 && Array.isArray(w2.factories)   ? w2.factories.length  : 0;
+
+  function _bsScore(criteria) {
+    let num = 0, den = 0;
+    (criteria || []).forEach(c => { num += (parseFloat(c.weight)||0)*(parseInt(c.score)||0); den += (parseFloat(c.weight)||0)*5; });
+    return den > 0 ? Math.round(num / den * 100) : 0;
+  }
+  const bsScore   = bs && bs.criteria ? _bsScore(bs.criteria) : 0;
+  const bsVerdict = bsScore >= 65 ? 'BID' : bsScore >= 40 ? 'CONDITIONAL' : 'NO BID';
 
   _setRing('timecast',     !tc ? 0 : taskCount >= 3 ? 100 : taskCount >= 1 ? 55 : 25);
   _setRing('resourcecast', !rc ? 0 : roleCount >= 1 && budget > 0 ? 100 : roleCount >= 1 ? 55 : 25);
@@ -1573,6 +1648,13 @@ function refreshStats() {
   _setRing('rfqcast',      !rq ? 0 : rfqItems === 0 ? 20 : rfqReceived >= 1 ? 100 : 50);
   _setRing('riskcast',     !ri ? 0 : riskCount >= 1 ? 100 : 25);
   _setRing('lettercast',   !lc ? 0 : lcSecs >= 1 ? 100 : 25);
+  _setRing('cashflow',     !cf ? 0 : cfMiles > 0 ? 100 : 40);
+  _setRing('w2w-report',   !w2 ? 0 : w2Facts > 0 ? 100 : 35);
+  _setRing('bidscore',     bsScore);
+
+  _badge('badge-cashflow',  cf ? 'Data Active' : '', 'Cash · Forecast');
+  _badge('badge-w2wreport', w2 ? 'Data Active' : '', 'KPI Stack · EBIT');
+  _badge('badge-bidscore',  bs && bs.criteria?.length ? `Score: ${bsScore} · ${bsVerdict}` : '', 'Weighted Score · Decision');
 
   const progressWrap = document.getElementById('progress-wrap');
   if (progressWrap) {
