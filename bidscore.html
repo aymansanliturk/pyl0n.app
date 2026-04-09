@@ -25,24 +25,27 @@
     /* ── Toolbar ── */
     #toolbar {
       position:sticky; top:0; z-index:100;
-      background:var(--surface); border-bottom:1px solid var(--border);
-      padding:10px 20px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+      background:rgba(255,255,255,0.92); backdrop-filter:blur(12px);
+      border-bottom:1px solid var(--border);
+      padding:10px 24px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
     }
-    .tb-sep { width:1px; height:22px; background:var(--border); margin:0 4px; }
-    .tb-brand { font-size:15px; font-weight:700; letter-spacing:-0.3px; }
-    .tb-brand span { color:var(--accent); }
-    .back-btn { text-decoration:none; color:var(--muted); font-size:18px; line-height:1; padding:4px; border-radius:6px; transition:color 0.2s; }
-    .back-btn:hover { color:var(--text); }
+    [data-theme="dark"] #toolbar { background:rgba(28,28,26,0.95); }
+    .tb-left  { display:flex; align-items:center; gap:12px; }
+    .tb-right { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .tb-sep   { width:1px; height:22px; background:var(--border); }
+    .logo-icon { width:28px; height:28px; background:var(--accent); border-radius:7px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .logo-icon svg { width:14px; height:14px; }
+    .tool-name { font-size:14px; font-weight:700; letter-spacing:-0.3px; }
+    .tool-tag  { font-size:9px; font-weight:600; color:var(--faint); letter-spacing:1px; text-transform:uppercase; }
     .tb-btn {
-      padding:6px 12px; border:1.5px solid var(--border); border-radius:7px;
-      background:var(--surface); color:var(--text); font-size:12px; font-weight:600;
-      cursor:pointer; transition:all 0.15s; white-space:nowrap; font-family:inherit;
+      font-family:'DM Sans',sans-serif; font-size:11px; font-weight:500;
+      padding:6px 12px; border-radius:7px; border:1.5px solid var(--border);
+      background:var(--bg); color:var(--muted); cursor:pointer; white-space:nowrap; transition:all .15s;
     }
-    .tb-btn:hover { border-color:var(--accent); color:var(--accent); }
-    .tb-btn:disabled { opacity:0.35; cursor:default; }
-    .tb-btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+    .tb-btn:hover { border-color:var(--accent); color:var(--accent); background:var(--surface); }
+    .tb-btn:disabled { opacity:0.35; pointer-events:none; }
+    .tb-btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
     .tb-btn.primary:hover { opacity:0.9; }
-    .tb-right { margin-left:auto; display:flex; gap:6px; align-items:center; }
 
     /* ── Editor ── */
     #editor { max-width:1100px; margin:0 auto; padding:28px 24px 80px; }
@@ -192,15 +195,28 @@
 <body>
 
 <div id="toolbar">
-  <a href="index.html" class="back-btn" title="Dashboard">←</a>
-  <div class="tb-brand">Bid<span>Score</span></div>
-  <div class="tb-sep"></div>
-  <button class="tb-btn" id="btn-undo" onclick="undo()" title="Undo (Ctrl+Z)" disabled>↩</button>
-  <button class="tb-btn" id="btn-redo" onclick="redo()" title="Redo (Ctrl+Y)" disabled>↪</button>
-  <div class="tb-sep"></div>
-  <button class="tb-btn" onclick="saveJSON()">Save</button>
-  <label class="tb-btn" style="cursor:pointer">Load<input type="file" accept=".json" onchange="loadJSON(this)" style="display:none"></label>
+  <div class="tb-left">
+    <div class="logo-icon">
+      <svg viewBox="0 0 18 18" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round">
+        <circle cx="9" cy="9" r="7"/>
+        <circle cx="9" cy="9" r="4"/>
+        <circle cx="9" cy="9" r="1.2" fill="white" stroke="none"/>
+      </svg>
+    </div>
+    <div>
+      <div class="tool-name">BidScore</div>
+      <div class="tool-tag">Bid / No-Bid Decision Tool</div>
+    </div>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" onclick="location.href='index.html'">← Dashboard</button>
+  </div>
   <div class="tb-right">
+    <button class="tb-btn" id="btn-undo" onclick="undo()" disabled>↩ Undo</button>
+    <button class="tb-btn" id="btn-redo" onclick="redo()" disabled>↪ Redo</button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" onclick="saveJSON()">Save</button>
+    <label class="tb-btn" style="cursor:pointer">Load<input type="file" accept=".json" onchange="loadJSON(this)" style="display:none"></label>
+    <div class="tb-sep"></div>
     <button class="tb-btn" onclick="exportExcel()">Excel</button>
     <button class="tb-btn" onclick="exportHTML()">HTML</button>
     <button class="tb-btn" onclick="exportPDF()">PDF</button>

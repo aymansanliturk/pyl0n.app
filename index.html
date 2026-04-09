@@ -46,7 +46,6 @@
 [data-theme="dark"] { --navy: #2a3f6a; }
 [data-theme="dark"] .stat-icon,
 [data-theme="dark"] .card-icon { background: rgba(255,255,255,0.07) !important; }
-[data-theme="dark"] .c-ring-bg { stroke: rgba(255,255,255,0.15); }
 
   body {
     font-family: 'DM Sans', sans-serif;
@@ -403,9 +402,12 @@
     position: relative;
   }
   .card-icon svg { width: 22px; height: 22px; }
-  .c-ring { position: absolute; top: 0; left: 0; width: 44px; height: 44px; pointer-events: none; border-radius: 11px; overflow: visible; }
-  .c-ring-bg  { fill: none; stroke: rgba(0,0,0,0.09); stroke-width: 2.5; }
-  .c-ring-fill { fill: none; stroke-width: 2.5; stroke-linecap: round; transition: stroke-dashoffset 0.7s cubic-bezier(0.4,0,0.2,1), stroke 0.4s; }
+  .c-ring { position: absolute; top: -6px; right: -6px; width: 22px; height: 22px; pointer-events: none; }
+  .c-ring-bg-white { fill: white; }
+  .c-ring-bg  { fill: none; stroke: rgba(0,0,0,0.1); stroke-width: 3; }
+  .c-ring-fill { fill: none; stroke-width: 3; stroke-linecap: round; transition: stroke-dashoffset 0.7s cubic-bezier(0.4,0,0.2,1), stroke 0.4s; }
+  [data-theme="dark"] .c-ring-bg-white { fill: #1c1c1a; }
+  [data-theme="dark"] .c-ring-bg { stroke: rgba(255,255,255,0.15); }
 
   .card-name { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; margin-bottom: 4px; }
   .card-tagline { font-size: 9px; font-weight: 600; color: var(--faint); letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 14px; }
@@ -1301,7 +1303,7 @@ function _fmtEUR(n) {
 const _MN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 /* ── Completeness rings ───────────────────────────────────────────── */
-const _RING_CIRC = +(2 * Math.PI * 19).toFixed(2); // r=19, ≈119.38
+const _RING_CIRC = +(2 * Math.PI * 8).toFixed(2); // r=8, ≈50.27
 
 function _initRings() {
   document.querySelectorAll('.card[href]').forEach(card => {
@@ -1309,12 +1311,13 @@ function _initRings() {
     if (!icon || icon.querySelector('.c-ring')) return;
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('class', 'c-ring');
-    svg.setAttribute('viewBox', '0 0 44 44');
+    svg.setAttribute('viewBox', '0 0 22 22');
     svg.innerHTML =
-      `<circle class="c-ring-bg" cx="22" cy="22" r="19"/>` +
-      `<circle class="c-ring-fill" cx="22" cy="22" r="19"` +
+      `<circle class="c-ring-bg-white" cx="11" cy="11" r="10"/>` +
+      `<circle class="c-ring-bg" cx="11" cy="11" r="8"/>` +
+      `<circle class="c-ring-fill" cx="11" cy="11" r="8"` +
       ` stroke-dasharray="${_RING_CIRC}" stroke-dashoffset="${_RING_CIRC}"` +
-      ` transform="rotate(-90 22 22)"/>`;
+      ` transform="rotate(-90 11 11)"/>`;
     icon.appendChild(svg);
   });
 }
