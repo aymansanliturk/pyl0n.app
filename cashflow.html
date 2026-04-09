@@ -317,6 +317,7 @@ label {
           <div class="info-row"><span class="info-key">Direct Cost</span><span class="info-val" id="info-cost">—</span></div>
           <div class="info-row"><span class="info-key">Duration</span><span class="info-val" id="info-dur">—</span></div>
           <div class="info-row"><span class="info-key">Start</span><span class="info-val" id="info-start">—</span></div>
+          <div class="info-row"><span class="info-key">End</span><span class="info-val" id="info-end">—</span></div>
         </div>
         <button class="btn-reload" onclick="loadSuiteData(); simulate();">↺ Reload from Suite</button>
       </div>
@@ -626,18 +627,37 @@ function loadSuiteData() {
   } catch(e) { console.warn('CashFlow: CalcCast ingest error', e); }
 
   /* ── TimeCast ─────────────────────────────────────────────────────── */
+  let tcEndMonth = 11, tcEndYear = new Date().getFullYear() + 4;
   try {
     const raw = localStorage.getItem('bidcast_state_timecast');
     if (raw) {
-      const ts  = JSON.parse(raw);
-      const sm  = parseInt(ts.startMonth) || 0;
-      const sy  = parseInt(ts.startYear)  || new Date().getFullYear();
-      const em  = parseInt(ts.endMonth)   || 11;
-      const ey  = parseInt(ts.endYear)    || (new Date().getFullYear() + 4);
-      const d   = (ey * 12 + em) - (sy * 12 + sm) + 1;
+      const ts = JSON.parse(raw);
+      // Compute actual task span (min start → max end across all tasks)
+      let minAbs = Infinity, maxAbs = -Infinity;
+      (ts.projects || []).forEach(proj => {
+        [...(proj.bidTasks || []), ...(proj.execTasks || [])].forEach(t => {
+          if (t.sy == null) return;
+          const tStart = t.sy * 12 + (t.sm || 0);
+          const tEnd   = (t.ey != null) ? t.ey * 12 + (t.em || 0) : tStart;
+          if (tStart < minAbs) minAbs = tStart;
+          if (tEnd   > maxAbs) maxAbs = tEnd;
+        });
+      });
+      // Fall back to chart display range if no tasks present
+      if (minAbs === Infinity) {
+        minAbs = (parseInt(ts.startYear) || new Date().getFullYear()) * 12 + (parseInt(ts.startMonth) || 0);
+        maxAbs = (parseInt(ts.endYear)   || new Date().getFullYear() + 4) * 12 + (parseInt(ts.endMonth) || 11);
+      }
+      const sm = minAbs % 12;
+      const sy = Math.floor(minAbs / 12);
+      const em = maxAbs % 12;
+      const ey = Math.floor(maxAbs / 12);
+      const d  = maxAbs - minAbs + 1;
       duration   = (d >= 1 && d <= 120) ? d : 60;
       startMonth = sm;
       startYear  = sy;
+      tcEndMonth = em;
+      tcEndYear  = ey;
     }
   } catch(e) { console.warn('CashFlow: TimeCast ingest error', e); }
 
@@ -659,6 +679,8 @@ function loadSuiteData() {
     duration,
     startMonth,
     startYear,
+    endMonth: tcEndMonth,
+    endYear:  tcEndYear,
     projectName,
     isLive,
     costItems, // per-item breakdown for per-item distribution
@@ -677,6 +699,7 @@ function _updateInfoPanel() {
   document.getElementById('info-cost').textContent  = fmtK(d.totalCost) + 'EUR';
   document.getElementById('info-dur').textContent   = d.duration + ' months';
   document.getElementById('info-start').textContent = MN[d.startMonth] + ' ' + d.startYear;
+  document.getElementById('info-end').textContent   = MN[d.endMonth]   + ' ' + d.endYear;
 
   const badge = document.getElementById('src-badge');
   badge.textContent = d.isLive ? 'Live' : 'Sample';
