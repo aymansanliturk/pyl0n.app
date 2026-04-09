@@ -402,12 +402,6 @@
     position: relative;
   }
   .card-icon svg { width: 22px; height: 22px; }
-  .c-ring { position: absolute; top: -6px; right: -6px; width: 22px; height: 22px; pointer-events: none; }
-  .c-ring-bg-white { fill: white; }
-  .c-ring-bg  { fill: none; stroke: rgba(0,0,0,0.1); stroke-width: 3; }
-  .c-ring-fill { fill: none; stroke-width: 3; stroke-linecap: round; transition: stroke-dashoffset 0.7s cubic-bezier(0.4,0,0.2,1), stroke 0.4s; }
-  [data-theme="dark"] .c-ring-bg-white { fill: #1c1c1a; }
-  [data-theme="dark"] .c-ring-bg { stroke: rgba(255,255,255,0.15); }
 
   .card-name { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; margin-bottom: 4px; }
   .card-tagline { font-size: 9px; font-weight: 600; color: var(--faint); letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 14px; }
@@ -1302,38 +1296,6 @@ function _fmtEUR(n) {
 
 const _MN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-/* ── Completeness rings ───────────────────────────────────────────── */
-const _RING_CIRC = +(2 * Math.PI * 8).toFixed(2); // r=8, ≈50.27
-
-function _initRings() {
-  document.querySelectorAll('.card[href]').forEach(card => {
-    const icon = card.querySelector('.card-icon');
-    if (!icon || icon.querySelector('.c-ring')) return;
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('class', 'c-ring');
-    svg.setAttribute('viewBox', '0 0 22 22');
-    svg.innerHTML =
-      `<circle class="c-ring-bg-white" cx="11" cy="11" r="10"/>` +
-      `<circle class="c-ring-bg" cx="11" cy="11" r="8"/>` +
-      `<circle class="c-ring-fill" cx="11" cy="11" r="8"` +
-      ` stroke-dasharray="${_RING_CIRC}" stroke-dashoffset="${_RING_CIRC}"` +
-      ` transform="rotate(-90 11 11)"/>`;
-    icon.appendChild(svg);
-  });
-}
-
-function _setRing(key, pct) {
-  const card = document.querySelector(`.card[href="${key}.html"]`);
-  if (!card) return;
-  const fill = card.querySelector('.c-ring-fill');
-  if (!fill) return;
-  const c = Math.max(0, Math.min(100, pct));
-  fill.setAttribute('stroke-dashoffset', (_RING_CIRC * (1 - c / 100)).toFixed(2));
-  fill.setAttribute('stroke',
-    c === 0 ? 'transparent' :
-    c >= 75 ? '#059669' :
-    c >= 30 ? '#d97706' : 'rgba(0,0,0,0.18)');
-}
 
 function refreshStats() {
   // ── Read all tool states ───────────────────────────────────────────
@@ -1674,17 +1636,6 @@ function refreshStats() {
   const bsScore   = bs && bs.criteria ? _bsScore(bs.criteria) : 0;
   const bsVerdict = bsScore >= 65 ? 'BID' : bsScore >= 40 ? 'CONDITIONAL' : 'NO BID';
 
-  _setRing('timecast',     !tc ? 0 : taskCount >= 3 ? 100 : taskCount >= 1 ? 55 : 25);
-  _setRing('resourcecast', !rc ? 0 : roleCount >= 1 && budget > 0 ? 100 : roleCount >= 1 ? 55 : 25);
-  _setRing('orgcast',      !oc ? 0 : personCount >= 1 ? 100 : 25);
-  _setRing('calccast',     !cc ? 0 : hasCalcData && customerPrice > 0 ? 100 : hasCalcData ? 50 : 20);
-  _setRing('dorcast',      !dc ? 0 : dorRows >= 1 ? 100 : 25);
-  _setRing('rfqcast',      !rq ? 0 : rfqItems === 0 ? 20 : rfqReceived >= 1 ? 100 : 50);
-  _setRing('riskcast',     !ri ? 0 : riskCount >= 1 ? 100 : 25);
-  _setRing('lettercast',   !lc ? 0 : lcSecs >= 1 ? 100 : 25);
-  _setRing('cashflow',     !cf ? 0 : cfMiles > 0 ? 100 : 40);
-  _setRing('w2w-report',   !w2 ? 0 : w2Facts > 0 ? 100 : 35);
-  _setRing('bidscore',     bsScore);
 
   _badge('badge-cashflow',  cf ? 'Data Active' : '', 'Cash · Forecast');
   _badge('badge-w2wreport', w2 ? 'Data Active' : '', 'KPI Stack · EBIT');
@@ -1704,7 +1655,6 @@ function refreshStats() {
   _badge('badge-actionlog', al && al.actions?.length
     ? alOpen + ' open' + (alOverdue > 0 ? ' · ⚠ ' + alOverdue + ' overdue' : '')
     : '', 'Actions · Tracker');
-  _setRing('actionlog', !al || !al.actions?.length ? 0 : alOpen === 0 ? 100 : alOverdue > 0 ? 40 : 75);
 
   const progressWrap = document.getElementById('progress-wrap');
   if (progressWrap) {
@@ -2327,7 +2277,6 @@ document.addEventListener('DOMContentLoaded', () => {
   SuiteManager.migrate();
   ppLoad();
   ppPopulateSelect();
-  _initRings();
   refreshStats();
   snapshotRenderList();
 
