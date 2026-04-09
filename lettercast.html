@@ -427,7 +427,10 @@
     </div>
     <div class="section-body">
       <div id="sections-list"></div>
-      <button class="btn-add-sec" onclick="addSection()">+ Add Section</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <button class="btn-add-sec" onclick="addSection()">+ Add Section</button>
+        <button class="btn-add-sec" onclick="insertRiskSummary()" title="Pull medium+ risks from RiskCast into a Risks &amp; Deviations section" style="border-color:var(--accent);color:var(--accent);">↺ Risks from RiskCast</button>
+      </div>
     </div>
   </div>
 
@@ -608,6 +611,55 @@ function initDrag(block) {
     }
     block.classList.remove('drag-over');
   });
+}
+
+function insertRiskSummary() {
+  let risks = [];
+  try {
+    const raw = localStorage.getItem('bidcast_state_riskcast');
+    if (raw) risks = JSON.parse(raw).risks || [];
+  } catch {}
+
+  // Medium and above (score >= 8), risks only (not opportunities), sorted by score desc
+  const filtered = risks
+    .filter(r => r.type !== 'opportunity' && (r.score || (r.likelihood * r.impact)) >= 8)
+    .sort((a, b) => (b.score || b.likelihood * b.impact) - (a.score || a.likelihood * a.impact));
+
+  if (!filtered.length) {
+    alert('No medium, high, or critical risks found in RiskCast. Add risks with a score of 8 or above first.');
+    return;
+  }
+
+  function levelLabel(s) {
+    if (s >= 20) return 'CRITICAL';
+    if (s >= 12) return 'HIGH';
+    return 'MEDIUM';
+  }
+
+  const lines = ['The following risks have been identified for this project:\n'];
+  filtered.forEach(r => {
+    const score = r.score || (r.likelihood * r.impact);
+    const lvl   = levelLabel(score);
+    const topic = [r.category, r.topic].filter(Boolean).join(' — ');
+    lines.push(`• [${lvl}] ${topic}`);
+    if (r.desc)       lines.push(`  ${r.desc}`);
+    if (r.mitigation) lines.push(`  Mitigation: ${r.mitigation}`);
+    lines.push('');
+  });
+
+  const content = lines.join('\n').trim();
+  const TITLE   = 'Risks & Deviations';
+
+  // Update existing section if one with this title already exists
+  const existing = [...($id('sections-list')?.querySelectorAll('.dyn-block') || [])].find(
+    b => b.querySelector('input[type=text]')?.value.trim() === TITLE
+  );
+  if (existing) {
+    existing.querySelector('textarea').value = content;
+    autoSave();
+  } else {
+    addSection({ title: TITLE, content });
+  }
 }
 
 function getSections() {
