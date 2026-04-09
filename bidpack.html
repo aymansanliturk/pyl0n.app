@@ -495,11 +495,434 @@ function _noDataPage(sec, num, source, proj) {
   </div>`;
 }
 
-/* ══ Renderers — filled in Part 2 ════════════════════════════════════ */
-function generate()   { alert('Renderers coming in Part 2!'); }
-function goBack()     { document.getElementById('output').style.display='none'; document.getElementById('editor').style.display='block'; }
-async function exportPDF()  { if(document.getElementById('output').style.display==='none') generate(); else window.print(); }
-async function exportHTML() { alert('Export coming in Part 2!'); }
+/* ══ Cover & TOC ══════════════════════════════════════════════════════ */
+function _renderCover(st) {
+  const logo = SuiteManager.getLogo();
+  const logoHtml = logo ? `<img src="${logo}" class="cover-logo" alt="Logo">` : '';
+  const confHtml = st.confidentiality
+    ? `<div class="cover-conf">${_esc(st.confidentiality)}</div>` : '';
+  const dateStr = st.date
+    ? new Date(st.date + 'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})
+    : '';
+  return `<div class="doc-page doc-cover">
+    <div class="cover-top">${logoHtml}${confHtml}</div>
+    <div class="cover-mid">
+      <div class="cover-rule"></div>
+      <div class="cover-title">${_esc(st.projName || 'Bid Document')}</div>
+      ${st.customer ? `<div class="cover-customer">${_esc(st.customer)}</div>` : ''}
+      <div class="cover-rule"></div>
+    </div>
+    <div class="cover-bottom">
+      ${dateStr        ? `<div><strong>Date:</strong> ${dateStr}</div>` : ''}
+      ${st.revision    ? `<div><strong>Revision:</strong> ${_esc(st.revision)}</div>` : ''}
+      ${st.preparedBy  ? `<div><strong>Prepared by:</strong> ${_esc(st.preparedBy)}</div>` : ''}
+      <div style="margin-top:12px;">Generated with BidPack &middot; PYL0N Bid Suite</div>
+    </div>
+  </div>`;
+}
+
+function _renderToc(enabledSecs, projName) {
+  const srcLabel = id => ({ bidscore:'BidScore', timeline:'TimeCast', commercial:'CalcCast',
+    resources:'ResourceCast', risks:'RiskCast', suppliers:'RFQCast', actions:'ActionLog' }[id] || '');
+  const entries = enabledSecs.map((s, i) => `
+    <div class="toc-entry">
+      <span class="toc-num">${String(i+1).padStart(2,'0')}</span>
+      <span class="toc-name">${_esc(s.title)}</span>
+      <span class="toc-src">${srcLabel(s.id)}</span>
+    </div>`).join('');
+  return `<div class="doc-page">
+    <div class="doc-page-hd"><div>
+      <div class="doc-pg-num">Contents</div>
+      <div class="doc-pg-title">Table of Contents</div>
+    </div></div>
+    <div>${entries}</div>
+    ${_pageFooter(projName)}
+  </div>`;
+}
+
+/* ══ Section: BidScore ════════════════════════════════════════════════ */
+function _renderBidScore(sec, num, proj) {
+  try {
+    const d = JSON.parse(localStorage.getItem('bidcast_state_bidscore') || 'null');
+    if (!d || !(d.criteria||[]).length) return _noDataPage(sec, num, 'BidScore', proj);
+    let nW = 0, dW = 0;
+    d.criteria.forEach(c => { nW += (parseFloat(c.weight)||0)*(parseInt(c.score)||0); dW += (parseFloat(c.weight)||0)*5; });
+    const score   = dW > 0 ? Math.round(nW/dW*100) : 0;
+    const verdict = score >= 65 ? 'BID' : score >= 40 ? 'CONDITIONAL' : 'NO BID';
+    const vClass  = score >= 65 ? 'v-bid' : score >= 40 ? 'v-cond' : 'v-no';
+    const gColor  = score >= 65 ? '#059669' : score >= 40 ? '#d97706' : '#dc2626';
+    const ARC     = Math.PI * 80;
+    const filled  = +(score / 100 * ARC).toFixed(2);
+    const rows = d.criteria.map(c => {
+      const w = parseFloat(c.weight)||0, sc = parseInt(c.score)||0;
+      return `<tr>
+        <td>${_esc(c.category||'')}</td>
+        <td>${_esc(c.name||c.label||'')}</td>
+        <td class="r mono">${w}%</td>
+        <td class="r mono">${sc} / 5</td>
+        <td class="r mono">${w > 0 ? (w*sc/5).toFixed(1) : '0.0'}%</td>
+      </tr>`;
+    }).join('');
+    return `<div class="doc-page">
+      <div class="doc-page-hd">
+        <div>
+          <div class="doc-pg-num">Section ${num}</div>
+          <div class="doc-pg-title">${_esc(sec.title)}</div>
+          ${d.projName ? `<div class="doc-pg-sub">${_esc(d.projName)}</div>` : ''}
+        </div>
+        <span class="verdict-chip ${vClass}">${verdict}</span>
+      </div>
+      <div class="score-gauge-wrap">
+        <svg class="score-gauge-svg" viewBox="0 0 200 115">
+          <path d="M20,110 A80,80 0 0 1 180,110" fill="none" stroke="#e5e7eb" stroke-width="14" stroke-linecap="round"/>
+          <path d="M20,110 A80,80 0 0 1 180,110" fill="none" stroke="${gColor}" stroke-width="14" stroke-linecap="round"
+            stroke-dasharray="${filled} ${ARC*2}"/>
+          <text x="100" y="100" text-anchor="middle" font-size="32" font-weight="700" fill="#111" font-family="DM Sans,sans-serif">${score}</text>
+          <text x="100" y="113" text-anchor="middle" font-size="10" fill="#9ca3af" font-family="DM Sans,sans-serif">OUT OF 100</text>
+        </svg>
+        <div style="display:grid;gap:6px;font-size:12px;">
+          ${d.bidRef      ? `<div><span style="color:#9ca3af">Reference &nbsp;</span>${_esc(d.bidRef)}</div>` : ''}
+          ${d.date        ? `<div><span style="color:#9ca3af">Date &nbsp;</span>${d.date}</div>` : ''}
+          ${d.assessedBy  ? `<div><span style="color:#9ca3af">Assessed by &nbsp;</span>${_esc(d.assessedBy)}</div>` : ''}
+          ${d.notes       ? `<div style="margin-top:4px;color:#4b5563;max-width:340px;line-height:1.5;">${_esc(d.notes)}</div>` : ''}
+        </div>
+      </div>
+      <table class="dt">
+        <thead><tr><th>Category</th><th>Criterion</th><th class="r">Weight</th><th class="r">Score</th><th class="r">Weighted</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      ${_pageFooter(proj)}
+    </div>`;
+  } catch { return _noDataPage(sec, num, 'BidScore', proj); }
+}
+
+/* ══ Section: Timeline ════════════════════════════════════════════════ */
+function _renderTimeline(sec, num, proj) {
+  try {
+    const d = JSON.parse(localStorage.getItem('bidcast_state_timecast') || 'null');
+    if (!d || !(d.projects||[]).length) return _noDataPage(sec, num, 'TimeCast', proj);
+    let rows = '', count = 0;
+    (d.projects||[]).forEach(p => {
+      [['Bid', p.bidTasks||[]], ['Execution', p.execTasks||[]]].forEach(([lane, tasks]) => {
+        tasks.forEach(t => {
+          if (!t.name) return;
+          count++;
+          const isM  = t.type === 'milestone';
+          const sm   = t.sm  ?? t.startMonth ?? 0,  sy = t.sy  ?? t.startYear  ?? '';
+          const em   = isM ? sm : (t.em ?? t.endMonth ?? sm), ey = isM ? sy : (t.ey ?? t.endYear ?? sy);
+          rows += `<tr>
+            <td>${isM ? '<span class="tb-ms">MS</span>' : ''}${_esc(t.name)}</td>
+            <td style="color:#6b6966;">${_esc(p.name||'')}</td>
+            <td style="color:#6b6966;">${lane}</td>
+            <td class="mono">${sy ? _MON[sm]+' '+sy : '—'}</td>
+            <td class="mono">${isM ? '—' : (ey ? _MON[em]+' '+ey : '—')}</td>
+            <td style="color:#6b6966;max-width:160px;">${_esc(t.notes||'')}</td>
+          </tr>`;
+        });
+      });
+    });
+    if (!count) return _noDataPage(sec, num, 'TimeCast', proj);
+    return `<div class="doc-page">
+      <div class="doc-page-hd"><div>
+        <div class="doc-pg-num">Section ${num}</div>
+        <div class="doc-pg-title">${_esc(sec.title)}</div>
+      </div></div>
+      <table class="dt">
+        <thead><tr><th>Task / Milestone</th><th>Project</th><th>Phase</th><th>Start</th><th>End</th><th>Notes</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      ${_pageFooter(proj)}
+    </div>`;
+  } catch { return _noDataPage(sec, num, 'TimeCast', proj); }
+}
+
+/* ══ Section: Commercial ══════════════════════════════════════════════ */
+function _renderCommercial(sec, num, proj) {
+  try {
+    const d = JSON.parse(localStorage.getItem('bidcast_state_calccast') || 'null');
+    const costRows = (d?.costRows||[]).filter(r => r.rowType !== 'contingency');
+    if (!costRows.length) return _noDataPage(sec, num, 'CalcCast', proj);
+
+    const cats = {};
+    let grand = 0;
+    costRows.forEach(r => {
+      const cat = r.category || 'Other';
+      if (!cats[cat]) cats[cat] = { items:[], total:0 };
+      const line = (parseFloat(r.qty)||0) * (parseFloat(r.unitPrice)||0);
+      cats[cat].items.push({ ...r, line });
+      cats[cat].total += line;
+      grand += line;
+    });
+
+    let body = '';
+    Object.entries(cats).forEach(([cat, data]) => {
+      body += `<tr class="cat-row"><td colspan="5">${_esc(cat)}</td></tr>`;
+      data.items.forEach(r => {
+        body += `<tr>
+          <td style="padding-left:18px;">${_esc(r.desc||'')}</td>
+          <td style="color:#6b6966;">${_esc(r.scope||'')}</td>
+          <td style="color:#6b6966;">${_esc(r.supplier||'')}</td>
+          <td class="r mono">${r.qty||''} ${_esc(r.units||'')}</td>
+          <td class="r mono">${_esc(r.currency||'EUR')} ${parseFloat(r.unitPrice||0).toLocaleString('en-GB',{maximumFractionDigits:0})}</td>
+        </tr>`;
+      });
+      body += `<tr style="background:#f0f9ff;">
+        <td colspan="4" style="font-weight:600;font-size:11px;padding-left:18px;">Subtotal — ${_esc(cat)}</td>
+        <td class="r mono" style="font-weight:700;">EUR ${Math.round(data.total).toLocaleString('en-GB')}</td>
+      </tr>`;
+    });
+    body += `<tr class="total-row">
+      <td colspan="4">TOTAL DIRECT COST</td>
+      <td class="r mono">${_fmtEUR(grand)}</td>
+    </tr>`;
+
+    return `<div class="doc-page">
+      <div class="doc-page-hd"><div>
+        <div class="doc-pg-num">Section ${num}</div>
+        <div class="doc-pg-title">${_esc(sec.title)}</div>
+        ${d.projName ? `<div class="doc-pg-sub">${_esc(d.projName)}</div>` : ''}
+      </div></div>
+      <table class="dt">
+        <thead><tr><th>Description</th><th>Scope</th><th>Supplier</th><th class="r">Qty / Unit</th><th class="r">Unit Price</th></tr></thead>
+        <tbody>${body}</tbody>
+      </table>
+      ${_pageFooter(proj)}
+    </div>`;
+  } catch { return _noDataPage(sec, num, 'CalcCast', proj); }
+}
+
+/* ══ Section: Resources ═══════════════════════════════════════════════ */
+function _renderResources(sec, num, proj) {
+  try {
+    const d = JSON.parse(localStorage.getItem('bidcast_state_resourcecast') || 'null');
+    const roles = d?.roles || [];
+    if (!roles.length) return _noDataPage(sec, num, 'ResourceCast', proj);
+
+    let totalHrs = 0, totalCost = 0;
+    const rows = roles.map(r => {
+      const hrs  = Object.values(r.monthHours||{}).reduce((s,v) => s + (parseFloat(v)||0), 0);
+      const rate = parseFloat(r.rate) || 0;
+      const cost = hrs * rate;
+      totalHrs += hrs; totalCost += cost;
+      return `<tr>
+        <td>${_esc(r.name||'')}</td>
+        <td class="r mono">${Math.round(hrs).toLocaleString('en-GB')} h</td>
+        <td class="r mono">${rate ? 'EUR '+rate.toLocaleString('en-GB',{maximumFractionDigits:0}) : '—'}</td>
+        <td class="r mono">${cost ? _fmtEUR(cost) : '—'}</td>
+      </tr>`;
+    }).join('');
+
+    let expRows = '', expTotal = 0;
+    (d.expenses||[]).forEach(e => {
+      const amt = parseFloat(e.amount)||0;
+      expTotal += amt;
+      expRows += `<tr>
+        <td>${_esc(e.label||'')}</td>
+        <td class="r mono" style="color:#6b6966;">expense</td>
+        <td></td>
+        <td class="r mono">${_fmtEUR(amt)}</td>
+      </tr>`;
+    });
+
+    return `<div class="doc-page">
+      <div class="doc-page-hd"><div>
+        <div class="doc-pg-num">Section ${num}</div>
+        <div class="doc-pg-title">${_esc(sec.title)}</div>
+      </div></div>
+      <table class="dt">
+        <thead><tr><th>Role</th><th class="r">Total Hours</th><th class="r">Rate (EUR/h)</th><th class="r">Cost (EUR)</th></tr></thead>
+        <tbody>
+          ${rows}
+          ${expRows}
+          <tr class="total-row">
+            <td>TOTAL</td>
+            <td class="r mono">${Math.round(totalHrs).toLocaleString('en-GB')} h</td>
+            <td></td>
+            <td class="r mono">${_fmtEUR(totalCost + expTotal)}</td>
+          </tr>
+        </tbody>
+      </table>
+      ${_pageFooter(proj)}
+    </div>`;
+  } catch { return _noDataPage(sec, num, 'ResourceCast', proj); }
+}
+
+/* ══ Section: Risks ═══════════════════════════════════════════════════ */
+function _renderRisks(sec, num, proj) {
+  try {
+    const d = JSON.parse(localStorage.getItem('bidcast_state_riskcast') || 'null');
+    const risks = d?.risks || [];
+    if (!risks.length) return _noDataPage(sec, num, 'RiskCast', proj);
+
+    const rows = risks.map(r => {
+      const l = parseInt(r.likelihood)||1, i = parseInt(r.impact)||1;
+      const score = r.score ?? l * i;
+      const isOpp = (r.type||'risk') === 'opportunity';
+      let rbClass = 'rb-low', rbLabel = 'Low';
+      if (isOpp)        { rbClass = 'rb-gain'; rbLabel = 'Gain'; }
+      else if (score >= 15) { rbClass = 'rb-crit'; rbLabel = 'Critical'; }
+      else if (score >= 10) { rbClass = 'rb-high'; rbLabel = 'High'; }
+      else if (score >=  5) { rbClass = 'rb-med';  rbLabel = 'Medium'; }
+      return `<tr>
+        <td style="font-size:10px;text-transform:capitalize;">${_esc(r.type||'risk')}</td>
+        <td>${_esc(r.category||'')}</td>
+        <td>${_esc(r.desc||r.topic||'')}</td>
+        <td class="r mono">${isOpp ? '—' : l}</td>
+        <td class="r mono">${isOpp ? '—' : i}</td>
+        <td class="r"><span class="rb ${rbClass}">${rbLabel}${isOpp ? '' : ' ('+score+')'}</span></td>
+        <td style="max-width:160px;color:#4b5563;">${_esc(r.mitigation||'')}</td>
+      </tr>`;
+    }).join('');
+
+    return `<div class="doc-page">
+      <div class="doc-page-hd"><div>
+        <div class="doc-pg-num">Section ${num}</div>
+        <div class="doc-pg-title">${_esc(sec.title)}</div>
+      </div></div>
+      <table class="dt">
+        <thead><tr><th>Type</th><th>Category</th><th>Description</th><th class="r">L</th><th class="r">I</th><th class="r">Level</th><th>Mitigation</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      ${_pageFooter(proj)}
+    </div>`;
+  } catch { return _noDataPage(sec, num, 'RiskCast', proj); }
+}
+
+/* ══ Section: Suppliers ═══════════════════════════════════════════════ */
+function _renderSuppliers(sec, num, proj) {
+  try {
+    const d = JSON.parse(localStorage.getItem('bidcast_state_rfqcast') || 'null');
+    const items = d?.items || [];
+    if (!items.length) return _noDataPage(sec, num, 'RFQCast', proj);
+
+    const today = new Date(); today.setHours(0,0,0,0);
+    const vStatus = v => {
+      if (v.validity && new Date(v.validity) < today) return 'Expired';
+      if (v.binding === 'Yes') return 'Binding';
+      if (v.offerRec) return 'Received';
+      if (v.enquiry)  return 'Waiting';
+      return 'Not Started';
+    };
+
+    let rows = '';
+    items.forEach(item => {
+      const vendors = (item.vendors||[]).filter(v => v.name);
+      if (!vendors.length) {
+        rows += `<tr><td>${_esc(item.desc||item.description||'')}</td><td>—</td><td>—</td><td></td><td></td></tr>`;
+        return;
+      }
+      vendors.forEach((v, vi) => {
+        const status = vStatus(v);
+        const price  = v.price ? `${_esc(v.currency||'EUR')} ${parseFloat(v.price).toLocaleString('en-GB',{maximumFractionDigits:0})}` : '—';
+        rows += `<tr ${v.isWinner ? 'style="background:#fffbe6;"' : ''}>
+          <td>${vi === 0 ? _esc(item.desc||item.description||'') : ''}</td>
+          <td>${_esc(v.name)}${v.isWinner ? ' <span style="font-size:9px;background:#fef08a;color:#713f12;padding:1px 5px;border-radius:3px;font-weight:700;">WINNER</span>' : ''}</td>
+          <td style="color:#6b6966;">${status}</td>
+          <td class="r mono">${price}</td>
+          <td style="color:#9ca3af;">${v.validity ? _fmtDate(v.validity) : ''}</td>
+        </tr>`;
+      });
+    });
+
+    return `<div class="doc-page">
+      <div class="doc-page-hd"><div>
+        <div class="doc-pg-num">Section ${num}</div>
+        <div class="doc-pg-title">${_esc(sec.title)}</div>
+      </div></div>
+      <table class="dt">
+        <thead><tr><th>Item</th><th>Supplier</th><th>Status</th><th class="r">Quoted Price</th><th>Validity</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      ${_pageFooter(proj)}
+    </div>`;
+  } catch { return _noDataPage(sec, num, 'RFQCast', proj); }
+}
+
+/* ══ Section: Actions ═════════════════════════════════════════════════ */
+function _renderActions(sec, num, proj) {
+  try {
+    const d = JSON.parse(localStorage.getItem('bidcast_state_actionlog') || 'null');
+    const actions = d?.actions || [];
+    if (!actions.length) return _noDataPage(sec, num, 'ActionLog', proj);
+
+    const today = new Date(); today.setHours(0,0,0,0);
+    const stCls = s => ({ Open:'sp-open', 'In Progress':'sp-prog', Done:'sp-done', Blocked:'sp-block' }[s] || 'sp-open');
+    const prCls = p => ({ High:'sp-high', Medium:'sp-med', Low:'sp-low' }[p] || 'sp-med');
+
+    const rows = actions.map(a => {
+      const overdue = a.status !== 'Done' && a.due && new Date(a.due+'T00:00:00') < today;
+      return `<tr ${overdue ? 'style="background:#fff7f7;"' : ''}>
+        <td style="color:#6b6966;">${_esc(a.category||'')}</td>
+        <td>${_esc(a.desc||'')}</td>
+        <td>${_esc(a.owner||'')}</td>
+        <td class="mono" ${overdue ? 'style="color:#dc2626;"' : ''}>${a.due ? _fmtDate(a.due) : '—'}${overdue ? ' ⚠' : ''}</td>
+        <td><span class="sp ${prCls(a.priority)}">${_esc(a.priority||'')}</span></td>
+        <td><span class="sp ${stCls(a.status)}">${_esc(a.status||'Open')}</span></td>
+      </tr>`;
+    }).join('');
+
+    return `<div class="doc-page">
+      <div class="doc-page-hd"><div>
+        <div class="doc-pg-num">Section ${num}</div>
+        <div class="doc-pg-title">${_esc(sec.title)}</div>
+      </div></div>
+      <table class="dt">
+        <thead><tr><th>Category</th><th>Action</th><th>Owner</th><th>Due Date</th><th>Priority</th><th>Status</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      ${_pageFooter(proj)}
+    </div>`;
+  } catch { return _noDataPage(sec, num, 'ActionLog', proj); }
+}
+
+/* ══ Generate ══════════════════════════════════════════════════════════ */
+function generate() {
+  const st   = collectState();
+  const enabled = st.sections.filter(s => s.enabled);
+  let html = _renderCover(st);
+  if (enabled.length) html += _renderToc(enabled, st.projName);
+  enabled.forEach((sec, i) => {
+    const num = String(i + 1).padStart(2, '0');
+    switch (sec.id) {
+      case 'bidscore':   html += _renderBidScore(sec, num, st.projName);   break;
+      case 'timeline':   html += _renderTimeline(sec, num, st.projName);   break;
+      case 'commercial': html += _renderCommercial(sec, num, st.projName); break;
+      case 'resources':  html += _renderResources(sec, num, st.projName);  break;
+      case 'risks':      html += _renderRisks(sec, num, st.projName);      break;
+      case 'suppliers':  html += _renderSuppliers(sec, num, st.projName);  break;
+      case 'actions':    html += _renderActions(sec, num, st.projName);    break;
+    }
+  });
+  document.getElementById('doc-wrap').innerHTML = html;
+  document.getElementById('editor').style.display  = 'none';
+  document.getElementById('output').style.display  = 'block';
+  window.scrollTo(0, 0);
+}
+
+function goBack() {
+  document.getElementById('output').style.display = 'none';
+  document.getElementById('editor').style.display = 'block';
+}
+
+/* ══ Export ════════════════════════════════════════════════════════════ */
+async function exportPDF() {
+  if (document.getElementById('output').style.display === 'none') generate();
+  window.print();
+}
+
+async function exportHTML() {
+  const st  = collectState();
+  const fn  = (st.projName||'bidpack').replace(/[^a-z0-9]/gi,'_') + '_bidpack.html';
+  const snap = btoa(unescape(encodeURIComponent(JSON.stringify(st))));
+  const inject = `<script>
+    (function(){ try {
+      var s = JSON.parse(decodeURIComponent(escape(atob('${snap}'))));
+      if (s) setTimeout(function(){ if(typeof applyState==='function'){ applyState(s); generate(); } }, 300);
+    } catch(e){} })();
+  <\/script>`;
+  const html = document.documentElement.outerHTML.replace('</body>', inject + '</body>');
+  await nativeSaveHTML(fn, html);
+}
 
 /* ══ Init ══════════════════════════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', () => {
