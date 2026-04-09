@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ActionLog · PYL0N</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <script src="libs/xlsx.full.min.js"></script>
+  <script src="libs/html2pdf.bundle.min.js"></script>
+  <link rel="stylesheet" href="libs/fonts.css">
+  <script src="vendor/pyl0n-native.js"></script>
+  <style>
+    :root {
+      --bg:#f5f4f0; --surface:#fff; --border:#e0ddd6; --text:#1a1916;
+      --accent:#15803d; --green:#059669; --amber:#d97706; --red:#dc2626;
+      --faint:#9c9a94; --muted:#6b6966;
+    }
+    [data-theme="dark"] {
+      --bg:#111110; --surface:#1c1c1a; --border:#2e2d2a; --text:#f0ede8;
+      --faint:#6b6966; --muted:#9c9a94;
+    }
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:'DM Sans',system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+    /* ── Toolbar ── */
+    #toolbar {
+      position:sticky; top:0; z-index:100;
+      background:var(--surface); border-bottom:1px solid var(--border);
+      padding:10px 20px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    }
+    .tb-sep { width:1px; height:22px; background:var(--border); margin:0 4px; }
+    .tb-brand { font-size:15px; font-weight:700; letter-spacing:-0.3px; }
+    .tb-brand span { color:var(--accent); }
+    .back-btn { text-decoration:none; color:var(--muted); font-size:18px; line-height:1; padding:4px; border-radius:6px; }
+    .back-btn:hover { color:var(--text); }
+    .tb-btn {
+      padding:6px 12px; border:1.5px solid var(--border); border-radius:7px;
+      background:var(--surface); color:var(--text); font-size:12px; font-weight:600;
+      cursor:pointer; transition:all 0.15s; white-space:nowrap; font-family:inherit;
+    }
+    .tb-btn:hover { border-color:var(--accent); color:var(--accent); }
+    .tb-btn:disabled { opacity:0.35; cursor:default; }
+    .tb-btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+    .tb-btn.primary:hover { opacity:0.9; }
+    .tb-right { margin-left:auto; display:flex; gap:6px; align-items:center; }
+
+    /* ── Editor ── */
+    #editor { max-width:1200px; margin:0 auto; padding:24px 24px 80px; }
+
+    /* Project name bar */
+    .proj-bar { display:flex; align-items:center; gap:12px; margin-bottom:20px; }
+    .proj-bar label { font-size:10px; font-weight:700; color:var(--faint); letter-spacing:.8px; text-transform:uppercase; white-space:nowrap; }
+    .proj-bar input {
+      flex:1; max-width:340px; padding:7px 10px; border:1.5px solid var(--border); border-radius:7px;
+      background:var(--surface); color:var(--text); font-size:13px; font-family:inherit;
+    }
+    .proj-bar input:focus { outline:none; border-color:var(--accent); }
+
+    /* Summary pills */
+    .summary-bar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+    .s-pill {
+      padding:5px 13px; border-radius:20px; font-size:11px; font-weight:700;
+      letter-spacing:0.3px; cursor:pointer; transition:opacity .15s; border:1.5px solid transparent;
+    }
+    .s-pill.active { border-color: currentColor; }
+    .s-pill.p-all      { background:#f1f5f9; color:#475569; }
+    .s-pill.p-open     { background:#eff6ff; color:#2563eb; }
+    .s-pill.p-inprog   { background:#fef3c7; color:#b45309; }
+    .s-pill.p-done     { background:#dcfce7; color:#15803d; }
+    .s-pill.p-blocked  { background:#fee2e2; color:#dc2626; }
+    .s-pill.p-overdue  { background:#fef2f2; color:#dc2626; }
+
+    /* Filter bar */
+    .filter-bar { display:flex; gap:8px; margin-bottom:12px; align-items:center; flex-wrap:wrap; }
+    .filter-bar input, .filter-bar select {
+      padding:6px 10px; border:1.5px solid var(--border); border-radius:7px;
+      background:var(--surface); color:var(--text); font-size:12px; font-family:inherit;
+    }
+    .filter-bar input:focus, .filter-bar select:focus { outline:none; border-color:var(--accent); }
+    .filter-bar input { width:200px; }
+
+    /* Action table */
+    .action-wrap { background:var(--surface); border:1.5px solid var(--border); border-radius:12px; overflow:hidden; }
+    .action-head, .action-row {
+      display:grid;
+      grid-template-columns:28px 110px 1fr 110px 100px 95px 105px auto;
+      align-items:center; padding:7px 10px; gap:4px;
+    }
+    .action-head { background:var(--bg); border-bottom:1px solid var(--border); }
+    .ah { font-size:10px; font-weight:700; color:var(--faint); text-transform:uppercase; letter-spacing:.8px; }
+
+    .action-row { border-bottom:1px solid var(--border); transition:background .12s; }
+    .action-row:last-child { border-bottom:none; }
+    .action-row:hover { background:var(--bg); }
+    .action-row.is-done { opacity:0.55; }
+    .action-row.is-overdue { background:#fff5f5; }
+    .action-row.dragging { opacity:0.35; }
+    .action-row.drag-over { border-top:2px solid var(--accent); }
+
+    .drag-handle { cursor:grab; color:var(--faint); font-size:14px; padding:2px 4px; user-select:none; }
+    .drag-handle:active { cursor:grabbing; }
+
+    .ai { /* action input */
+      width:100%; padding:5px 7px; border:1.5px solid transparent; border-radius:6px;
+      background:transparent; color:var(--text); font-size:13px; font-family:inherit; transition:border-color .15s;
+    }
+    .ai:focus { outline:none; border-color:var(--accent); background:var(--surface); }
+    .ai.sm { font-size:12px; color:var(--muted); }
+    .ai[type="date"] { font-family:'DM Mono',monospace; font-size:12px; }
+
+    .a-sel {
+      width:100%; padding:5px 6px; border:1.5px solid var(--border); border-radius:6px;
+      background:var(--surface); color:var(--text); font-size:12px; font-family:inherit; cursor:pointer;
+    }
+    .a-sel:focus { outline:none; border-color:var(--accent); }
+
+    .del-btn { color:var(--faint); background:none; border:none; cursor:pointer; font-size:16px; padding:3px 7px; border-radius:5px; }
+    .del-btn:hover { color:var(--red); background:#fef2f2; }
+
+    .action-footer {
+      padding:10px 12px; background:var(--bg); border-top:1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .add-btn {
+      padding:6px 14px; border:1.5px dashed var(--border); border-radius:7px;
+      background:none; color:var(--muted); font-size:12px; font-weight:600;
+      cursor:pointer; transition:all .15s; font-family:inherit;
+    }
+    .add-btn:hover { border-color:var(--accent); color:var(--accent); }
+    .empty-msg { padding:24px; text-align:center; color:var(--faint); font-size:13px; }
+
+    /* Priority badge */
+    .prio { display:inline-block; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:700; }
+    .prio-high { background:#fee2e2; color:#dc2626; }
+    .prio-med  { background:#fef3c7; color:#b45309; }
+    .prio-low  { background:#f0fdf4; color:#15803d; }
+
+    /* ── Output ── */
+    #output { display:none; max-width:1000px; margin:0 auto; padding:28px 24px 80px; }
+    .out-toolbar { display:flex; align-items:center; gap:8px; margin-bottom:24px; flex-wrap:wrap; }
+    .out-card { background:var(--surface); border:1.5px solid var(--border); border-radius:14px; padding:28px; margin-bottom:20px; }
+    .out-hdr { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:20px; padding-bottom:16px; border-bottom:1px solid var(--border); gap:12px; }
+    .out-title { font-size:20px; font-weight:700; letter-spacing:-.4px; margin-bottom:4px; }
+    .out-sub { font-size:12px; color:var(--muted); }
+    .out-logo { height:28px; object-fit:contain; display:block; margin-bottom:6px; }
+    .out-pills { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px; }
+    .out-sec-title { font-size:11px; font-weight:700; color:var(--faint); letter-spacing:1px; text-transform:uppercase; margin-bottom:10px; }
+    .out-table { width:100%; border-collapse:collapse; font-size:12px; }
+    .out-table th { padding:7px 8px; text-align:left; font-size:10px; font-weight:700; color:var(--faint); text-transform:uppercase; letter-spacing:.7px; border-bottom:1.5px solid var(--border); }
+    .out-table td { padding:8px 8px; border-bottom:1px solid var(--border); vertical-align:top; }
+    .out-table tr:last-child td { border-bottom:none; }
+    .out-status { display:inline-block; padding:2px 9px; border-radius:10px; font-size:10px; font-weight:700; }
+    .st-open    { background:#eff6ff; color:#2563eb; }
+    .st-inprog  { background:#fef3c7; color:#b45309; }
+    .st-done    { background:#dcfce7; color:#15803d; }
+    .st-blocked { background:#fee2e2; color:#dc2626; }
+    .out-footer { font-size:10px; color:var(--faint); text-align:center; padding-top:16px; margin-top:16px; border-top:1px solid var(--border); }
+
+    @media print {
+      #toolbar, .out-toolbar { display:none !important; }
+      body { background:#fff; }
+      #output { display:block !important; padding:12px; }
+      #editor { display:none !important; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="toolbar">
+  <a href="index.html" class="back-btn" title="Dashboard">←</a>
+  <div class="tb-brand">Action<span>Log</span></div>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" id="btn-undo" onclick="undo()" title="Undo (Ctrl+Z)" disabled>↩</button>
+  <button class="tb-btn" id="btn-redo" onclick="redo()" title="Redo (Ctrl+Y)" disabled>↪</button>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" onclick="saveJSON()">Save</button>
+  <label class="tb-btn" style="cursor:pointer">Load<input type="file" accept=".json" onchange="loadJSON(this)" style="display:none"></label>
+  <div class="tb-right">
+    <button class="tb-btn" onclick="exportExcel()">Excel</button>
+    <button class="tb-btn" onclick="exportHTML()">HTML</button>
+    <button class="tb-btn" onclick="exportPDF()">PDF</button>
+    <button class="tb-btn primary" onclick="generate()">Preview ›</button>
+  </div>
+</div>
+
+<div id="editor">
+  <div class="proj-bar">
+    <label>Project</label>
+    <input type="text" id="proj-name" placeholder="Project name" oninput="_scheduleSnap();_suiteWrite()">
+  </div>
+
+  <div class="summary-bar" id="summary-bar"></div>
+
+  <div class="filter-bar">
+    <input type="text" id="search-box" placeholder="Search actions…" oninput="_applyFilters()">
+    <select id="filter-status" onchange="_applyFilters()">
+      <option value="">All statuses</option>
+      <option>Open</option>
+      <option>In Progress</option>
+      <option>Done</option>
+      <option>Blocked</option>
+    </select>
+    <select id="filter-prio" onchange="_applyFilters()">
+      <option value="">All priorities</option>
+      <option>High</option>
+      <option>Medium</option>
+      <option>Low</option>
+    </select>
+    <select id="filter-cat" onchange="_applyFilters()">
+      <option value="">All categories</option>
+      <option>Planning</option>
+      <option>Commercial</option>
+      <option>Technical</option>
+      <option>Risk</option>
+      <option>Legal</option>
+      <option>Admin</option>
+    </select>
+  </div>
+
+  <div class="action-wrap">
+    <div class="action-head">
+      <div></div>
+      <div class="ah">Category</div>
+      <div class="ah">Action</div>
+      <div class="ah">Owner</div>
+      <div class="ah">Due Date</div>
+      <div class="ah">Priority</div>
+      <div class="ah">Status</div>
+      <div></div>
+    </div>
+    <div id="action-body"></div>
+    <div class="action-footer">
+      <button class="add-btn" onclick="addAction()">+ Add Action</button>
+      <span id="row-count" style="font-size:11px;color:var(--faint)"></span>
+    </div>
+  </div>
+</div>
+
+<div id="output"></div>
+
+<script>
+/* ══ SuiteManager ═════════════════════════════════════════════════════ */
+const SuiteManager = (() => {
+  const SK='bidcast_suite_sync', LK='bidcast_logo';
+  function read() { try{return JSON.parse(localStorage.getItem(SK)||'{}');}catch{return{};} }
+  function write(p){ try{localStorage.setItem(SK,JSON.stringify({...read(),...p,_ts:Date.now()}));}catch{} }
+  function getLogo(){ return localStorage.getItem(LK)||null; }
+  function onUpdate(cb){ window.addEventListener('storage',e=>{if(e.key===SK||e.key===LK)cb(read(),e.key);}); }
+  function migrate(){
+    const mv=[]; for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k?.startsWith('pyl0n_'))mv.push(k);}
+    mv.forEach(k=>{const nk='bidcast_'+k.slice(6);if(!localStorage.getItem(nk))localStorage.setItem(nk,localStorage.getItem(k));localStorage.removeItem(k);});
+  }
+  return{read,write,getLogo,onUpdate,migrate};
+})();
+
+const STATE_KEY = 'bidcast_state_actionlog';
+let _nextId = 100;
+
+/* ══ Undo / Redo ══════════════════════════════════════════════════════ */
+let _hist=[], _hIdx=-1, _snapTimer=null;
+function _snapshot(){
+  const s=JSON.stringify(collectState());
+  if(_hist[_hIdx]===s)return;
+  _hist=_hist.slice(0,_hIdx+1); _hist.push(s);
+  if(_hist.length>60)_hist.shift();
+  _hIdx=_hist.length-1; _syncUndoUI(); _saveLocal();
+}
+function _scheduleSnap(){ clearTimeout(_snapTimer); _snapTimer=setTimeout(_snapshot,500); }
+function undo(){ if(_hIdx>0){_hIdx--;applyState(JSON.parse(_hist[_hIdx]));_syncUndoUI();} }
+function redo(){ if(_hIdx<_hist.length-1){_hIdx++;applyState(JSON.parse(_hist[_hIdx]));_syncUndoUI();} }
+function _syncUndoUI(){
+  const u=document.getElementById('btn-undo'); if(u)u.disabled=_hIdx<=0;
+  const r=document.getElementById('btn-redo'); if(r)r.disabled=_hIdx>=_hist.length-1;
+}
+
+/* ══ State ════════════════════════════════════════════════════════════ */
+function collectState(){
+  return { projName: document.getElementById('proj-name')?.value||'', actions: _getActions() };
+}
+function applyState(s){
+  if(!s)return;
+  document.getElementById('proj-name').value=s.projName||'';
+  document.getElementById('action-body').innerHTML='';
+  (s.actions||[]).forEach(a=>addAction(a));
+  _refreshSummary();
+}
+function _saveLocal(){ try{localStorage.setItem(STATE_KEY,JSON.stringify(collectState()));}catch{} }
+
+function _getActions(){
+  return Array.from(document.querySelectorAll('#action-body .action-row')).map(row=>({
+    id:      +row.dataset.id||0,
+    category:row.querySelector('.a-cat')?.value   ||'',
+    desc:    row.querySelector('.a-desc')?.value  ||'',
+    owner:   row.querySelector('.a-owner')?.value ||'',
+    due:     row.querySelector('.a-due')?.value   ||'',
+    priority:row.querySelector('.a-prio')?.value  ||'Medium',
+    status:  row.querySelector('.a-status')?.value||'Open',
+    notes:   row.querySelector('.a-notes')?.value ||'',
+  }));
+}
+
+/* ══ Add / remove actions ═════════════════════════════════════════════ */
+function addAction(data){
+  const id  = data?.id  || (_nextId++);
+  const cat = data?.category || '';
+  const desc= data?.desc     || '';
+  const own = data?.owner    || '';
+  const due = data?.due      || '';
+  const pri = data?.priority || 'Medium';
+  const sts = data?.status   || 'Open';
+  const nt  = data?.notes    || '';
+
+  const row=document.createElement('div');
+  row.className='action-row';
+  row.dataset.id=id;
+  row.draggable=true;
+  row.innerHTML=
+    `<span class="drag-handle" title="Drag to reorder">⠿</span>`+
+    `<select class="a-sel a-cat sm" onchange="_onRowChange(this)">`+
+      ['','Planning','Commercial','Technical','Risk','Legal','Admin','Other']
+        .map(v=>`<option${v===cat?' selected':''}>${v}</option>`).join('')+
+    `</select>`+
+    `<input class="ai a-desc" type="text" value="${esc(desc)}" placeholder="Describe the action…" oninput="_scheduleSnap()">`+
+    `<input class="ai a-owner sm" type="text" value="${esc(own)}" placeholder="Owner" oninput="_scheduleSnap()">`+
+    `<input class="ai a-due" type="date" value="${esc(due)}" oninput="_onRowChange(this)">`+
+    `<select class="a-sel a-prio" onchange="_onRowChange(this)">`+
+      ['High','Medium','Low'].map(v=>`<option${v===pri?' selected':''}>${v}</option>`).join('')+
+    `</select>`+
+    `<select class="a-sel a-status" onchange="_onRowChange(this)">`+
+      ['Open','In Progress','Done','Blocked'].map(v=>`<option${v===sts?' selected':''}>${v}</option>`).join('')+
+    `</select>`+
+    `<div style="display:flex;align-items:center;gap:2px;">`+
+      `<input class="ai a-notes sm" type="text" value="${esc(nt)}" placeholder="Notes…" oninput="_scheduleSnap()" style="min-width:70px">`+
+      `<button class="del-btn" onclick="removeAction(this)" title="Delete">×</button>`+
+    `</div>`;
+
+  _initDrag(row);
+  document.getElementById('action-body').appendChild(row);
+  _updateRowStyle(row);
+  _refreshSummary();
+}
+
+function removeAction(btn){
+  btn.closest('.action-row').remove();
+  _snapshot(); _refreshSummary();
+}
+
+function _onRowChange(el){
+  _updateRowStyle(el.closest('.action-row'));
+  _scheduleSnap(); _refreshSummary();
+}
+
+function _updateRowStyle(row){
+  const sts = row.querySelector('.a-status')?.value||'';
+  const due = row.querySelector('.a-due')?.value||'';
+  const today=new Date(); today.setHours(0,0,0,0);
+  const isOverdue = due && new Date(due)<today && sts!=='Done';
+  row.classList.toggle('is-done',    sts==='Done');
+  row.classList.toggle('is-overdue', isOverdue);
+}
+
+/* ══ Drag and drop ════════════════════════════════════════════════════ */
+let _dragSrc=null;
+function _initDrag(row){
+  row.addEventListener('dragstart',e=>{_dragSrc=row;row.classList.add('dragging');e.dataTransfer.effectAllowed='move';});
+  row.addEventListener('dragend',()=>{_dragSrc=null;document.querySelectorAll('.action-row').forEach(r=>r.classList.remove('dragging','drag-over'));});
+  row.addEventListener('dragover',e=>{e.preventDefault();if(_dragSrc&&_dragSrc!==row)row.classList.add('drag-over');});
+  row.addEventListener('dragleave',()=>row.classList.remove('drag-over'));
+  row.addEventListener('drop',e=>{e.preventDefault();row.classList.remove('drag-over');if(_dragSrc&&_dragSrc!==row){row.before(_dragSrc);_snapshot();}});
+}
+
+/* ══ Summary pills ════════════════════════════════════════════════════ */
+let _activeFilter='';
+function _refreshSummary(){
+  const actions=_getActions();
+  const today=new Date(); today.setHours(0,0,0,0);
+  let open=0,inprog=0,done=0,blocked=0,overdue=0;
+  actions.forEach(a=>{
+    if(a.status==='Open')        open++;
+    else if(a.status==='In Progress') inprog++;
+    else if(a.status==='Done')   done++;
+    else if(a.status==='Blocked')blocked++;
+    if(a.status!=='Done'&&a.due&&new Date(a.due)<today) overdue++;
+  });
+  const total=actions.length;
+  const bar=document.getElementById('summary-bar');
+  if(!bar)return;
+  bar.innerHTML=[
+    {k:'',    cls:'p-all',    label:`All (${total})`},
+    {k:'Open',cls:'p-open',   label:`Open (${open})`},
+    {k:'In Progress',cls:'p-inprog',label:`In Progress (${inprog})`},
+    {k:'Done',cls:'p-done',   label:`Done (${done})`},
+    {k:'Blocked',cls:'p-blocked',label:`Blocked (${blocked})`},
+    ...(overdue>0?[{k:'overdue',cls:'p-overdue',label:`⚠ Overdue (${overdue})`}]:[]),
+  ].map(p=>`<span class="s-pill ${p.cls}${_activeFilter===p.k?' active':''}"
+    onclick="_filterPill('${p.k}')">${p.label}</span>`).join('');
+
+  const cnt=document.getElementById('row-count');
+  if(cnt) cnt.textContent=`${total} action${total!==1?'s':''}`;
+  _applyFilters();
+}
+
+function _filterPill(key){
+  _activeFilter=key;
+  if(key!=='overdue'){
+    const sf=document.getElementById('filter-status');
+    if(sf) sf.value=key;
+  }
+  _refreshSummary();
+}
+
+function _applyFilters(){
+  const search=(document.getElementById('search-box')?.value||'').toLowerCase();
+  const fSts  =document.getElementById('filter-status')?.value||'';
+  const fPrio =document.getElementById('filter-prio')?.value||'';
+  const fCat  =document.getElementById('filter-cat')?.value||'';
+  const today =new Date(); today.setHours(0,0,0,0);
+
+  document.querySelectorAll('#action-body .action-row').forEach(row=>{
+    const desc =row.querySelector('.a-desc')?.value.toLowerCase()||'';
+    const owner=row.querySelector('.a-owner')?.value.toLowerCase()||'';
+    const sts  =row.querySelector('.a-status')?.value||'';
+    const prio =row.querySelector('.a-prio')?.value||'';
+    const cat  =row.querySelector('.a-cat')?.value||'';
+    const due  =row.querySelector('.a-due')?.value||'';
+    const isOverdue=due&&new Date(due)<today&&sts!=='Done';
+
+    const matchSearch=!search||(desc.includes(search)||owner.includes(search));
+    const matchSts   =!fSts  ||(_activeFilter==='overdue'?isOverdue:sts===fSts);
+    const matchPrio  =!fPrio ||prio===fPrio;
+    const matchCat   =!fCat  ||cat===fCat;
+
+    row.style.display=(matchSearch&&matchSts&&matchPrio&&matchCat)?'':'none';
+  });
+}
+
+/* ══ Exports (stubs) ══════════════════════════════════════════════════ */
+function generate()      { alert('Output view coming in next build.'); }
+function goBack()        { document.getElementById('editor').style.display='block'; document.getElementById('output').style.display='none'; }
+async function exportPDF()  { alert('PDF export coming in next build.'); }
+async function exportExcel(){ alert('Excel export coming in next build.'); }
+async function exportHTML() { alert('HTML export coming in next build.'); }
+
+async function saveJSON(){
+  const s=collectState();
+  try{localStorage.setItem(STATE_KEY,JSON.stringify(s));}catch{}
+  const name=(s.projName||'actionlog').replace(/[^a-zA-Z0-9_-]/g,'_');
+  await nativeSaveText(`actionlog_${name}.json`,JSON.stringify(s,null,2),'JSON Files','.json');
+}
+async function loadJSON(input){
+  const file=input.files[0]; if(!file)return;
+  try{applyState(JSON.parse(await file.text()));_snapshot();}catch{alert('Invalid JSON file');}
+  input.value='';
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function _suiteWrite(){
+  const n=document.getElementById('proj-name')?.value||'';
+  if(n)SuiteManager.write({projectName:n},'actionlog');
+}
+
+/* ══ Init ═════════════════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded',()=>{
+  SuiteManager.migrate();
+  const saved=localStorage.getItem(STATE_KEY);
+  if(saved){ try{applyState(JSON.parse(saved));}catch{} }
+  else{
+    const sync=SuiteManager.read();
+    if(sync.projectName) document.getElementById('proj-name').value=sync.projectName;
+  }
+  _snapshot(); _syncUndoUI();
+  SuiteManager.onUpdate(sync=>{
+    const el=document.getElementById('proj-name');
+    if(el&&document.activeElement!==el&&sync.projectName) el.value=sync.projectName;
+  });
+  document.addEventListener('keydown',e=>{
+    if(e.ctrlKey||e.metaKey){
+      if(e.key==='z'&&!e.shiftKey){e.preventDefault();undo();}
+      if(e.key==='y'||(e.key==='z'&&e.shiftKey)){e.preventDefault();redo();}
+      if(e.key==='s'){e.preventDefault();saveJSON();}
+    }
+  });
+});
+</script>
+</body>
+</html>
