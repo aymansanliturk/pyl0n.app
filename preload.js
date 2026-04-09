@@ -21,25 +21,4 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   getVersion: () => ipcRenderer.invoke('app:getVersion'),
 
-  // ── Azure AD authentication ─────────────────────────────────────────────────
-
-  // Get signed-in user from cached token: { name, email, oid, tid } or null
-  getUser: () => ipcRenderer.invoke('auth:getUser'),
-
-  // Open Microsoft login window and return user object on success
-  login: () => ipcRenderer.invoke('auth:login'),
-
-  // Sign out and clear stored token
-  logout: () => ipcRenderer.invoke('auth:logout'),
-
-  // Signal main process that login succeeded (used by login.html)
-  authSuccess: () => ipcRenderer.send('auth:success'),
-
-  // ── Auto-update ─────────────────────────────────────────────────────────────
-
-  checkForUpdates: () => ipcRenderer.invoke('app:checkForUpdates'),
-  installUpdate:   () => ipcRenderer.invoke('app:installUpdate'),
-
-  // Listen for update-ready event pushed from main process
-  onUpdateReady: (callback) => ipcRenderer.on('update:ready', (_e, info) => callback(info)),
 });

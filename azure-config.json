@@ -1,5 +1,0 @@
-{
-  "_readme": "Fill in clientId and tenantId from your Azure App Registration. See BUILD.md for IT setup steps.",
-  "clientId": "YOUR-CLIENT-ID-HERE",
-  "tenantId": "YOUR-TENANT-ID-HERE"
-}

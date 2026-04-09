@@ -2158,40 +2158,6 @@ function _applyTheme(theme) {
 }
 </script>
 
-<script>
-// ── Auto-update banner (Electron only) ───────────────────────────────────────
-(function () {
-  if (!window.electronAPI || !window.electronAPI.onUpdateReady) return;
-
-  function _showUpdateBanner(info) {
-    if (document.getElementById('update-banner')) return;
-    const banner = document.createElement('div');
-    banner.id = 'update-banner';
-    banner.style.cssText = [
-      'position:fixed;bottom:0;left:0;right:0;z-index:9999',
-      'background:#2c4e87;color:#fff;display:flex;align-items:center',
-      'justify-content:space-between;padding:10px 20px',
-      'font-family:DM Sans,sans-serif;font-size:14px;box-shadow:0 -2px 8px rgba(0,0,0,.2)',
-    ].join(';');
-    banner.innerHTML = `
-      <span>&#x1F4E6; PYL0N <strong>${info.version}</strong> has been downloaded and is ready to install.</span>
-      <span style="display:flex;gap:8px">
-        <button onclick="document.getElementById('update-banner').remove()"
-          style="background:transparent;border:1px solid rgba(255,255,255,.5);color:#fff;border-radius:4px;padding:4px 12px;cursor:pointer">
-          Later
-        </button>
-        <button onclick="window.electronAPI.installUpdate()"
-          style="background:#fff;color:#2c4e87;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font-weight:600">
-          Restart &amp; Update
-        </button>
-      </span>`;
-    document.body.appendChild(banner);
-  }
-
-  // Listen for update-ready event from main process
-  window.electronAPI.onUpdateReady(_showUpdateBanner);
-})();
-</script>
 
 </body>
 </html>

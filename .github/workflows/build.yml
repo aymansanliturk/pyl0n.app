@@ -3,11 +3,11 @@ name: Build & Release
 on:
   push:
     tags:
-      - 'v*.*.*'       # triggers on v1.0.0, v1.2.3, etc.
-  workflow_dispatch:   # allows manual trigger from GitHub UI
+      - 'v*.*.*'
+  workflow_dispatch:
 
 permissions:
-  contents: write      # needed to create GitHub Releases
+  contents: write
 
 jobs:
   build-mac:
@@ -25,7 +25,7 @@ jobs:
         run: npm ci
 
       - name: Build macOS DMG (x64 + arm64)
-        run: npm run build:mac   # runs obfuscate automatically via prebuild:mac
+        run: npm run build:mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -38,65 +38,13 @@ jobs:
             dist/*.zip
           retention-days: 5
 
-  build-win:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build Windows NSIS installer
-        run: npm run build:win
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Windows artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: win-dist
-          path: dist/*.exe
-          retention-days: 5
-
-  build-linux:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build Linux AppImage
-        run: npm run build:linux
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-dist
-          path: dist/*.AppImage
-          retention-days: 5
-
   release:
-    needs: [build-mac, build-win, build-linux]
+    needs: [build-mac]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download all build artifacts
+      - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
           path: dist-all
@@ -117,17 +65,13 @@ jobs:
 
             | Platform | File | Notes |
             |----------|------|-------|
-            | Windows  | `PYL0N Setup *.exe` | Run installer, then launch from Start Menu |
             | macOS    | `PYL0N-*.dmg` | Open DMG, drag PYL0N to Applications |
-            | Linux    | `PYL0N-*.AppImage` | `chmod +x` then run directly |
 
             ### What's new
             See commit history for changes in this release.
           files: |
             dist-all/mac-dist/*.dmg
             dist-all/mac-dist/*.zip
-            dist-all/win-dist/*.exe
-            dist-all/linux-dist/*.AppImage
           draft: false
           prerelease: false
         env:
