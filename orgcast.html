@@ -389,6 +389,9 @@ function updateLogoUI() {
     const fmt = document.getElementById('format-select').value;
     setFormat(fmt);
     if (typeof _scheduleSnap === 'function') _scheduleSnap();
+    // Re-render with correct layout if output is already showing
+    const out = document.getElementById('output');
+    if (out && out.style.display !== 'none') generate();
   }
 
   function setFormat(fmt) {
@@ -578,6 +581,28 @@ function updateLogoUI() {
     });
   }
 
+  // Portrait layout helpers ────────────────────────────────────────────────
+  // subtreeHeight: number of leaf-rows consumed by a subtree (1 per leaf)
+  function subtreeHeight(node) {
+    if (!node.children.length) return 1;
+    return node.children.reduce((s, c) => s + subtreeHeight(c), 0);
+  }
+
+  // Assign x,y positions for portrait mode: depth → column, rows → vertical
+  function layoutNodePortrait(node, depth, topOffset, positions) {
+    const sh = subtreeHeight(node);
+    const nw = NODE_W(), hg = H_GAP(), vg = V_GAP(), nh = NODE_H();
+    const x  = depth * (nw + hg);
+    // Centre this node vertically within its subtree span
+    const y  = topOffset * (nh + vg) + (sh - 1) * (nh + vg) / 2;
+    positions[node.id] = { x, y, w: nw, h: nh };
+    let childTop = topOffset;
+    node.children.forEach(child => {
+      layoutNodePortrait(child, depth + 1, childTop, positions);
+      childTop += subtreeHeight(child);
+    });
+  }
+
   // ── Render chart ──
   function renderChart(roots, people) {
     const canvas = document.getElementById('org-canvas');
@@ -588,21 +613,34 @@ function updateLogoUI() {
       return;
     }
 
-    // Layout
-    const positions = {};
-    let leftOffset = 0;
-    roots.forEach(r => {
-      layoutNode(r, 0, leftOffset, positions);
-      leftOffset += subtreeWidth(r);
-    });
-
-    // Canvas size
     const nw = NODE_W(), nh = NODE_H(), hg = H_GAP(), vg = V_GAP();
-    const totalW = leftOffset * (nw + hg) - hg + 40;
-    const maxDepth = people.reduce((m,p) => {
-      let d=0, cur=p; while(cur._parent){d++;cur=cur._parent;} return Math.max(m,d);
+    const positions  = {};
+    const isPortrait = currentFormat === 'a4-portrait';
+    let totalW, totalH;
+
+    const maxDepth = people.reduce((m, p) => {
+      let d = 0, cur = p; while (cur._parent) { d++; cur = cur._parent; } return Math.max(m, d);
     }, 0);
-    const totalH = (maxDepth + 1) * (nh + vg) - vg + 20;
+
+    if (isPortrait) {
+      // ── Portrait layout: depth = column (L→R), rows stack vertically ──
+      let topOffset = 0;
+      roots.forEach(r => {
+        layoutNodePortrait(r, 0, topOffset, positions);
+        topOffset += subtreeHeight(r);
+      });
+      totalW = (maxDepth + 1) * (nw + hg) - hg + 40;
+      totalH = topOffset * (nh + vg) - vg + 20;
+    } else {
+      // ── Landscape layout: depth = row (T→B), nodes spread horizontally ──
+      let leftOffset = 0;
+      roots.forEach(r => {
+        layoutNode(r, 0, leftOffset, positions);
+        leftOffset += subtreeWidth(r);
+      });
+      totalW = leftOffset * (nw + hg) - hg + 40;
+      totalH = (maxDepth + 1) * (nh + vg) - vg + 20;
+    }
 
     canvas.style.width  = totalW + 'px';
     canvas.style.height = totalH + 'px';
@@ -624,15 +662,15 @@ function updateLogoUI() {
 
     canvas.appendChild(svg);
 
-    // Draw nodes
+    // Draw nodes (same for all formats)
     people.forEach(p => {
       const pos = positions[p.id];
       if (!pos) return;
 
       const div = document.createElement('div');
       div.className = 'org-node' + (compactMode?' compact':'') + (p.vacancy?' vacancy':'');
-      div.style.left = (pos.x + 20) + 'px';
-      div.style.top  = (pos.y + 10) + 'px';
+      div.style.left  = (pos.x + 20) + 'px';
+      div.style.top   = (pos.y + 10) + 'px';
       div.style.width = pos.w + 'px';
 
       const coBg  = compColor(p.company) + '22';
@@ -660,68 +698,114 @@ function updateLogoUI() {
       canvas.appendChild(div);
     });
 
-    // Draw orthogonal connectors — grouped per parent (bus-bar style).
-    // Each parent gets: one vertical stub → one horizontal bus → per-child drops.
-    // This avoids overlapping lines when a parent has multiple children.
-    people.forEach(parent => {
-      if (!parent.children.length) return;
-      const pp = positions[parent.id];
-      if (!pp) return;
+    if (isPortrait) {
+      // ── Portrait connectors: L-shaped (parent right → busX → child left) ──
+      people.forEach(parent => {
+        if (!parent.children.length) return;
+        const pp = positions[parent.id];
+        if (!pp) return;
 
-      const px   = pp.x + 20 + pp.w / 2;  // parent center-x
-      const py   = pp.y + 10 + pp.h;       // parent bottom-y
-      const busY = py + vg / 2;             // horizontal bus level
+        const px   = pp.x + 20 + pp.w;      // parent right-edge x
+        const py   = pp.y + 10 + pp.h / 2;  // parent center-y
+        const busX = px + hg / 2;            // vertical bus x (between columns)
 
-      const valid = parent.children
-        .map(c => ({ c, cp: positions[c.id] }))
-        .filter(({ cp }) => !!cp);
-      if (!valid.length) return;
+        const valid = parent.children
+          .map(c => ({ c, cp: positions[c.id] }))
+          .filter(({ cp }) => !!cp);
+        if (!valid.length) return;
 
-      const xs   = valid.map(({ cp }) => cp.x + 20 + cp.w / 2);
-      const minX = Math.min(...xs);
-      const maxX = Math.max(...xs);
+        const ys   = valid.map(({ cp }) => cp.y + 10 + cp.h / 2);
+        const minY = Math.min(py, ...ys);
+        const maxY = Math.max(py, ...ys);
 
-      // 1. Vertical stub: parent bottom → bus level
-      line(px, py, px, busY);
-
-      // 2. Horizontal bus spanning all child columns
-      //    Extend to px as well so the stub always meets the bus
-      line(Math.min(px, minX), busY, Math.max(px, maxX), busY);
-
-      // 3. Per-child vertical drop: bus → child top
-      valid.forEach(({ cp }) => {
-        const cx = cp.x + 20 + cp.w / 2;
-        const cy = cp.y + 10;
-        line(cx, busY, cx, cy);
+        // 1. Horizontal stub: parent right → busX
+        line(px, py, busX, py);
+        // 2. Vertical bus spanning all child rows (and parent row)
+        line(busX, minY, busX, maxY);
+        // 3. Per-child horizontal: busX → child left
+        valid.forEach(({ cp }) => {
+          const cy = cp.y + 10 + cp.h / 2;
+          line(busX, cy, cp.x + 20, cy);
+        });
       });
-    });
+    } else {
+      // ── Landscape connectors: bus-bar (parent bottom → busY → child top) ──
+      people.forEach(parent => {
+        if (!parent.children.length) return;
+        const pp = positions[parent.id];
+        if (!pp) return;
+
+        const px   = pp.x + 20 + pp.w / 2;  // parent center-x
+        const py   = pp.y + 10 + pp.h;       // parent bottom-y
+        const busY = py + vg / 2;             // horizontal bus level
+
+        const valid = parent.children
+          .map(c => ({ c, cp: positions[c.id] }))
+          .filter(({ cp }) => !!cp);
+        if (!valid.length) return;
+
+        const xs   = valid.map(({ cp }) => cp.x + 20 + cp.w / 2);
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+
+        // 1. Vertical stub: parent bottom → bus level
+        line(px, py, px, busY);
+        // 2. Horizontal bus spanning all child columns
+        line(Math.min(px, minX), busY, Math.max(px, maxX), busY);
+        // 3. Per-child vertical drop: bus → child top
+        valid.forEach(({ cp }) => {
+          const cx = cp.x + 20 + cp.w / 2;
+          const cy = cp.y + 10;
+          line(cx, busY, cx, cy);
+        });
+      });
+    }
 
     // Auto-scale for print
-    autoScale(totalW);
+    autoScale(totalW, totalH);
   }
 
-  function autoScale(contentW) {
-    const wrap = document.getElementById('org-scale-wrap');
-    // Usable print width in mm per format
-    const printWmm = currentFormat === 'a3-landscape' ? 400
-                   : currentFormat === 'a4-portrait'  ? 190
-                   : 277; // a4-landscape default
+  function autoScale(contentW, contentH) {
+    const wrap    = document.getElementById('org-scale-wrap');
+    const canvas  = document.getElementById('org-canvas');
     const pxPerMm = 3.78;
-    const maxPx = printWmm * pxPerMm;
-    // If called without contentW (e.g. on format change), use canvas width
-    if (contentW === undefined) {
-      const canvas = document.getElementById('org-canvas');
-      contentW = canvas ? parseInt(canvas.style.width) || canvas.offsetWidth : 0;
-    }
-    const scale = contentW > maxPx ? maxPx / contentW : 1;
-    wrap.style.transform = scale < 1 ? `scale(${scale.toFixed(3)})` : '';
-    wrap.style.transformOrigin = 'top center';
-    const canvas = document.getElementById('org-canvas');
-    if (scale < 1) {
-      const scaledH = parseInt(canvas.style.height) * scale;
-      wrap.style.height = scaledH + 'px';
+
+    if (currentFormat === 'a4-portrait') {
+      // Portrait layout: nodes stack vertically → scale by HEIGHT
+      const printHmm = 257; // A4 297 mm − ~40 mm margins
+      const maxPx = printHmm * pxPerMm; // ≈ 972 px
+      if (contentH === undefined) {
+        contentH = canvas ? parseInt(canvas.style.height) || canvas.offsetHeight : 0;
+      }
+      if (!contentW) {
+        contentW = canvas ? parseInt(canvas.style.width) || canvas.offsetWidth : 0;
+      }
+      const scale = contentH > maxPx ? maxPx / contentH : 1;
+      wrap.style.transform       = scale < 1 ? `scale(${scale.toFixed(3)})` : '';
+      wrap.style.transformOrigin = 'top left';
+      if (canvas && scale < 1) {
+        wrap.style.height = (parseInt(canvas.style.height) * scale) + 'px';
+        wrap.style.width  = (parseInt(canvas.style.width)  * scale) + 'px';
+      } else {
+        wrap.style.height = '';
+        wrap.style.width  = '';
+      }
     } else {
-      wrap.style.height = '';
+      // Landscape modes: scale by WIDTH
+      if (contentW === undefined) {
+        contentW = canvas ? parseInt(canvas.style.width) || canvas.offsetWidth : 0;
+      }
+      const printWmm = currentFormat === 'a3-landscape' ? 400 : 277;
+      const maxPx    = printWmm * pxPerMm;
+      const scale    = contentW > maxPx ? maxPx / contentW : 1;
+      wrap.style.transform       = scale < 1 ? `scale(${scale.toFixed(3)})` : '';
+      wrap.style.transformOrigin = 'top center';
+      wrap.style.width           = '';
+      if (canvas && scale < 1) {
+        wrap.style.height = (parseInt(canvas.style.height) * scale) + 'px';
+      } else {
+        wrap.style.height = '';
+      }
     }
   }
 
