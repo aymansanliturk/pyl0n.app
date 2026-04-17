@@ -9,6 +9,7 @@
 <script src="libs/html2pdf.bundle.min.js"></script>
 <script src="vendor/pyl0n-native.js"></script>
 <script src="vendor/pyl0n-state.js"></script>
+<script src="vendor/pyl0n-validate.js"></script>
 <style id="page-size-style">@page { size: A3 landscape; margin: 8mm; }</style>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -576,6 +577,26 @@ function buildDetailPanel(tr, vendors, requiredMonths) {
   });
   panel.querySelectorAll('.inp-winner').forEach(inp => {
     inp.addEventListener('change', () => { saveDetailToRow(tr); updateVendorPills(tr, getVendorsFromPanel(panel)); });
+  });
+
+  panel.querySelectorAll('[data-key="price"]').forEach(inp => {
+    inp.addEventListener('blur', function() {
+      PylonValidate.markField(this, PylonValidate.nonNegative(this.value, 'Quote price'));
+    });
+  });
+  panel.querySelectorAll('[data-key="expOffer"]').forEach(end => {
+    end.addEventListener('blur', function() {
+      const vi = this.dataset.vi;
+      const start = panel.querySelector(`[data-vi="${vi}"][data-key="enquiry"]`);
+      PylonValidate.markField(this, PylonValidate.dateRange(start?.value, this.value, 'Enquiry → Expected Offer'));
+    });
+  });
+  panel.querySelectorAll('[data-key="validity"]').forEach(end => {
+    end.addEventListener('blur', function() {
+      const vi = this.dataset.vi;
+      const start = panel.querySelector(`[data-vi="${vi}"][data-key="offerRec"]`);
+      PylonValidate.markField(this, PylonValidate.dateRange(start?.value, this.value, 'Offer → Validity'));
+    });
   });
 }
 

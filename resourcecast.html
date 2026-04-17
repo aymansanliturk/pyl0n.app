@@ -9,6 +9,7 @@
 <script src="libs/html2pdf.bundle.min.js"></script>
 <script src="vendor/pyl0n-native.js"></script>
 <script src="vendor/pyl0n-state.js"></script>
+<script src="vendor/pyl0n-validate.js"></script>
 <style id="page-size-style">@page { size: A3 landscape; margin: 8mm; }
 </style>
 <style>
@@ -816,6 +817,10 @@ function updateLogoUI() {
     const tbody = document.getElementById('res-tbody');
     tbody.appendChild(tr);
 
+    tr.querySelector('.role-rate').addEventListener('blur', function() {
+      PylonValidate.markField(this, PylonValidate.positive(this.value, 'Rate'));
+    });
+
     tr.addEventListener('dragstart', e => { roleDragSrc=tr; tr.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; });
     tr.addEventListener('dragend',   () => { roleDragSrc=null; document.querySelectorAll('.role-row').forEach(rx=>rx.classList.remove('dragging','drag-over')); });
     tr.addEventListener('dragover',  e => { e.preventDefault(); if(roleDragSrc&&roleDragSrc!==tr) tr.classList.add('drag-over'); });
@@ -1014,6 +1019,10 @@ function updateLogoUI() {
         <input type="number" class="res-inp exp-inp-amt" value="${amt}" min="0" placeholder="0" step="100" oninput="updateExpTotals()">
       </td>
       <td><button class="btn-del-row" onclick="this.closest('tr').remove();updateExpTotals();">×</button></td>`;
+
+    tr.querySelector('.exp-inp-amt').addEventListener('blur', function() {
+      PylonValidate.markField(this, PylonValidate.nonNegative(this.value, 'Amount'));
+    });
 
     document.getElementById('exp-tbody').appendChild(tr);
     updateExpTotals();
