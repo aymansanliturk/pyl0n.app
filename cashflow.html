@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="libs/fonts.css">
 <script src="libs/chart.js"></script>
 <script src="vendor/pyl0n-validate.js"></script>
+<script src="vendor/pyl0n-suite.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -393,26 +394,6 @@ label {
 </div><!-- /editor -->
 
 <script>
-/* ══ SuiteManager ══════════════════════════════════════════════════════ */
-const SuiteManager = (() => {
-  const SYNC_KEY = 'bidcast_suite_sync';
-  const LOGO_KEY = 'bidcast_logo';
-  function read() { try { return JSON.parse(localStorage.getItem(SYNC_KEY) || '{}'); } catch { return {}; } }
-  function write(patch, src) {
-    try { const n = { ...read(), ...patch, _ts: Date.now(), _src: src }; localStorage.setItem(SYNC_KEY, JSON.stringify(n)); return n; } catch { return {}; }
-  }
-  function getLogo() { return localStorage.getItem(LOGO_KEY) || null; }
-  function migrate() {
-    const mv = [];
-    for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('pyl0n_')) mv.push(k); }
-    mv.forEach(k => { const nk = 'bidcast_' + k.slice(6); if (!localStorage.getItem(nk)) localStorage.setItem(nk, localStorage.getItem(k)); localStorage.removeItem(k); });
-  }
-  function onUpdate(cb) {
-    window.addEventListener('storage', e => { if (e.storageArea !== localStorage) return; if (e.key && e.key !== SYNC_KEY && e.key !== LOGO_KEY) return; cb(read(), e.key); });
-  }
-  return { read, write, getLogo, migrate, onUpdate };
-})();
-
 /* ══ Theme ═════════════════════════════════════════════════════════════ */
 function _applyTheme(t) {
   document.documentElement.setAttribute('data-theme', t);

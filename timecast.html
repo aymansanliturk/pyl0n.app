@@ -9,6 +9,7 @@
 <script src="libs/html2pdf.bundle.min.js"></script>
 <script src="libs/html2canvas.min.js"></script>
 <script src="vendor/pyl0n-native.js"></script>
+<script src="vendor/pyl0n-suite.js"></script>
 <script src="vendor/pyl0n-state.js"></script>
 <script src="vendor/pyl0n-validate.js"></script>
 <style>
@@ -550,46 +551,6 @@
 </div>
 
 <script>
-/* ══ SuiteManager ══════════════════════════════════════════════════
-   Central synchronisation utility for the Bid Forecast Suite.
-   Manages bidcast_suite_sync (project meta, phases, team) and
-   bidcast_logo (company logo as base64 dataURL).
-═══════════════════════════════════════════════════════════════════ */
-const SuiteManager = (() => {
-  const SYNC_KEY = 'bidcast_suite_sync';
-  const LOGO_KEY = 'bidcast_logo';
-  const CUSTOMER_LOGO_KEY = 'bidcast_customer_logo';
-  function read() {
-    try { return JSON.parse(localStorage.getItem(SYNC_KEY) || '{}'); } catch { return {}; }
-  }
-  function write(patch, source) {
-    try {
-      const next = { ...read(), ...patch, _ts: Date.now(), _src: source };
-      localStorage.setItem(SYNC_KEY, JSON.stringify(next));
-      return next;
-    } catch { return {}; }
-  }
-  function getLogo() { return localStorage.getItem(LOGO_KEY) || null; }
-  function getCustomerLogo() { return localStorage.getItem(CUSTOMER_LOGO_KEY) || null; }
-  function setLogo(dataUrl) { localStorage.setItem(LOGO_KEY, dataUrl); write({ _logoTs: Date.now() }, 'logo'); }
-  function removeLogo() { localStorage.removeItem(LOGO_KEY); write({ _logoTs: Date.now() }, 'logo'); }
-  function onUpdate(cb) {
-    window.addEventListener('storage', e => {
-      if (e.key === SYNC_KEY || e.key === LOGO_KEY || e.key === CUSTOMER_LOGO_KEY) cb(read(), e.key);
-    });
-  }
-  function updateBadge(el) {
-    if (!el) return;
-    const sync = read();
-    if (sync._ts) {
-      const s = Math.round((Date.now() - sync._ts) / 1000);
-      el.textContent = '↻ Synced ' + (s < 5 ? 'just now' : s < 60 ? s + 's ago' : Math.round(s / 60) + 'm ago');
-      el.style.display = 'inline';
-    }
-  }
-  return { read, write, getLogo, getCustomerLogo, setLogo, removeLogo, onUpdate, updateBadge };
-})();
-
 /* ── Logo (stored in bidcast_logo, shared across all tools) ── */
 function saveLogo(input) {
   const file = input.files[0];
