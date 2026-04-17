@@ -1,35 +1,15 @@
 /* sw.js — PYL0N Suite Service Worker
    Strategy:
-   - HTML navigations → Network-first (always fresh from server; cache as
-     offline fallback only). This prevents Safari WebKitInternal:0 errors and
-     avoids serving stale content after deployments.
-   - Static assets (scripts, libs, fonts, images) → Cache-first (fast repeat
-     loads; only hits the network on a miss).
-   All fetches use redirect:'follow' so the SW never hands a redirect
-   response to the browser (Safari refuses those with WebKitInternal:0).
+   - HTML navigations → fetch by URL string (cors mode, not navigate mode).
+     Safari WebKit refuses SW responses to navigate-mode fetches that involve
+     any redirect. Fetching the same URL as a plain cors GET sidesteps the
+     restriction entirely while still returning correct HTML to the browser.
+   - Static assets → Cache-first (vendor scripts, libs, fonts, icons).
+   - Offline fallback → cached HTML served when network is unavailable.
 */
 
-const CACHE_NAME = 'pyl0n-v3';
+const CACHE_NAME = 'pyl0n-v4';
 
-const PRECACHE_ASSETS = [
-  /* ── Brand assets ───────────────────────────────────────────────── */
-  './favicon.svg',
-  './logo.svg',
-
-  /* ── Vendor scripts ─────────────────────────────────────────────── */
-  './vendor/pyl0n-native.js',
-  './vendor/pyl0n-suite.js',
-  './vendor/pyl0n-state.js',
-  './vendor/pyl0n-validate.js',
-
-  /* ── Local libraries ────────────────────────────────────────────── */
-  './libs/chart.js',
-  './libs/xlsx.full.min.js',
-  './libs/html2pdf.bundle.min.js',
-  './libs/html2canvas.min.js',
-];
-
-/* HTML pages — fetched network-first at runtime, cached as offline fallback */
 const HTML_PAGES = [
   './index.html',
   './timecast.html',
@@ -45,40 +25,42 @@ const HTML_PAGES = [
   './cvcast.html',
 ];
 
-/* ── Install: pre-cache stable assets + seed HTML pages ─────────────── */
+const STATIC_ASSETS = [
+  './favicon.svg',
+  './logo.svg',
+  './vendor/pyl0n-native.js',
+  './vendor/pyl0n-suite.js',
+  './vendor/pyl0n-state.js',
+  './vendor/pyl0n-validate.js',
+  './libs/chart.js',
+  './libs/xlsx.full.min.js',
+  './libs/html2pdf.bundle.min.js',
+  './libs/html2canvas.min.js',
+];
+
+/* ── Install ─────────────────────────────────────────────────────────── */
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      const all = [...PRECACHE_ASSETS, ...HTML_PAGES];
-      return Promise.allSettled(
-        all.map(url =>
-          // redirect:'follow' prevents storing a redirect response in cache
+    caches.open(CACHE_NAME).then(cache =>
+      Promise.allSettled(
+        [...HTML_PAGES, ...STATIC_ASSETS].map(url =>
+          // Fetch as a plain string (cors mode) — never stores a redirect response.
           fetch(url, { redirect: 'follow' })
-            .then(res => {
-              if (res.ok) return cache.put(url, res);
-              console.warn('PYL0N SW: non-ok response for', url, res.status);
-            })
-            .catch(err => console.warn('PYL0N SW: could not pre-cache', url, err.message))
+            .then(res => { if (res.ok) return cache.put(url, res); })
+            .catch(err => console.warn('PYL0N SW: could not precache', url, err.message))
         )
-      );
-    }).then(() => self.skipWaiting())
+      )
+    ).then(() => self.skipWaiting())
   );
 });
 
-/* ── Activate: delete stale caches from previous versions ───────────── */
+/* ── Activate ────────────────────────────────────────────────────────── */
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
-      .then(keys =>
-        Promise.all(
-          keys
-            .filter(k => k !== CACHE_NAME)
-            .map(k => {
-              console.log('PYL0N SW: deleting old cache', k);
-              return caches.delete(k);
-            })
-        )
-      )
+      .then(keys => Promise.all(
+        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
+      ))
       .then(() => self.clients.claim())
   );
 });
@@ -87,33 +69,34 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
 
-  const url = new URL(event.request.url);
   const isNavigation = event.request.mode === 'navigate';
 
-  // ── HTML navigations: Network-first ──────────────────────────────────
-  // Always try the server so users get the latest version of the app.
-  // Fall back to the cached .html file only when offline.
   if (isNavigation) {
+    // ── HTML: network-first, fetched by URL string (cors mode) ──────────
+    // Using event.request.url (string) instead of event.request (object)
+    // avoids the Safari WebKit "response has redirections" error that occurs
+    // when a navigate-mode fetch encounters any redirect in the chain.
     event.respondWith(
-      fetch(event.request, { redirect: 'follow' })
+      fetch(event.request.url, { redirect: 'follow' })
         .then(response => {
-          if (!response.ok) return response; // pass through 4xx/5xx
-          // Cache the fresh response for offline use
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
+          if (response.ok) {
+            // Cache fresh copy for offline use, keyed to the full URL.
+            caches.open(CACHE_NAME).then(c => c.put(event.request.url, response.clone()));
+          }
           return response;
         })
         .catch(async () => {
-          // Offline: try the exact URL, then the .html variant, then index
-          const exact = await caches.match(event.request);
+          // Offline fallback: exact URL → .html variant → dashboard
+          const url = new URL(event.request.url);
+
+          const exact = await caches.match(event.request.url);
           if (exact) return exact;
 
-          // Cloudflare / Azure may serve /timecast (no extension).
-          // Try the .html variant we pre-cached.
+          // Cloudflare / Azure may serve /timecast without extension —
+          // try the .html variant we precached.
           if (!url.pathname.includes('.')) {
-            const htmlUrl = url.origin + url.pathname + '.html';
-            const htmlCached = await caches.match(htmlUrl);
-            if (htmlCached) return htmlCached;
+            const withHtml = await caches.match(url.origin + url.pathname + '.html');
+            if (withHtml) return withHtml;
           }
 
           return caches.match('./index.html');
@@ -122,23 +105,15 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // ── Static assets: Cache-first ───────────────────────────────────────
-  // Scripts, libs, fonts, images — stable and large; serve from cache.
+  // ── Static assets: cache-first ────────────────────────────────────────
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
-
       return fetch(event.request, { redirect: 'follow' }).then(response => {
-        if (
-          !response ||
-          response.status !== 200 ||
-          response.type === 'opaque' ||
-          response.type === 'opaqueredirect'
-        ) {
+        if (!response || response.status !== 200 || response.type === 'opaque') {
           return response;
         }
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
+        caches.open(CACHE_NAME).then(c => c.put(event.request, response.clone()));
         return response;
       });
     })
