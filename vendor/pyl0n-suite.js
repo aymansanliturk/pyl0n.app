@@ -192,6 +192,17 @@ const SuiteManager = (() => {
 
 /* ── PWA Service Worker registration + Breadcrumb injection ──────────── */
 if ('serviceWorker' in navigator) {
+  // When a new SW takes over (skipWaiting → clients.claim), reload once so
+  // the page starts fresh under the new SW — eliminates the "refresh twice"
+  // problem after a deployment.
+  var _swRefreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', function () {
+    if (!_swRefreshing) {
+      _swRefreshing = true;
+      window.location.reload();
+    }
+  });
+
   window.addEventListener('load', function () {
     navigator.serviceWorker.register('./sw.js').catch(function (err) {
       console.warn('PYL0N SW registration failed:', err);
