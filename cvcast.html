@@ -7,6 +7,7 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="libs/fonts.css">
 <script src="vendor/pyl0n-native.js"></script>
+<script src="vendor/pyl0n-state.js"></script>
 <script src="libs/html2pdf.bundle.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -941,42 +942,27 @@ async function exportHTML() {
   await nativeSaveHTML(name + '_CVCast.html', html);
 }
 
-/* ══ Undo / Redo ════════════════════════════════════════════════════════════ */
-let _hist = [], _histIdx = -1, _suppHist = false, _histTimer = null;
+/* ══ Undo / Redo (backed by vendor/pyl0n-state.js) ═══════════════════════════ */
+const _undoStack = PylonState.createUndoStack({
+  collect:    collectState,
+  apply:      applyState,
+  max:        50,
+  debounceMs: 600,
+  onChange:   () => {
+    _syncUndoUI();
+    PylonState.safeWriteLS(STATE_KEY, collectState());
+  },
+});
 
-function _snapshot() {
-  if (_suppHist) return;
-  const s = JSON.stringify(collectState());
-  if (_hist[_histIdx] === s) return;
-  _hist.splice(_histIdx + 1);
-  _hist.push(s);
-  if (_hist.length > 50) _hist.shift(); else _histIdx++;
-  _syncUndoUI();
-  localStorage.setItem(STATE_KEY, s);
-}
-function _scheduleSnap() {
-  if (_suppHist) return;
-  clearTimeout(_histTimer); _histTimer = setTimeout(_snapshot, 600);
-}
+function _snapshot()     { _undoStack.snapshot(); }
+function _scheduleSnap() { _undoStack.scheduleSnap(); }
 function _syncUndoUI() {
   const u = $id('btn-undo'), r = $id('btn-redo');
-  if (u) u.disabled = _histIdx <= 0;
-  if (r) r.disabled = _histIdx >= _hist.length - 1;
+  if (u) u.disabled = !_undoStack.canUndo;
+  if (r) r.disabled = !_undoStack.canRedo;
 }
-function undo() {
-  clearTimeout(_histTimer);
-  if (_histIdx <= 0) return;
-  _histIdx--; _suppHist = true;
-  applyState(JSON.parse(_hist[_histIdx]));
-  _suppHist = false; _syncUndoUI();
-}
-function redo() {
-  clearTimeout(_histTimer);
-  if (_histIdx >= _hist.length - 1) return;
-  _histIdx++; _suppHist = true;
-  applyState(JSON.parse(_hist[_histIdx]));
-  _suppHist = false; _syncUndoUI();
-}
+function undo() { _undoStack.undo(); }
+function redo() { _undoStack.redo(); }
 
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
