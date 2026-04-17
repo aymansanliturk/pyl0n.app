@@ -145,6 +145,20 @@ const SuiteManager = (() => {
     }
   }
 
+  /* ── Cross-tool breadcrumbs ───────────────────────────────────────────── */
+
+  function setReturnPath(url, toolName) {
+    write({ returnUrl: url, returnName: toolName }, 'breadcrumb');
+  }
+
+  function consumeReturnPath() {
+    const sync = read();
+    if (!sync.returnUrl) return null;
+    const path = { url: sync.returnUrl, name: sync.returnName };
+    write({ returnUrl: null, returnName: null }, 'breadcrumb');
+    return path;
+  }
+
   /* ── Migration (pyl0n_ → bidcast_) ───────────────────────────────────── */
 
   function migrate() {
@@ -172,5 +186,149 @@ const SuiteManager = (() => {
     getCustomerLogo, setCustomerLogo, removeCustomerLogo,
     onUpdate, updateBadge, migrate,
     checkStorageQuota,
+    setReturnPath, consumeReturnPath,
   };
+})();
+
+/* ── PWA Service Worker registration + Breadcrumb injection ──────────── */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('./sw.js').catch(function (err) {
+      console.warn('PYL0N SW registration failed:', err);
+    });
+
+    // Inject breadcrumb "Return to …" button if a return path was stored
+    const returnPath = SuiteManager.consumeReturnPath();
+    if (returnPath && returnPath.url &&
+        window.location.pathname.indexOf(returnPath.url) === -1) {
+      const tbLeft = document.querySelector('.tb-left');
+      if (tbLeft) {
+        const btn = document.createElement('button');
+        btn.className = 'tb-btn';
+        btn.style.color = 'var(--accent)';
+        btn.style.borderColor = 'var(--accent)';
+        btn.style.fontWeight = '700';
+        btn.setAttribute('aria-label', 'Return to ' + returnPath.name);
+        btn.innerHTML = '\u2190 Return to ' + returnPath.name;
+        btn.onclick = function () { window.location.href = returnPath.url; };
+        const sep = tbLeft.querySelector('.tb-sep');
+        if (sep && sep.nextSibling) {
+          tbLeft.insertBefore(btn, sep.nextSibling);
+        } else {
+          tbLeft.appendChild(btn);
+        }
+      }
+    }
+  });
+}
+
+/* ── Global Keyboard Shortcuts Overlay ───────────────────────────────── */
+(function () {
+  function toggleShortcutModal() {
+    var existing = document.getElementById('pyl0n-shortcuts-modal');
+    if (existing) { existing.remove(); return; }
+
+    var shortcuts = [
+      { keys: ['?'],               desc: 'Toggle this menu' },
+      { keys: ['Ctrl', 'S'],       desc: 'Force Snapshot / Save' },
+      { keys: ['Ctrl', 'Z'],       desc: 'Undo last action' },
+      { keys: ['Ctrl', 'Shift', 'Z'], desc: 'Redo action' },
+      { keys: ['Ctrl', 'E'],       desc: 'Export PDF' },
+    ];
+    if (window.PYL0N_TOOL_SHORTCUTS && Array.isArray(window.PYL0N_TOOL_SHORTCUTS)) {
+      shortcuts = shortcuts.concat(window.PYL0N_TOOL_SHORTCUTS);
+    }
+
+    var modal = document.createElement('div');
+    modal.id = 'pyl0n-shortcuts-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Keyboard Shortcuts');
+    modal.style.cssText = [
+      'position:fixed', 'top:0', 'left:0', 'width:100%', 'height:100%',
+      'background:rgba(0,0,0,0.6)', 'z-index:10000',
+      'display:flex', 'align-items:center', 'justify-content:center',
+      'backdrop-filter:blur(3px)',
+      "font-family:'DM Sans',sans-serif",
+    ].join(';');
+
+    var box = document.createElement('div');
+    box.style.cssText = [
+      'background:var(--surface,#fff)', 'color:var(--text,#111)',
+      'width:400px', 'max-width:90%', 'border-radius:8px',
+      'box-shadow:0 10px 30px rgba(0,0,0,0.3)', 'overflow:hidden',
+      'border:1px solid var(--border,#ccc)',
+    ].join(';');
+
+    var header = document.createElement('div');
+    header.style.cssText = [
+      'background:var(--accent,#2c4e87)', 'color:#fff',
+      'padding:15px 20px', 'font-weight:bold', 'font-size:16px',
+      'display:flex', 'justify-content:space-between', 'align-items:center',
+    ].join(';');
+    var title = document.createElement('span');
+    title.textContent = 'Keyboard Shortcuts';
+    var closeX = document.createElement('button');
+    closeX.textContent = '\u2715';
+    closeX.setAttribute('aria-label', 'Close keyboard shortcuts');
+    closeX.style.cssText = 'background:none;border:none;color:#fff;font-size:16px;cursor:pointer;opacity:0.8;padding:0;line-height:1;';
+    closeX.onmouseover = function () { closeX.style.opacity = '1'; };
+    closeX.onmouseout  = function () { closeX.style.opacity = '0.8'; };
+    closeX.onclick     = function () { modal.remove(); };
+    header.appendChild(title);
+    header.appendChild(closeX);
+
+    var body = document.createElement('div');
+    body.style.cssText = 'padding:20px;';
+
+    shortcuts.forEach(function (sc, i) {
+      var row = document.createElement('div');
+      var isLast = i === shortcuts.length - 1;
+      row.style.cssText = [
+        'display:flex', 'justify-content:space-between', 'align-items:center',
+        'padding-bottom:8px',
+        isLast ? '' : 'margin-bottom:12px;border-bottom:1px solid var(--border,#eee)',
+      ].join(';');
+
+      var descDiv = document.createElement('div');
+      descDiv.style.cssText = 'font-size:14px;opacity:0.9;';
+      descDiv.textContent = sc.desc;
+
+      var keysDiv = document.createElement('div');
+      keysDiv.style.cssText = 'display:flex;gap:4px;flex-shrink:0;margin-left:12px;';
+      sc.keys.forEach(function (k) {
+        var kbd = document.createElement('kbd');
+        kbd.style.cssText = [
+          'background:var(--bg,#eee)', 'border:1px solid var(--border,#ccc)',
+          'border-radius:4px', 'padding:2px 6px', 'font-size:12px',
+          'font-family:monospace', 'box-shadow:0 1px 0 var(--border,#ccc)',
+          'color:var(--text,#333)', 'white-space:nowrap',
+        ].join(';');
+        kbd.textContent = k;
+        keysDiv.appendChild(kbd);
+      });
+
+      row.appendChild(descDiv);
+      row.appendChild(keysDiv);
+      body.appendChild(row);
+    });
+
+    box.appendChild(header);
+    box.appendChild(body);
+    modal.appendChild(box);
+    modal.onclick = function (e) { if (e.target === modal) modal.remove(); };
+    document.body.appendChild(modal);
+    closeX.focus();
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === '?' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) {
+      e.preventDefault();
+      toggleShortcutModal();
+    }
+    if (e.key === 'Escape') {
+      var modal = document.getElementById('pyl0n-shortcuts-modal');
+      if (modal) modal.remove();
+    }
+  });
 })();

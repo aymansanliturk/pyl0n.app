@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RiskCast · PYL0N</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="libs/fonts.css">
 <script src="libs/xlsx.full.min.js"></script>
 <script src="libs/html2pdf.bundle.min.js"></script>
@@ -850,9 +851,10 @@ function loadJSON(input) {
         ['timecast','resourcecast','orgcast','rfqcast','dorcast','calccast','riskcast'].forEach(k => {
           if (k !== 'riskcast' && data[k]) localStorage.setItem('bidcast_state_' + k, JSON.stringify(data[k]));
         });
-        if (data.riskcast) applyState(data.riskcast);
+        if (data.riskcast) { PylonValidate.checkImport(data.riskcast, 'riskcast'); applyState(data.riskcast); }
         else alert('No RiskCast data found in this suite file.');
       } else {
+        PylonValidate.checkImport(data, 'riskcast');
         applyState(data);
       }
     } catch { alert('Invalid JSON file.'); }

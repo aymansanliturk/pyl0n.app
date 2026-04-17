@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PYL0N</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="libs/fonts.css">
 <script src="vendor/pyl0n-native.js"></script>
 <script src="vendor/pyl0n-suite.js"></script>
@@ -2334,6 +2335,7 @@ function runExecReport() {
 document.addEventListener('DOMContentLoaded', () => {
   _applyTheme(localStorage.getItem('bidcast_theme') || 'light');
   SuiteManager.migrate();
+  SuiteManager.setReturnPath(null, null);
   ppLoad();
   ppPopulateSelect();
   refreshStats();

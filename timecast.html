@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TimeCast · PYL0N</title>
 <style id="page-size-style">@page { size: A3 landscape; margin: 12mm; }</style>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="libs/fonts.css">
 <script src="libs/html2pdf.bundle.min.js"></script>
 <script src="libs/html2canvas.min.js"></script>
@@ -551,6 +553,13 @@
 </div>
 
 <script>
+/* ── Tool-specific keyboard shortcuts (shown by ? overlay) ── */
+window.PYL0N_TOOL_SHORTCUTS = [
+  { keys: ['G'], desc: 'Generate / refresh chart' },
+  { keys: ['Shift', 'Click'], desc: 'Multi-select tasks' },
+  { keys: ['Del'], desc: 'Delete selected task' },
+];
+
 /* ── Logo (stored in bidcast_logo, shared across all tools) ── */
 function saveLogo(input) {
   const file = input.files[0];
@@ -1763,9 +1772,10 @@ function updateLogoUI() {
           ['timecast','resourcecast','orgcast','rfqcast','dorcast','calccast','riskcast'].forEach(k => {
             if (k !== 'timecast' && data[k]) localStorage.setItem('bidcast_state_' + k, JSON.stringify(data[k]));
           });
-          if (data.timecast) applyState(data.timecast);
+          if (data.timecast) { PylonValidate.checkImport(data.timecast, 'timecast'); applyState(data.timecast); }
           else alert('No TimeCast data found in this suite file.');
         } else {
+          PylonValidate.checkImport(data, 'timecast');
           applyState(data);
         }
       } catch(err) { console.error('loadJSON error:', err); alert('Invalid .json file: ' + err.message); }

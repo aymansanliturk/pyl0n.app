@@ -4,11 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DORCast · PYL0N</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="libs/fonts.css">
 <script src="libs/xlsx.full.min.js"></script>
 <script src="libs/html2pdf.bundle.min.js"></script>
 <script src="vendor/pyl0n-native.js"></script>
 <script src="vendor/pyl0n-suite.js"></script>
+<script src="vendor/pyl0n-validate.js"></script>
 <script src="vendor/pyl0n-state.js"></script>
 <style id="page-size-style">@page { size: A3 landscape; margin: 8mm; }</style>
 <style>
@@ -789,9 +792,9 @@ function loadJSON(input) {
         ['timecast','resourcecast','orgcast','rfqcast','dorcast','calccast','riskcast'].forEach(k => {
           if (k !== 'dorcast' && data[k]) localStorage.setItem('bidcast_state_' + k, JSON.stringify(data[k]));
         });
-        if (data.dorcast) applyState(data.dorcast);
+        if (data.dorcast) { PylonValidate.checkImport(data.dorcast, 'dorcast'); applyState(data.dorcast); }
         else alert('No DORCast data found in this suite file.');
-      } else { applyState(data); }
+      } else { PylonValidate.checkImport(data, 'dorcast'); applyState(data); }
     } catch(err) { alert('Invalid .json file.'); }
   };
   reader.readAsText(file); input.value='';

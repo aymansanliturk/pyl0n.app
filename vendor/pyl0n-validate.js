@@ -12,6 +12,9 @@
  * Each validator returns `{ok: boolean, message?: string}`. Tools can
  * compose these at `collectState()` time or bind them to `input`/`blur`.
  *
+ * Also exposes `validateSchema(state, toolName)` + `showValidationWarning`
+ * for import-time schema checks across all 11 tools.
+ *
  * Adoption is opt-in per tool. Load via <script src="vendor/pyl0n-validate.js">
  * before any tool-specific script. No dependencies on tool globals.
  */
@@ -120,6 +123,165 @@
     return { ok: true };
   }
 
+  /* ── Import schema validation ──────────────────────────────────────────── */
+
+  /**
+   * Validate that a parsed JSON state object matches the expected shape for
+   * a given tool. Returns { isValid, warnings[] }.
+   * Checks are intentionally lenient — they only flag missing/wrong-type keys
+   * that would cause silent data loss, not every possible field.
+   *
+   * @param {*}      state    The parsed JSON object from a .json file load.
+   * @param {string} toolName One of the PYL0N tool identifiers.
+   * @returns {{ isValid: boolean, warnings: string[] }}
+   */
+  function validateSchema(state, toolName) {
+    const warnings = [];
+
+    if (!state || typeof state !== 'object' || Array.isArray(state)) {
+      return { isValid: false, warnings: ['File does not contain a valid JSON object'] };
+    }
+
+    function expectArray(val, field) {
+      if (val !== undefined && !Array.isArray(val)) {
+        warnings.push('"' + field + '" should be an array (got ' + typeof val + ')');
+      }
+      if (val === undefined || val === null) {
+        warnings.push('"' + field + '" is missing — rows may not load');
+      }
+    }
+
+    function expectNumber(val, field) {
+      if (val !== undefined && val !== null && typeof val !== 'number' && isNaN(parseFloat(val))) {
+        warnings.push('"' + field + '" should be a number (got ' + JSON.stringify(val) + ')');
+      }
+    }
+
+    switch (toolName) {
+      case 'timecast':
+        expectArray(state.projects, 'projects');
+        if (state.startYear !== undefined) expectNumber(state.startYear, 'startYear');
+        if (state.endYear   !== undefined) expectNumber(state.endYear,   'endYear');
+        break;
+
+      case 'resourcecast':
+        expectArray(state.phases,   'phases');
+        expectArray(state.roles,    'roles');
+        expectArray(state.expenses, 'expenses');
+        break;
+
+      case 'orgcast':
+        expectArray(state.people, 'people');
+        break;
+
+      case 'rfqcast':
+        expectArray(state.items, 'items');
+        break;
+
+      case 'dorcast':
+        expectArray(state.parties, 'parties');
+        expectArray(state.rows,    'rows');
+        break;
+
+      case 'riskcast':
+        expectArray(state.risks, 'risks');
+        break;
+
+      case 'calccast':
+        expectArray(state.costRows, 'costRows');
+        if (state.kpiEbit !== undefined) expectNumber(parseFloat(state.kpiEbit), 'kpiEbit');
+        if (state.kpiSga  !== undefined) expectNumber(parseFloat(state.kpiSga),  'kpiSga');
+        break;
+
+      case 'lettercast':
+        expectArray(state.sections, 'sections');
+        break;
+
+      case 'cvcast':
+        expectArray(state.experience, 'experience');
+        expectArray(state.languages,  'languages');
+        break;
+
+      default:
+        // Unknown tool — no schema defined; treat as valid
+        break;
+    }
+
+    return { isValid: warnings.length === 0, warnings: warnings };
+  }
+
+  /* ── Import warning banner ─────────────────────────────────────────────── */
+
+  const WARN_BANNER_ID = 'pyl0n-import-warn-banner';
+
+  /**
+   * Inject an amber dismissible banner listing import schema warnings.
+   * Auto-dismisses after 20 seconds. Does not stack — removes any prior banner first.
+   *
+   * @param {string[]} warnings
+   */
+  function showValidationWarning(warnings) {
+    if (!warnings || warnings.length === 0) return;
+
+    // Remove any pre-existing import warning banner
+    const existing = document.getElementById(WARN_BANNER_ID);
+    if (existing) existing.remove();
+
+    const first2 = warnings.slice(0, 2);
+    const more   = warnings.length > 2 ? ' (+' + (warnings.length - 2) + ' more)' : '';
+    const issueText = first2.join(' · ') + more;
+
+    const banner = document.createElement('div');
+    banner.id = WARN_BANNER_ID;
+    banner.style.cssText = [
+      'position:fixed', 'top:0', 'left:0', 'width:100%',
+      'background:#b45309', 'color:#fff', 'text-align:center',
+      'padding:10px 44px 10px 12px',
+      "font-family:'DM Sans',sans-serif", 'font-size:13px', 'font-weight:600',
+      'z-index:9998', 'box-shadow:0 2px 10px rgba(0,0,0,0.2)',
+      'box-sizing:border-box', 'line-height:1.5',
+    ].join(';');
+
+    banner.textContent =
+      '⚠️ Data Import Warning: This file may be from an older version or contain invalid data. ' +
+      'Issues found: ' + issueText + '. Please review your inputs carefully.';
+
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    closeBtn.setAttribute('aria-label', 'Dismiss import warning');
+    closeBtn.style.cssText = [
+      'position:absolute', 'right:12px', 'top:50%', 'transform:translateY(-50%)',
+      'background:none', 'border:none', 'color:#fff', 'font-size:16px',
+      'cursor:pointer', 'padding:0 4px', 'line-height:1', 'opacity:0.85',
+    ].join(';');
+    closeBtn.onmouseover = function () { closeBtn.style.opacity = '1'; };
+    closeBtn.onmouseout  = function () { closeBtn.style.opacity = '0.85'; };
+    closeBtn.onclick     = function () { banner.remove(); };
+    banner.appendChild(closeBtn);
+
+    if (document.body) {
+      document.body.insertBefore(banner, document.body.firstChild);
+    }
+
+    // Auto-dismiss after 20 s
+    var _t = setTimeout(function () { if (banner.parentNode) banner.remove(); }, 20000);
+    closeBtn.addEventListener('click', function () { clearTimeout(_t); });
+  }
+
+  /**
+   * Convenience one-liner: validate + show warning if invalid.
+   * Call immediately after JSON.parse, before applyState.
+   *
+   * @param {*}      state
+   * @param {string} toolName
+   */
+  function checkImport(state, toolName) {
+    var result = validateSchema(state, toolName);
+    if (!result.isValid && result.warnings.length > 0) {
+      showValidationWarning(result.warnings);
+    }
+  }
+
   /* ── UI helpers ────────────────────────────────────────────────────────── */
 
   const ERR_CLASS = 'pyl-invalid';
@@ -183,16 +345,22 @@
   /* ── Export ─────────────────────────────────────────────────────────────── */
 
   global.PylonValidate = {
-    required:    required,
-    numRange:    numRange,
-    positive:    positive,
-    nonNegative: nonNegative,
-    intRange:    intRange,
-    monthRange:  monthRange,
-    dateRange:   dateRange,
-    email:       email,
-    all:         all,
-    markField:   markField,
-    clearErrors: clearErrors,
+    // Primitive validators
+    required:             required,
+    numRange:             numRange,
+    positive:             positive,
+    nonNegative:          nonNegative,
+    intRange:             intRange,
+    monthRange:           monthRange,
+    dateRange:            dateRange,
+    email:                email,
+    all:                  all,
+    // Import schema validation
+    validateSchema:       validateSchema,
+    showValidationWarning: showValidationWarning,
+    checkImport:          checkImport,
+    // Inline field error UI
+    markField:            markField,
+    clearErrors:          clearErrors,
   };
 })(typeof window !== 'undefined' ? window : this);

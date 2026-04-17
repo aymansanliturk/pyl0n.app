@@ -1,0 +1,21 @@
+{
+  "name": "PYL0N Suite",
+  "short_name": "PYL0N",
+  "description": "Project Controls & Bidding Suite",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f5f4f0",
+  "theme_color": "#2c4e87",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "build/icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

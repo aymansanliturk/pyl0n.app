@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CalcCast · PYL0N</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="libs/fonts.css">
 <script src="libs/xlsx.full.min.js"></script>
 <script src="libs/html2pdf.bundle.min.js"></script>
@@ -287,8 +288,8 @@ input[type="number"] { font-family: 'DM Mono', monospace; }
     <button class="tb-btn" id="btn-undo" onclick="undo()" disabled>↩ Undo</button>
     <button class="tb-btn" id="btn-redo" onclick="redo()" disabled>↪ Redo</button>
     <div class="tb-sep"></div>
-    <button class="tb-btn" onclick="location.href='w2w-report.html'" style="border-color: var(--accent); color: var(--accent);">◱ W2W Report</button>
-    <button class="tb-btn" onclick="location.href='cashflow.html'" style="border-color: var(--green); color: var(--green);">◱ Cash Flow &amp; Risk</button>
+    <button class="tb-btn" onclick="SuiteManager.setReturnPath('calccast.html','CalcCast');location.href='w2w-report.html'" style="border-color: var(--accent); color: var(--accent);">◱ W2W Report</button>
+    <button class="tb-btn" onclick="SuiteManager.setReturnPath('calccast.html','CalcCast');location.href='cashflow.html'" style="border-color: var(--green); color: var(--green);">◱ Cash Flow &amp; Risk</button>
     <label class="tb-btn" style="cursor:pointer;">
       ↑ Load JSON
       <input type="file" accept=".json" style="display:none;" onchange="loadJSON(this)">
@@ -1152,7 +1153,7 @@ function loadJSON(input) {
   const file = input.files[0]; if (!file) return;
   const reader = new FileReader();
   reader.onload = e => {
-    try { applyState(JSON.parse(e.target.result)); } catch { alert('Invalid JSON file.'); }
+    try { const _s = JSON.parse(e.target.result); PylonValidate.checkImport(_s, 'calccast'); applyState(_s); } catch { alert('Invalid JSON file.'); }
   };
   reader.readAsText(file); input.value = '';
 }

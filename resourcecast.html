@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ResourceCast · PYL0N</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="libs/fonts.css">
 <script src="libs/xlsx.full.min.js"></script>
 <script src="libs/html2pdf.bundle.min.js"></script>
@@ -1432,9 +1434,9 @@ function updateLogoUI() {
           ['timecast','resourcecast','orgcast','rfqcast','dorcast','calccast','riskcast'].forEach(k => {
             if (k !== 'resourcecast' && data[k]) localStorage.setItem('bidcast_state_' + k, JSON.stringify(data[k]));
           });
-          if (data.resourcecast) applyState(data.resourcecast);
+          if (data.resourcecast) { PylonValidate.checkImport(data.resourcecast, 'resourcecast'); applyState(data.resourcecast); }
           else alert('No ResourceCast data found in this suite file.');
-        } else { applyState(data); }
+        } else { PylonValidate.checkImport(data, 'resourcecast'); applyState(data); }
       } catch(err) { alert('Invalid .json file.'); }
     };
     reader.readAsText(file); input.value='';

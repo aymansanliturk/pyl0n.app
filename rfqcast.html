@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RFQCast · PYL0N</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="libs/fonts.css">
 <script src="libs/xlsx.full.min.js"></script>
 <script src="libs/html2pdf.bundle.min.js"></script>
@@ -835,7 +837,12 @@ function pushToCalcCast() {
   sync._ts = Date.now();
   localStorage.setItem('bidcast_suite_sync', JSON.stringify(sync));
 
-  alert(`Successfully pushed ${pushedCount} winning quote${pushedCount !== 1 ? 's' : ''} to CalcCast!`);
+  if (pushedCount === 0) {
+    alert('No winning quotes to push. Mark a vendor as winner and enter a price first.');
+    return;
+  }
+  SuiteManager.setReturnPath('rfqcast.html', 'RFQCast');
+  window.location.href = 'calccast.html';
 }
 
 
@@ -1070,9 +1077,9 @@ function loadJSON(input) {
         ['timecast','resourcecast','orgcast','rfqcast','dorcast','calccast','riskcast'].forEach(k => {
           if (k !== 'rfqcast' && data[k]) localStorage.setItem('bidcast_state_' + k, JSON.stringify(data[k]));
         });
-        if (data.rfqcast) applyState(data.rfqcast);
+        if (data.rfqcast) { PylonValidate.checkImport(data.rfqcast, 'rfqcast'); applyState(data.rfqcast); }
         else alert('No RFQCast data found in this suite file.');
-      } else { applyState(data); }
+      } else { PylonValidate.checkImport(data, 'rfqcast'); applyState(data); }
     } catch(err) { alert('Invalid .json file.'); }
   };
   reader.readAsText(file); input.value='';

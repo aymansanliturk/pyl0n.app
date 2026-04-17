@@ -5,9 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LetterCast · PYL0N</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="libs/fonts.css">
 <script src="vendor/pyl0n-native.js"></script>
 <script src="vendor/pyl0n-suite.js"></script>
+<script src="vendor/pyl0n-validate.js"></script>
 <script src="vendor/pyl0n-state.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -813,7 +815,7 @@ function loadJSON(input) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = e => {
-    try   { applyState(JSON.parse(e.target.result)); autoSave(); }
+    try   { const _s = JSON.parse(e.target.result); PylonValidate.checkImport(_s, 'lettercast'); applyState(_s); autoSave(); }
     catch { alert('Invalid JSON file — please check the format.'); }
     finally { input.value = ''; }
   };
