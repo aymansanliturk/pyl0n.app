@@ -1,102 +1,81 @@
-/* sw.js — PYL0N Suite Service Worker
-   Strategy:
-   - HTML navigations → fetch by URL string (cors mode, not navigate mode).
-     Safari WebKit refuses SW responses to navigate-mode fetches that involve
-     any redirect. Fetching the same URL as a plain cors GET sidesteps the
-     restriction entirely while still returning correct HTML to the browser.
-   - Static assets → Cache-first (vendor scripts, libs, fonts, icons).
-   - Offline fallback → cached HTML served when network is unavailable.
+/* sw.js — PYL0N Suite Service Worker v5 (Safari-optimised)
+   Key fix: when a navigation response is redirected, reconstruct a clean
+   Response from the body so Safari does not reject it with
+   "response has redirections" (WebKitInternal:0).
 */
 
-const CACHE_NAME = 'pyl0n-v4';
+const CACHE_NAME = 'pyl0n-v5';
 
-const HTML_PAGES = [
+const PRECACHE_ASSETS = [
   './index.html',
-  './timecast.html',
-  './resourcecast.html',
-  './orgcast.html',
-  './rfqcast.html',
-  './dorcast.html',
-  './riskcast.html',
-  './calccast.html',
-  './lettercast.html',
-  './cashflow.html',
-  './w2w-report.html',
-  './cvcast.html',
-];
-
-const STATIC_ASSETS = [
   './favicon.svg',
   './logo.svg',
   './vendor/pyl0n-native.js',
   './vendor/pyl0n-suite.js',
   './vendor/pyl0n-state.js',
   './vendor/pyl0n-validate.js',
-  './libs/chart.js',
-  './libs/xlsx.full.min.js',
-  './libs/html2pdf.bundle.min.js',
-  './libs/html2canvas.min.js',
+  './libs/fonts.css',
+];
+
+// Tool page stems — used for extensionless offline URL matching
+const PAGES = [
+  'timecast', 'resourcecast', 'orgcast', 'rfqcast',
+  'dorcast', 'riskcast', 'calccast', 'lettercast',
+  'cashflow', 'w2w-report', 'cvcast',
 ];
 
 /* ── Install ─────────────────────────────────────────────────────────── */
 self.addEventListener('install', event => {
+  self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache =>
-      Promise.allSettled(
-        [...HTML_PAGES, ...STATIC_ASSETS].map(url =>
-          // Fetch as a plain string (cors mode) — never stores a redirect response.
-          fetch(url, { redirect: 'follow' })
-            .then(res => { if (res.ok) return cache.put(url, res); })
-            .catch(err => console.warn('PYL0N SW: could not precache', url, err.message))
-        )
-      )
-    ).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then(cache => cache.addAll(PRECACHE_ASSETS))
   );
 });
 
 /* ── Activate ────────────────────────────────────────────────────────── */
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(
-        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
-      ))
-      .then(() => self.clients.claim())
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+    )
   );
+  self.clients.claim();
 });
 
 /* ── Fetch ───────────────────────────────────────────────────────────── */
 self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
 
-  const isNavigation = event.request.mode === 'navigate';
+  // Only handle same-origin GET requests
+  if (event.request.method !== 'GET' || url.origin !== location.origin) return;
 
-  if (isNavigation) {
-    // ── HTML: network-first, fetched by URL string (cors mode) ──────────
-    // Using event.request.url (string) instead of event.request (object)
-    // avoids the Safari WebKit "response has redirections" error that occurs
-    // when a navigate-mode fetch encounters any redirect in the chain.
+  // ── HTML navigations ─────────────────────────────────────────────────
+  if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request.url, { redirect: 'follow' })
+      fetch(event.request)
         .then(response => {
-          if (response.ok) {
-            // Cache fresh copy for offline use, keyed to the full URL.
-            caches.open(CACHE_NAME).then(c => c.put(event.request.url, response.clone()));
+          // Safari fix: if the response was redirected, reconstruct a clean
+          // Response object from the body. This strips the internal redirect
+          // chain that WebKit refuses to serve from a service worker.
+          if (response.redirected) {
+            return new Response(response.body, {
+              status:     response.status,
+              statusText: response.statusText,
+              headers:    response.headers,
+            });
           }
+          caches.open(CACHE_NAME).then(c => c.put(event.request, response.clone()));
           return response;
         })
         .catch(async () => {
-          // Offline fallback: exact URL → .html variant → dashboard
-          const url = new URL(event.request.url);
+          // Offline fallback: exact match → .html variant → dashboard
+          const cached = await caches.match(event.request);
+          if (cached) return cached;
 
-          const exact = await caches.match(event.request.url);
-          if (exact) return exact;
-
-          // Cloudflare / Azure may serve /timecast without extension —
-          // try the .html variant we precached.
-          if (!url.pathname.includes('.')) {
-            const withHtml = await caches.match(url.origin + url.pathname + '.html');
-            if (withHtml) return withHtml;
+          const stem = url.pathname.split('/').pop();
+          if (PAGES.includes(stem)) {
+            const htmlCached = await caches.match(`./${stem}.html`);
+            if (htmlCached) return htmlCached;
           }
 
           return caches.match('./index.html');
@@ -105,17 +84,15 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // ── Static assets: cache-first ────────────────────────────────────────
+  // ── Static assets: network-first, cache as fallback ──────────────────
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      if (cached) return cached;
-      return fetch(event.request, { redirect: 'follow' }).then(response => {
-        if (!response || response.status !== 200 || response.type === 'opaque') {
-          return response;
+    fetch(event.request)
+      .then(response => {
+        if (response.status === 200) {
+          caches.open(CACHE_NAME).then(c => c.put(event.request, response.clone()));
         }
-        caches.open(CACHE_NAME).then(c => c.put(event.request, response.clone()));
         return response;
-      });
-    })
+      })
+      .catch(() => caches.match(event.request))
   );
 });
