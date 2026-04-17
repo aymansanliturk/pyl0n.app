@@ -392,15 +392,17 @@ textarea.tall { min-height: 100px; }
   </div>
   <div class="tb-right">
     <input type="file" id="load-file" accept=".json" style="display:none" onchange="loadJSON(this)">
-    <button class="tb-btn" id="btn-undo" onclick="undo()" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
-    <button class="tb-btn" id="btn-redo" onclick="redo()" disabled title="Redo (Ctrl+Y)">↪ Redo</button>
+    <button class="tb-btn" id="btn-undo" onclick="undo()" disabled title="Undo (Ctrl+Z)" aria-label="Undo (Ctrl+Z)">↩ Undo</button>
+    <button class="tb-btn" id="btn-redo" onclick="redo()" disabled title="Redo (Ctrl+Y)" aria-label="Redo (Ctrl+Y)">↪ Redo</button>
     <div class="tb-sep"></div>
     <button class="tb-btn" onclick="document.getElementById('load-file').click()">↑ Load JSON</button>
     <button class="tb-btn" onclick="saveJSON()">↓ Save JSON</button>
+    <div style="position:relative;display:inline-block;"><button class="tb-btn" id="backup-btn" onclick="_showBackups()" style="font-size:11px;" title="View autosave backups" aria-label="View autosave backups">⏱ Backups</button></div>
     <button class="tb-btn" onclick="exportHTML()">⬡ Export HTML</button>
     <button class="tb-btn primary" onclick="generate()">Preview →</button>
     <button class="tb-btn green" onclick="exportPDF()">⬇ Export PDF</button>
-    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;">🌙</button>
+    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;" aria-label="Toggle dark mode">🌙</button>
+    <span id="autosave-label" style="font-size:10px;color:var(--green);white-space:nowrap;"></span>
     <span class="save-confirm" id="save-confirm">✓ Saved!</span>
   </div>
 </div>
@@ -477,7 +479,7 @@ textarea.tall { min-height: 100px; }
 <!-- ── Output toolbar (preview mode) ── -->
 <div id="out-toolbar">
   <div id="out-toolbar-inner">
-    <button class="tb-btn" onclick="goBack()">← Back to Editor</button>
+    <button class="tb-btn" onclick="goBack()">← Edit Data</button>
     <button class="tb-btn green" onclick="exportPDF()">⬇ Export PDF</button>
   </div>
 </div>
@@ -621,7 +623,7 @@ function addExperience(data) {
   block.innerHTML = `
     <div class="dyn-block-hd">
       <span class="dyn-block-label">Experience #${id}</span>
-      <button class="btn-del" onclick="this.closest('.dyn-block').remove();autoSave();" title="Remove">✕</button>
+      <button class="btn-del" onclick="this.closest('.dyn-block').remove();autoSave();" title="Remove" aria-label="Remove">✕</button>
     </div>
     <div class="dyn-block-body">
       <div class="fields f2" style="margin-bottom:10px;">
@@ -685,7 +687,7 @@ function addLanguage(data) {
   block.innerHTML = `
     <div class="dyn-block-hd">
       <span class="dyn-block-label">Language #${id}</span>
-      <button class="btn-del" onclick="this.closest('.dyn-block').remove();autoSave();" title="Remove">✕</button>
+      <button class="btn-del" onclick="this.closest('.dyn-block').remove();autoSave();" title="Remove" aria-label="Remove">✕</button>
     </div>
     <div class="dyn-block-body">
       <div class="fields f2">
@@ -943,6 +945,8 @@ async function exportHTML() {
 }
 
 /* ══ Undo / Redo (backed by vendor/pyl0n-state.js) ═══════════════════════════ */
+let _lastSaved = null;
+
 const _undoStack = PylonState.createUndoStack({
   collect:    collectState,
   apply:      applyState,
@@ -951,6 +955,8 @@ const _undoStack = PylonState.createUndoStack({
   onChange:   () => {
     _syncUndoUI();
     PylonState.safeWriteLS(STATE_KEY, collectState());
+    _writeBackup();
+    _lastSaved = Date.now(); _updateSavedLabel();
   },
 });
 
@@ -991,6 +997,69 @@ function _applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme || 'light');
   const btn = $id('theme-toggle-btn');
   if (btn) btn.textContent = theme === 'dark' ? '☀' : '🌙';
+}
+
+function _updateSavedLabel() {
+  const el = $id('autosave-label');
+  if (!el) return;
+  if (!_lastSaved) { el.textContent = ''; return; }
+  const s = Math.floor((Date.now() - _lastSaved) / 1000);
+  el.textContent = s < 5 ? '● Saved' : s < 60 ? '● Saved ' + s + 's ago' : '● Saved ' + Math.floor(s / 60) + 'm ago';
+}
+
+function _writeBackup() {
+  const stateStr = localStorage.getItem(STATE_KEY);
+  if (!stateStr) return;
+  localStorage.setItem('bidcast_backup_cvcast_' + Date.now(), stateStr);
+  const prefix = 'bidcast_backup_cvcast_';
+  const keys = Object.keys(localStorage).filter(k => k.startsWith(prefix)).sort();
+  while (keys.length > 5) localStorage.removeItem(keys.shift());
+}
+
+function _showBackups() {
+  const existing = $id('backup-popover');
+  if (existing) { existing.remove(); return; }
+  const prefix = 'bidcast_backup_cvcast_';
+  const keys = Object.keys(localStorage).filter(k => k.startsWith(prefix)).sort().reverse();
+  const pop = document.createElement('div');
+  pop.id = 'backup-popover';
+  pop.style.cssText = 'position:absolute;z-index:999;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px;min-width:220px;max-height:200px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.12);font-size:11px;';
+  if (keys.length === 0) {
+    pop.innerHTML = '<div style="color:var(--faint);padding:4px 6px;">No backups yet.</div>';
+  } else {
+    keys.forEach(k => {
+      const ts = parseInt(k.replace(prefix, ''));
+      const d = new Date(ts);
+      const item = document.createElement('div');
+      item.style.cssText = 'padding:5px 8px;cursor:pointer;border-radius:4px;';
+      item.textContent = _relTime(ts) + ' — ' + d.toLocaleTimeString();
+      item.onmouseover = () => item.style.background = 'var(--bg)';
+      item.onmouseout  = () => item.style.background = '';
+      item.onclick = () => {
+        if (!confirm('Restore this backup? Current state will be replaced.')) return;
+        try { applyState(JSON.parse(localStorage.getItem(k))); pop.remove(); } catch { alert('Could not restore backup.'); }
+      };
+      pop.appendChild(item);
+    });
+  }
+  const btn = $id('backup-btn');
+  if (btn) {
+    const rect = btn.getBoundingClientRect();
+    pop.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+    pop.style.right = (window.innerWidth - rect.right) + 'px';
+    pop.style.left = 'auto';
+  }
+  document.body.appendChild(pop);
+  setTimeout(() => document.addEventListener('click', function _cl(e) {
+    if (!pop.contains(e.target) && e.target.id !== 'backup-btn') { pop.remove(); document.removeEventListener('click', _cl); }
+  }), 50);
+}
+
+function _relTime(ts) {
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60)  return s + 's ago';
+  if (s < 3600) return Math.floor(s / 60) + 'm ago';
+  return Math.floor(s / 3600) + 'h ago';
 }
 
 /* ══ Boot ═══════════════════════════════════════════════════════════════════ */

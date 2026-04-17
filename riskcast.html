@@ -354,7 +354,7 @@ input[type="text"]:focus { border-color:var(--accent); background:var(--input-bg
     <div class="tb-sep"></div>
     <button class="tb-btn green" onclick="exportExcel()">⬇ Export Excel</button>
     <button class="tb-btn primary" onclick="exportPDF()">⬇ Export PDF</button>
-    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;">🌙</button>
+    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;" aria-label="Toggle dark mode">🌙</button>
     <div style="position:relative;display:inline-block;"><button class="tb-btn" id="backup-btn" onclick="_showBackups()" style="font-size:11px;">⏱ Backups</button></div>
     <span id="autosave-label" style="font-size:10px;color:var(--faint);"></span>
     <span class="save-confirm" id="save-confirm">✓ Saved!</span>
@@ -429,7 +429,7 @@ input[type="text"]:focus { border-color:var(--accent); background:var(--input-bg
 <!-- ══════════════════ OUTPUT ══════════════════ -->
 <div id="output">
   <div class="print-bar no-print">
-    <button class="pb-btn" onclick="goBack()">← Edit</button>
+    <button class="pb-btn" onclick="goBack()">← Edit Data Data/button>
     <button class="pb-btn export" onclick="exportPDF()">Export PDF</button>
     <button class="pb-btn xl" onclick="exportExcel()">Export Excel</button>
     <button class="pb-btn" onclick="saveJSON()">Save .json</button>
@@ -669,7 +669,7 @@ function addRisk(d) {
     <td class="td-score"><span class="exposure-badge emv-neutral">—</span></td>
     <td><input class="risk-input risk-mitigation" type="text" placeholder="Mitigation plan…" value="${esc(d.mitigation||'')}"></td>
     <td><select class="risk-sel risk-status">${optStatus(d.status||'Open')}</select></td>
-    <td><button class="btn-del-row" onclick="removeRisk(this)" title="Remove risk">✕</button></td>
+    <td><button class="btn-del-row" onclick="removeRisk(this)" title="Remove risk" aria-label="Remove risk">✕</button></td>
   `;
 
   tr.querySelector('.sel-lh').addEventListener('change',        () => _refreshScore(tr));

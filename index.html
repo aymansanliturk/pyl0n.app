@@ -489,7 +489,7 @@
       <div class="header-meta">100% Private · Local Execution</div>
     </div>
   </div>
-  <button id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:16px;padding:4px 8px;border:none;background:transparent;cursor:pointer;color:inherit;margin-left:auto;">🌙</button>
+  <button id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:16px;padding:4px 8px;border:none;background:transparent;cursor:pointer;color:inherit;margin-left:auto;" aria-label="Toggle dark mode">🌙</button>
 </header>
 
 <!-- ── Workspace Bar ── -->
@@ -501,16 +501,16 @@
       <div class="pp-sep"></div>
       <input id="pp-name" class="pp-input name" type="text" placeholder="Project name…" title="Project name — syncs to all tools instantly">
       <div class="pp-sep"></div>
-      <button class="pp-btn" onclick="ppSave()" title="Save current project">Save</button>
-      <button class="pp-btn" onclick="ppNew()"  title="Create new blank project">New</button>
-      <button class="pp-btn danger" id="pp-del-btn" onclick="ppDelete()" title="Delete active project" disabled>Delete</button>
+      <button class="pp-btn" onclick="ppSave()" title="Save current project" aria-label="Save current project">Save</button>
+      <button class="pp-btn" onclick="ppNew()"  title="Create new blank project" aria-label="Create new blank project">New</button>
+      <button class="pp-btn danger" id="pp-del-btn" onclick="ppDelete()" title="Delete active project" disabled aria-label="Delete active project">Delete</button>
       <span class="pp-proj-count" id="pp-proj-count">0/5</span>
       <div class="pp-sep"></div>
       <div class="pp-logo-wrap">
         <img id="pp-logo-preview" class="pp-logo-preview" alt="Logo">
         <input type="file" id="pp-logo-input" accept="image/*" style="display:none" onchange="ppSaveLogo(this)">
         <button class="pp-btn" id="pp-logo-btn" onclick="document.getElementById('pp-logo-input').click()">⊕ Logo</button>
-        <button class="pp-btn danger" id="pp-logo-clear" onclick="ppClearLogo()" style="display:none">✕</button>
+        <button class="pp-btn danger" id="pp-logo-clear" onclick="ppClearLogo()" style="display:none" aria-label="Remove">✕</button>
       </div>
       <div class="pp-sep"></div>
       <span class="pp-sync-dot" id="pp-sync-dot" title="Changes synced to all open tools"></span>
@@ -711,22 +711,22 @@
         <div class="archive-rows">
           <div class="archive-row">
             <div class="archive-row-desc"><strong>Full Project Archive</strong> — all tools, settings &amp; logo in one file.</div>
-            <button class="pp-btn" style="border-color:var(--accent);color:var(--accent);font-weight:700;" onclick="masterExport()" title="Download Full_Project_Archive.json">↓ Export</button>
+            <button class="pp-btn" style="border-color:var(--accent);color:var(--accent);font-weight:700;" onclick="masterExport()" title="Download Full_Project_Archive.json" aria-label="Download Full_Project_Archive.json">↓ Export</button>
           </div>
           <div class="archive-row">
             <div class="archive-row-desc">Restore entire suite from a previously exported archive.</div>
             <input type="file" id="master-import-input" accept=".json" style="display:none"
                    onchange="masterImport(this)">
-            <button class="pp-btn" style="border-color:var(--accent);color:var(--accent);font-weight:700;" onclick="document.getElementById('master-import-input').click()" title="Import archive JSON">↑ Import</button>
+            <button class="pp-btn" style="border-color:var(--accent);color:var(--accent);font-weight:700;" onclick="document.getElementById('master-import-input').click()" title="Import archive JSON" aria-label="Import archive JSON">↑ Import</button>
           </div>
           <div class="archive-row">
             <div class="archive-row-desc">Consolidated executive summary from all suite tools — print-ready PDF.</div>
-            <button class="pp-btn" style="border-color:var(--accent);color:var(--accent);font-weight:700;" onclick="openErConfig()" title="Generate Executive Report">📄 Executive Report</button>
+            <button class="pp-btn" style="border-color:var(--accent);color:var(--accent);font-weight:700;" onclick="openErConfig()" title="Generate Executive Report" aria-label="Generate Executive Report">📄 Executive Report</button>
           </div>
           <div class="archive-row" style="flex-direction:column;align-items:stretch;gap:4px;">
             <div style="display:flex;align-items:center;gap:8px;">
               <div class="archive-row-desc" style="flex:1;"><strong>Snapshots</strong> — freeze a named point-in-time you can restore later.</div>
-              <button class="pp-btn" style="border-color:var(--green);color:var(--green);font-weight:700;flex-shrink:0;" onclick="snapshotFreeze()" title="Save a named snapshot of the current state">📸 Freeze</button>
+              <button class="pp-btn" style="border-color:var(--green);color:var(--green);font-weight:700;flex-shrink:0;" onclick="snapshotFreeze()" title="Save a named snapshot of the current state" aria-label="Save a named snapshot of the current state">📸 Freeze</button>
             </div>
             <div id="snap-list" class="snap-list"><div class="snap-empty">No snapshots yet.</div></div>
           </div>
@@ -1890,7 +1890,7 @@ function snapshotRenderList() {
       <div class="snap-item-name" title="${name}">${name}</div>
       <div class="snap-item-ts">${ts}</div>
       <button class="pp-btn" style="padding:2px 8px;font-size:10px;" onclick="snapshotRestore('${s.id}')">Restore</button>
-      <button class="pp-btn danger" style="padding:2px 8px;font-size:10px;" onclick="snapshotDelete('${s.id}')">✕</button>
+      <button class="pp-btn danger" style="padding:2px 8px;font-size:10px;" onclick="snapshotDelete('${s.id}')" aria-label="Remove">✕</button>
     </div>`;
   }).join('');
 }

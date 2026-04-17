@@ -8,6 +8,8 @@
 <script src="libs/xlsx.full.min.js"></script>
 <script src="libs/html2pdf.bundle.min.js"></script>
 <script src="vendor/pyl0n-native.js"></script>
+<script src="vendor/pyl0n-state.js"></script>
+<script src="vendor/pyl0n-validate.js"></script>
 <style id="page-size-style">@page { size: A3 landscape; margin: 8mm; }</style>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -240,7 +242,7 @@ input:focus, select:focus { border-color:var(--accent); background:var(--input-b
     <label class="tb-btn" style="cursor:pointer;">↑ Import Excel<input type="file" accept=".xlsx,.xls" style="display:none" onchange="importExcel(this)"></label>
     <button class="tb-btn green" onclick="exportExcel()">⬇ Export Excel</button>
     <button class="tb-btn" onclick="exportHTML()">⬇ Export HTML</button>
-    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;">🌙</button>
+    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;" aria-label="Toggle dark mode">🌙</button>
     <div style="position:relative;display:inline-block;"><button class="tb-btn" id="backup-btn" onclick="_showBackups()" style="font-size:11px;">⏱ Backups</button></div>
     <span id="autosave-label" style="font-size:10px;color:var(--faint);"></span>
     <span class="save-confirm" id="save-confirm">✓ Saved!</span>
@@ -289,7 +291,7 @@ input:focus, select:focus { border-color:var(--accent); background:var(--input-b
     </div>
     <div class="add-row-bar">
       <button class="btn-add-row" onclick="addItem({})">+ Add Item</button>
-      <button class="btn-green" onclick="pushToCalcCast()" title="Send winning bids to the Pricing Engine">→ Push to CalcCast</button>
+      <button class="btn-green" onclick="pushToCalcCast()" title="Send winning bids to the Pricing Engine" aria-label="Send winning bids to the Pricing Engine">→ Push to CalcCast</button>
     </div>
   </div>
 
@@ -477,7 +479,7 @@ function addItem(data) {
   tr.innerHTML = `
     <td style="white-space: nowrap;">
       <span class="drag-handle" title="Drag to reorder" style="vertical-align: middle;">⋮⋮</span>
-      <button class="expand-btn" title="Click to expand details" style="vertical-align: middle; margin-left: 4px;">
+      <button class="expand-btn" title="Click to expand details" style="vertical-align: middle; margin-left: 4px;" aria-label="Click to expand details">
         <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
       </button>
     </td>
@@ -487,7 +489,7 @@ function addItem(data) {
     <td class="v-cell" data-vi="0"></td>
     <td class="v-cell" data-vi="1"></td>
     <td class="v-cell" data-vi="2"></td>
-    <td><button class="btn-del" onclick="deleteRow(this)">×</button></td>`;
+    <td><button class="btn-del" onclick="deleteRow(this)" aria-label="Delete">×</button></td>`;
 
   tbody.appendChild(tr);
 
@@ -575,6 +577,26 @@ function buildDetailPanel(tr, vendors, requiredMonths) {
   });
   panel.querySelectorAll('.inp-winner').forEach(inp => {
     inp.addEventListener('change', () => { saveDetailToRow(tr); updateVendorPills(tr, getVendorsFromPanel(panel)); });
+  });
+
+  panel.querySelectorAll('[data-key="price"]').forEach(inp => {
+    inp.addEventListener('blur', function() {
+      PylonValidate.markField(this, PylonValidate.nonNegative(this.value, 'Quote price'));
+    });
+  });
+  panel.querySelectorAll('[data-key="expOffer"]').forEach(end => {
+    end.addEventListener('blur', function() {
+      const vi = this.dataset.vi;
+      const start = panel.querySelector(`[data-vi="${vi}"][data-key="enquiry"]`);
+      PylonValidate.markField(this, PylonValidate.dateRange(start?.value, this.value, 'Enquiry → Expected Offer'));
+    });
+  });
+  panel.querySelectorAll('[data-key="validity"]').forEach(end => {
+    end.addEventListener('blur', function() {
+      const vi = this.dataset.vi;
+      const start = panel.querySelector(`[data-vi="${vi}"][data-key="offerRec"]`);
+      PylonValidate.markField(this, PylonValidate.dateRange(start?.value, this.value, 'Offer → Validity'));
+    });
   });
 }
 
@@ -1221,42 +1243,28 @@ window.addEventListener('afterprint', function() {
   else { out.setAttribute('style','display:block'); ed.setAttribute('style','display:none'); }
 });
 
-// ── Undo / Redo ──
-let _hist = [], _histIdx = -1, _suppHist = false, _histTimer = null, _lastSaved = null;
+// ── Undo / Redo (backed by vendor/pyl0n-state.js) ──
+let _lastSaved = null;
 
-function _snapshot() {
-  if (_suppHist) return;
-  const s = JSON.stringify(collectState());
-  if (_hist[_histIdx] === s) return;
-  _hist = _hist.slice(0, _histIdx + 1);
-  _hist.push(s);
-  if (_hist.length > 50) _hist.shift(); else _histIdx++;
-  _syncUndoUI();
-  localStorage.setItem('bidcast_state_rfqcast', s);
-  _lastSaved = Date.now(); _updateSavedLabel();
-}
-function _scheduleSnap() {
-  if (_suppHist) return;
-  clearTimeout(_histTimer); _histTimer = setTimeout(_snapshot, 800);
-}
-function undo() {
-  clearTimeout(_histTimer);
-  if (_histIdx <= 0) return;
-  _suppHist = true; _histIdx--;
-  applyState(JSON.parse(_hist[_histIdx]));
-  _suppHist = false; _syncUndoUI();
-}
-function redo() {
-  clearTimeout(_histTimer);
-  if (_histIdx >= _hist.length - 1) return;
-  _suppHist = true; _histIdx++;
-  applyState(JSON.parse(_hist[_histIdx]));
-  _suppHist = false; _syncUndoUI();
-}
+const _undoStack = PylonState.createUndoStack({
+  collect:    collectState,
+  apply:      applyState,
+  max:        50,
+  debounceMs: 800,
+  onChange: () => {
+    _syncUndoUI();
+    PylonState.safeWriteLS('bidcast_state_rfqcast', collectState());
+    _lastSaved = Date.now(); _updateSavedLabel();
+  },
+});
+function _snapshot()     { _undoStack.snapshot(); }
+function _scheduleSnap() { _undoStack.scheduleSnap(); }
+function undo()          { _undoStack.undo(); }
+function redo()          { _undoStack.redo(); }
 function _syncUndoUI() {
   const u = document.getElementById('btn-undo'), r = document.getElementById('btn-redo');
-  if (u) u.disabled = _histIdx <= 0;
-  if (r) r.disabled = _histIdx >= _hist.length - 1;
+  if (u) u.disabled = !_undoStack.canUndo;
+  if (r) r.disabled = !_undoStack.canRedo;
 }
 function _updateSavedLabel() {
   const el = document.getElementById('autosave-label');
@@ -1274,14 +1282,13 @@ document.addEventListener('keydown', e => {
   }
 });
 (function() {
-  const _rawApply = applyState;
-  applyState = s => { _suppHist = true; _rawApply(s); _suppHist = false; };
   const ed = document.getElementById('editor');
   if (ed) {
-    new MutationObserver(() => {
-      if (_suppHist) return;
-      clearTimeout(_histTimer); _histTimer = setTimeout(_snapshot, 400);
-    }).observe(ed, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'], characterData: true, characterDataSubtree: true });
+    new MutationObserver(_scheduleSnap).observe(ed, {
+      childList: true, subtree: true,
+      attributes: true, attributeFilter: ['style'],
+      characterData: true, characterDataSubtree: true,
+    });
     ed.addEventListener('input',  _scheduleSnap);
     ed.addEventListener('change', _scheduleSnap);
   }

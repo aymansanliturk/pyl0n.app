@@ -7,6 +7,7 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="libs/fonts.css">
 <script src="libs/chart.js"></script>
+<script src="vendor/pyl0n-validate.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -266,7 +267,7 @@ label {
   </div>
   <div class="tb-right">
     <button class="tb-btn" onclick="loadSuiteData(); simulate();" style="border-color:var(--accent);color:var(--accent);">↺ Refresh Data</button>
-    <button class="tb-btn" id="theme-btn" onclick="toggleTheme()" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;">🌙</button>
+    <button class="tb-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle dark mode" aria-label="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;">🌙</button>
   </div>
 </div>
 
@@ -448,7 +449,7 @@ function renderMilestones() {
     html += `<div style="display:flex; gap:8px; align-items:center;">
       <input type="number" style="width:80px; padding:6px; font-size:12px; border:1px solid var(--border); border-radius:4px; background:var(--input-bg); color:var(--text); font-family:'DM Mono',monospace;" value="${ms.m}" min="1" max="${_simData.duration || 120}" onchange="updateMilestone(${i},'m',this.value)">
       <input type="number" style="width:80px; padding:6px; font-size:12px; border:1px solid var(--border); border-radius:4px; background:var(--input-bg); color:var(--text); font-family:'DM Mono',monospace;" value="${ms.p}" min="0" max="100" step="1" onchange="updateMilestone(${i},'p',this.value)">
-      <button onclick="removeMilestone(${i})" style="background:none; border:none; color:var(--faint); cursor:pointer; font-size:14px;">✕</button>
+      <button onclick="removeMilestone(${i})" title="Remove milestone" aria-label="Remove milestone" style="background:none; border:none; color:var(--faint); cursor:pointer; font-size:14px;">✕</button>
     </div>`;
   });
   cont.innerHTML = html;
@@ -986,7 +987,7 @@ function renderItemDist() {
             onchange="updateItemMilestone(${jid},${idx},'m',this.value)">
           <input class="item-ms-inp" type="number" value="${ms.p}" min="0" max="100" step="1"
             onchange="updateItemMilestone(${jid},${idx},'p',this.value)">
-          <button class="item-ms-del" onclick="removeItemMilestone(${jid},${idx})">✕</button>
+          <button class="item-ms-del" onclick="removeItemMilestone(${jid},${idx})" title="Remove milestone" aria-label="Remove milestone">✕</button>
         </div>`;
       });
       html += `<div class="item-ms-total" style="color:${msTotal===100?'var(--green)':'var(--red)'}">Total: ${msTotal}%</div>
@@ -997,6 +998,12 @@ function renderItemDist() {
 
   html += '</div>';
   section.innerHTML = html;
+
+  section.querySelectorAll('.item-ms-inp[max="100"]').forEach(inp => {
+    inp.addEventListener('blur', function() {
+      PylonValidate.markField(this, PylonValidate.numRange(this.value, 0, 100, 'Payment %'));
+    });
+  });
 }
 
 function _ensureItemDist(itemId) {

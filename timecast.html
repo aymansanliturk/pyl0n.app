@@ -9,6 +9,7 @@
 <script src="libs/html2pdf.bundle.min.js"></script>
 <script src="libs/html2canvas.min.js"></script>
 <script src="vendor/pyl0n-native.js"></script>
+<script src="vendor/pyl0n-state.js"></script>
 <script src="vendor/pyl0n-validate.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -421,7 +422,7 @@
     <button class="tb-btn" id="btn-redo" onclick="redo()" disabled>↪ Redo</button>
     <div class="tb-sep"></div>
     <button class="tb-btn" onclick="exportHTML()">⬇ Export HTML</button>
-    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;">🌙</button>
+    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;" aria-label="Toggle dark mode">🌙</button>
     <div style="position:relative;display:inline-block;"><button class="tb-btn" id="backup-btn" onclick="_showBackups()" style="font-size:11px;">⏱ Backups</button></div>
     <span id="autosave-label" style="font-size:10px;color:var(--faint);"></span>
     <span class="save-confirm" id="save-confirm">✓ Saved!</span>
@@ -495,7 +496,7 @@
     <div class="reorder-sidebar no-print">
       <div class="sidebar-actions">
         <button class="sb-btn sb-btn-primary" onclick="refreshChart()">↻ Refresh Chart</button>
-        <button class="sb-btn sb-btn-ghost" onclick="goBack()">← Back to Editor</button>
+        <button class="sb-btn sb-btn-ghost" onclick="goBack()">← Edit Data</button>
         <button class="sb-btn sb-btn-ghost" id="sb-print-btn" onclick="window.print()">🖨 Print</button>
         <button class="sb-btn sb-btn-ghost" onclick="exportPDF()">⬇ PDF</button>
         <button class="sb-btn sb-btn-ghost" style="background:#4f46e5;color:#fff;" onclick="exportPNG()">🖼 PNG</button>
@@ -534,13 +535,13 @@
       <!-- Dynamic time-window control: shift or resize the visible date range -->
       <div id="time-window-ctrl" class="time-window-ctrl no-print">
         <span style="font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--faint);flex-shrink:0;">Visible Window</span>
-        <button class="tw-btn" onclick="_shiftWindow(-3)" title="Shift window 3 months earlier">← 3m</button>
-        <button class="tw-btn" onclick="_shiftWindow(-1)" title="Shift window 1 month earlier">← 1m</button>
+        <button class="tw-btn" onclick="_shiftWindow(-3)" title="Shift window 3 months earlier" aria-label="Shift window 3 months earlier">← 3m</button>
+        <button class="tw-btn" onclick="_shiftWindow(-1)" title="Shift window 1 month earlier" aria-label="Shift window 1 month earlier">← 1m</button>
         <input type="range" id="window-slider" min="3" max="48" value="12" step="1"
                oninput="_resizeWindow(parseInt(this.value))" title="Drag to resize visible window (months)">
         <span id="window-label">12 months</span>
-        <button class="tw-btn" onclick="_shiftWindow(1)" title="Shift window 1 month later">1m →</button>
-        <button class="tw-btn" onclick="_shiftWindow(3)" title="Shift window 3 months later">3m →</button>
+        <button class="tw-btn" onclick="_shiftWindow(1)" title="Shift window 1 month later" aria-label="Shift window 1 month later">1m →</button>
+        <button class="tw-btn" onclick="_shiftWindow(3)" title="Shift window 3 months later" aria-label="Shift window 3 months later">3m →</button>
       </div>
       <div class="chart-watermark">Generated with PYL0N Time · Bid Timeline Intelligence</div>
     </div>
@@ -762,7 +763,7 @@ function updateLogoUI() {
     initDragRow(tr);
 
     tr.innerHTML = `
-      <td style="width:3%"><span class="drag-handle" title="Drag to reorder">⠿</span></td>
+      <td style="width:3%"><span class="drag-handle" title="Drag to reorder" aria-hidden="true">⠿</span></td>
       <td style="width:5%"><span class="type-badge ${isM?'type-mile':'type-bar'}">${isM?'◆':'▬'}</span></td>
       <td style="width:20%"><input class="t-name" type="text" value="${data.name||''}" placeholder="${isM?'Milestone':'Phase'} name"></td>
       <td style="width:11%"><select class="t-sm">${optsFor(scale, smDisp)}</select></td>
@@ -781,7 +782,7 @@ function updateLogoUI() {
       <td style="width:13%"><input class="t-notes" type="text" value="${data.notes||''}" placeholder="Notes..." style="font-size:11px"></td>
       <td style="width:6%"><input class="pct-input" type="number" min="0" max="100" value="${data.pct||0}" style="width:46px;font-size:11px;text-align:center;"><span style="font-size:10px;color:var(--faint);">%</span></td>
       <td style="width:8%">${!isM ? `<button class="btn-baseline-toggle" onclick="toggleBaseline(this)">± Plan</button>` : ''}</td>
-      <td style="width:4%"><button class="btn-del" onclick="removeTaskRow(this)">×</button></td>
+      <td style="width:4%"><button class="btn-del" onclick="removeTaskRow(this)" aria-label="Delete">×</button></td>
     `;
 
     const btr = document.createElement('tr');
@@ -914,7 +915,7 @@ function updateLogoUI() {
           <input type="color" class="proj-color-inp" value="${color}" onchange="updateProjColor(${id},this.value)">
         </label>
         <input type="text" class="proj-name-inp" id="proj-name-${id}" value="${name}" placeholder="Project name" oninput="onProjNameChange(${id}, this.value)">
-        <button class="btn-del" onclick="removeProject(${id})" title="Remove project">×</button>
+        <button class="btn-del" onclick="removeProject(${id})" title="Remove project" aria-label="Remove project">×</button>
       </div>
       <div class="subsection" id="bid-section-${id}">
         <div class="subsection-title">Bid Phase <span class="pill pill-bid">PM20–PM80</span>
@@ -1158,7 +1159,7 @@ function updateLogoUI() {
           item.innerHTML = `
             <span class="si-dot${t.type==='milestone'?' diamond':''}" style="background:${t.color}"></span>
             <span class="si-name">${t.name}</span>
-            <span class="si-handle">⠿</span>
+            <span class="si-handle" aria-hidden="true">⠿</span>
           `;
           item.addEventListener('dragstart', e => { sbDragSrc = item; item.classList.add('si-dragging'); e.dataTransfer.effectAllowed='move'; });
           item.addEventListener('dragend',   () => { sbDragSrc=null; container.querySelectorAll('.sidebar-item').forEach(i=>i.classList.remove('si-dragging','si-drag-over')); });
@@ -1852,43 +1853,29 @@ function updateLogoUI() {
   updateProjWarn();
   updateDelBtns();
 
-  // ── Undo / Redo ──
-  let _hist = [], _histIdx = -1, _suppHist = false, _histTimer = null, _lastSaved = null;
+  // ── Undo / Redo (backed by vendor/pyl0n-state.js) ──
+  let _lastSaved = null;
 
-  function _snapshot() {
-    if (_suppHist) return;
-    const s = JSON.stringify(collectState());
-    if (_hist[_histIdx] === s) return;
-    _hist = _hist.slice(0, _histIdx + 1);
-    _hist.push(s);
-    if (_hist.length > 50) _hist.shift(); else _histIdx++;
-    _syncUndoUI();
-    localStorage.setItem('bidcast_state_timecast', s);
-    suiteWrite();
-    _lastSaved = Date.now(); _updateSavedLabel();
-  }
-  function _scheduleSnap() {
-    if (_suppHist) return;
-    clearTimeout(_histTimer); _histTimer = setTimeout(_snapshot, 800);
-  }
-  function undo() {
-    clearTimeout(_histTimer);
-    if (_histIdx <= 0) return;
-    _suppHist = true; _histIdx--;
-    applyState(JSON.parse(_hist[_histIdx]));
-    _suppHist = false; _syncUndoUI();
-  }
-  function redo() {
-    clearTimeout(_histTimer);
-    if (_histIdx >= _hist.length - 1) return;
-    _suppHist = true; _histIdx++;
-    applyState(JSON.parse(_hist[_histIdx]));
-    _suppHist = false; _syncUndoUI();
-  }
+  const _undoStack = PylonState.createUndoStack({
+    collect:    collectState,
+    apply:      applyState,
+    max:        50,
+    debounceMs: 800,
+    onChange: () => {
+      _syncUndoUI();
+      PylonState.safeWriteLS('bidcast_state_timecast', collectState());
+      suiteWrite();
+      _lastSaved = Date.now(); _updateSavedLabel();
+    },
+  });
+  function _snapshot()     { _undoStack.snapshot(); }
+  function _scheduleSnap() { _undoStack.scheduleSnap(); }
+  function undo()          { _undoStack.undo(); }
+  function redo()          { _undoStack.redo(); }
   function _syncUndoUI() {
     const u = document.getElementById('btn-undo'), r = document.getElementById('btn-redo');
-    if (u) u.disabled = _histIdx <= 0;
-    if (r) r.disabled = _histIdx >= _hist.length - 1;
+    if (u) u.disabled = !_undoStack.canUndo;
+    if (r) r.disabled = !_undoStack.canRedo;
   }
   function _updateSavedLabel() {
     const el = document.getElementById('autosave-label');
@@ -1906,14 +1893,9 @@ function updateLogoUI() {
     }
   });
   (function() {
-    const _rawApply = applyState;
-    applyState = s => { _suppHist = true; _rawApply(s); _suppHist = false; };
     const ed = document.getElementById('editor');
     if (ed) {
-      new MutationObserver(() => {
-        if (_suppHist) return;
-        clearTimeout(_histTimer); _histTimer = setTimeout(_snapshot, 400);
-      }).observe(ed, { childList: true, subtree: true });
+      new MutationObserver(_scheduleSnap).observe(ed, { childList: true, subtree: true });
       ed.addEventListener('input', _scheduleSnap);
     }
     setTimeout(_snapshot, 300);

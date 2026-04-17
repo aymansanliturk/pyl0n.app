@@ -7,6 +7,7 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="libs/fonts.css">
 <script src="libs/chart.js"></script>
+<script src="vendor/pyl0n-validate.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -387,7 +388,7 @@ table.w2w-tbl tr.w2w-row-spacer td { height: 6px; background: var(--bg); padding
   <div class="tb-right">
     <button class="tb-btn" onclick="refreshAll()">↻ Refresh from CalcCast</button>
     <span id="proj-name-display"></span>
-    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode">🌙</button>
+    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" aria-label="Toggle dark mode">🌙</button>
   </div>
 </div>
 
@@ -1334,6 +1335,12 @@ function renderFactories() {
       <div class="factory-stack" id="fstack-${f.id}">${_factoryStackHTML(r)}</div>
     </div>`;
   }).join('');
+
+  list.querySelectorAll('.factory-kpis input[type="number"]').forEach(inp => {
+    inp.addEventListener('blur', function() {
+      PylonValidate.markField(this, PylonValidate.numRange(this.value, 0, 100, 'KPI %'));
+    });
+  });
 }
 
 /* ══ W2W Consolidated Table ════════════════════════════════════════════════ */
@@ -1522,6 +1529,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const pn = sync.projectName || '';
     const el = $('proj-name-display');
     if (el && pn) el.textContent = pn;
+  });
+
+  // Validate project-level KPI % inputs (0–100)
+  ['w-spec-risk','w-unspec-risk','w-sga','w-exu','w-ba','w-ebit','w-neg','w-warranty',
+   'sb-risk','sb-sga','sb-exu','sb-ba','sb-ebit','sb-neg'].forEach(id => {
+    const inp = document.getElementById(id);
+    if (inp) inp.addEventListener('blur', function() {
+      PylonValidate.markField(this, PylonValidate.numRange(this.value, 0, 100, 'KPI %'));
+    });
   });
 });
 </script>

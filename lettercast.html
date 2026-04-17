@@ -354,14 +354,14 @@
   </div>
   <div class="tb-right">
     <input type="file" id="load-file" accept=".json" style="display:none" onchange="loadJSON(this)">
-    <button class="tb-btn" id="btn-undo" onclick="undo()" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
-    <button class="tb-btn" id="btn-redo" onclick="redo()" disabled title="Redo (Ctrl+Y)">↪ Redo</button>
+    <button class="tb-btn" id="btn-undo" onclick="undo()" disabled title="Undo (Ctrl+Z)" aria-label="Undo (Ctrl+Z)">↩ Undo</button>
+    <button class="tb-btn" id="btn-redo" onclick="redo()" disabled title="Redo (Ctrl+Y)" aria-label="Redo (Ctrl+Y)">↪ Redo</button>
     <div class="tb-sep"></div>
     <button class="tb-btn" onclick="document.getElementById('load-file').click()">↑ Load JSON</button>
     <button class="tb-btn" onclick="saveJSON()">↓ Save JSON</button>
     <button class="tb-btn primary" onclick="generate()">Preview →</button>
     <button class="tb-btn green" onclick="exportPDF()">⬇ Export PDF</button>
-    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;">🌙</button>
+    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;" aria-label="Toggle dark mode">🌙</button>
     <div style="position:relative;display:inline-block;"><button class="tb-btn" id="backup-btn" onclick="_showBackups()" style="font-size:11px;">⏱ Backups</button></div>
     <span id="autosave-label" style="font-size:10px;color:var(--faint);"></span>
     <span class="save-confirm" id="save-confirm">✓ Saved!</span>
@@ -454,7 +454,7 @@
       <div id="sections-list"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
         <button class="btn-add-sec" onclick="addSection()">+ Add Section</button>
-        <button class="btn-add-sec" onclick="insertRiskSummary()" title="Pull medium+ risks from RiskCast into a Risks &amp; Deviations section" style="border-color:var(--accent);color:var(--accent);">↺ Risks from RiskCast</button>
+        <button class="btn-add-sec" onclick="insertRiskSummary()" title="Pull medium+ risks from RiskCast into a Risks &amp; Deviations section" style="border-color:var(--accent);color:var(--accent);" aria-label="Pull medium+ risks from RiskCast into a Risks &amp; Deviations section">↺ Risks from RiskCast</button>
       </div>
     </div>
   </div>
@@ -464,7 +464,7 @@
 <!-- ── Output toolbar (screen preview) ── -->
 <div id="out-toolbar">
   <div id="out-toolbar-inner">
-    <button class="tb-btn" onclick="goBack()">← Back to Editor</button>
+    <button class="tb-btn" onclick="goBack()">← Edit Data</button>
     <button class="tb-btn green" onclick="exportPDF()">⬇ Print / Export PDF</button>
   </div>
 </div>
@@ -598,20 +598,20 @@ function addSection(data) {
   block.dataset.id = _secCount;
   block.innerHTML  = `
     <div class="dyn-block-hd">
-      <span class="drag-handle" title="Drag to reorder">⠿</span>
+      <span class="drag-handle" title="Drag to reorder" aria-hidden="true">⠿</span>
       <input type="text" value="${esc(title)}" placeholder="Section Title" oninput="autoSave()">
-      <button class="btn-del-sec" onclick="this.closest('.dyn-block').remove();autoSave();" title="Remove">✕</button>
+      <button class="btn-del-sec" onclick="this.closest('.dyn-block').remove();autoSave();" title="Remove" aria-label="Remove">✕</button>
     </div>
     <div class="fmt-toolbar">
-      <button class="fmt-btn" onmousedown="event.preventDefault();_fmt('bold')"            title="Bold (Ctrl+B)"><b>B</b></button>
-      <button class="fmt-btn" onmousedown="event.preventDefault();_fmt('italic')"          title="Italic (Ctrl+I)"><i>I</i></button>
-      <button class="fmt-btn" onmousedown="event.preventDefault();_fmt('underline')"       title="Underline (Ctrl+U)"><u>U</u></button>
-      <button class="fmt-btn" onmousedown="event.preventDefault();_fmt('strikeThrough')"   title="Strikethrough"><s>S</s></button>
+      <button class="fmt-btn" onmousedown="event.preventDefault();_fmt('bold')"            title="Bold (Ctrl+B)" aria-label="Bold (Ctrl+B)"><b>B</b></button>
+      <button class="fmt-btn" onmousedown="event.preventDefault();_fmt('italic')"          title="Italic (Ctrl+I)" aria-label="Italic (Ctrl+I)"><i>I</i></button>
+      <button class="fmt-btn" onmousedown="event.preventDefault();_fmt('underline')"       title="Underline (Ctrl+U)" aria-label="Underline (Ctrl+U)"><u>U</u></button>
+      <button class="fmt-btn" onmousedown="event.preventDefault();_fmt('strikeThrough')"   title="Strikethrough" aria-label="Strikethrough"><s>S</s></button>
       <div class="fmt-sep"></div>
-      <button class="fmt-btn" onmousedown="event.preventDefault();_fmt('insertUnorderedList')" title="Bullet list">• List</button>
-      <button class="fmt-btn" onmousedown="event.preventDefault();_fmt('insertOrderedList')"   title="Numbered list">1. List</button>
+      <button class="fmt-btn" onmousedown="event.preventDefault();_fmt('insertUnorderedList')" title="Bullet list" aria-label="Bullet list">• List</button>
+      <button class="fmt-btn" onmousedown="event.preventDefault();_fmt('insertOrderedList')"   title="Numbered list" aria-label="Numbered list">1. List</button>
       <div class="fmt-sep"></div>
-      <button class="fmt-btn" onmousedown="event.preventDefault();_fmt('removeFormat')"   title="Clear formatting">✕ fmt</button>
+      <button class="fmt-btn" onmousedown="event.preventDefault();_fmt('removeFormat')"   title="Clear formatting" aria-label="Clear formatting">✕ fmt</button>
     </div>
     <div class="dyn-block-body" style="padding:0;">
       <div class="sec-body" contenteditable="true" spellcheck="true" oninput="autoSave()"></div>

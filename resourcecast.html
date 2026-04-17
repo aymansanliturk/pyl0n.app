@@ -8,6 +8,8 @@
 <script src="libs/xlsx.full.min.js"></script>
 <script src="libs/html2pdf.bundle.min.js"></script>
 <script src="vendor/pyl0n-native.js"></script>
+<script src="vendor/pyl0n-state.js"></script>
+<script src="vendor/pyl0n-validate.js"></script>
 <style id="page-size-style">@page { size: A3 landscape; margin: 8mm; }
 </style>
 <style>
@@ -301,7 +303,7 @@
     <button class="tb-btn" id="btn-redo" onclick="redo()" disabled>↪ Redo</button>
     <div class="tb-sep"></div>
     <button class="tb-btn" onclick="exportHTML()">⬇ Export HTML</button>
-    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;">🌙</button>
+    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;" aria-label="Toggle dark mode">🌙</button>
     <div style="position:relative;display:inline-block;"><button class="tb-btn" id="backup-btn" onclick="_showBackups()" style="font-size:11px;">⏱ Backups</button></div>
     <span id="autosave-label" style="font-size:10px;color:var(--faint);"></span>
     <span class="save-confirm" id="save-confirm">✓ Saved!</span>
@@ -363,7 +365,7 @@
       <select id="rc-proj-filter" style="display:none; font-family:'DM Sans',sans-serif; font-size:12px; padding:6px 10px; border-radius:6px; border:1px solid var(--border); outline:none; background:var(--bg);" onchange="filterResourceProjects()">
         <option value="ALL">All Projects</option>
       </select>
-      <button class="btn-secondary" onclick="loadSETemplate()" style="font-size:11px;padding:5px 12px;" title="Load 17 standard SE roles with EUR rates">⚙ SE Template</button>
+      <button class="btn-secondary" onclick="loadSETemplate()" style="font-size:11px;padding:5px 12px;" title="Load 17 standard SE roles with EUR rates" aria-label="Load 17 standard SE roles with EUR rates">⚙ SE Template</button>
       <div class="pb-sep"></div>
       <label class="pb-btn" style="margin:0;cursor:pointer;">
         📥 Import Excel
@@ -649,9 +651,9 @@ function updateLogoUI() {
     chip.dataset.ey = data.ey || '';
     chip.dataset.project = data.project || '';
     chip.draggable  = true;
-    chip.innerHTML  = `<span class="drag-handle">⠿</span>
+    chip.innerHTML  = `<span class="drag-handle" aria-hidden="true">⠿</span>
       <input type="text" value="${esc(name)}" placeholder="Phase name" oninput="rebuildMonthlyGrid()">
-      <button class="phase-chip-del" onclick="removePhase(${id})" title="Remove phase">×</button>`;
+      <button class="phase-chip-del" onclick="removePhase(${id})" title="Remove phase" aria-label="Remove phase">×</button>`;
 
     chip.addEventListener('dragstart', e => { phaseDragSrc=chip; chip.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; });
     chip.addEventListener('dragend',   () => { phaseDragSrc=null; document.querySelectorAll('.phase-chip').forEach(c=>c.classList.remove('dragging','drag-over')); });
@@ -714,7 +716,7 @@ function updateLogoUI() {
           : `${MN[ph.sm-1]}'${String(ph.sy).slice(-2)}–${MN[ph.em-1]}'${String(ph.ey).slice(-2)}`
         : '';
       const toggleBtn = hasDates
-        ? `<button class="mg-toggle-btn" onclick="togglePhase('${ph.id}')" title="${isCol?'Expand months':'Collapse to total'}">${isCol?'▶':'▼'}</button>`
+        ? `<button class="mg-toggle-btn" onclick="togglePhase('${ph.id}')" title="${isCol?'Expand months':'Collapse to total'}" aria-label="${isCol?'Expand months':'Collapse to total'}">${isCol?'▶':'▼'}</button>`
         : '';
       r1 += `<th colspan="${span}" class="mg-ph-th phase-col" data-proj="${esc(ph.project || '')}" style="background:${color}12;color:${color};border-left:2px solid ${color}55;border-right:2px solid ${color}55;">${toggleBtn}<strong>${esc(ph.name)}</strong>${rangeStr ? `<span class="mg-ph-range">${rangeStr}</span>` : ''}</th>`;
     });
@@ -805,15 +807,19 @@ function updateLogoUI() {
     tr.draggable  = true;
 
     tr.innerHTML = `
-      <td class="mg-sticky-name"><span class="drag-handle">⠿</span><input type="text" class="res-inp res-inp-name role-name" value="${esc(r.name || '')}" placeholder="Name / role" oninput="updateMonthlyTotals()"></td>
+      <td class="mg-sticky-name"><span class="drag-handle" aria-hidden="true">⠿</span><input type="text" class="res-inp res-inp-name role-name" value="${esc(r.name || '')}" placeholder="Name / role" oninput="updateMonthlyTotals()"></td>
       <td class="mg-sticky-rate"><input type="number" class="res-inp res-inp-rate role-rate" value="${r.rate != null ? r.rate : ''}" min="0" max="9999" step="1" placeholder="0" oninput="updateMonthlyTotals()"></td>
       ${monthCells}
       <td class="calc-cell role-total-h" data-role="${id}">—</td>
       <td class="calc-cell hi role-total-eur" data-role="${id}">—</td>
-      <td><button class="btn-del-row" onclick="removeRole(this)">×</button></td>`;
+      <td><button class="btn-del-row" onclick="removeRole(this)" aria-label="Delete">×</button></td>`;
 
     const tbody = document.getElementById('res-tbody');
     tbody.appendChild(tr);
+
+    tr.querySelector('.role-rate').addEventListener('blur', function() {
+      PylonValidate.markField(this, PylonValidate.positive(this.value, 'Rate'));
+    });
 
     tr.addEventListener('dragstart', e => { roleDragSrc=tr; tr.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; });
     tr.addEventListener('dragend',   () => { roleDragSrc=null; document.querySelectorAll('.role-row').forEach(rx=>rx.classList.remove('dragging','drag-over')); });
@@ -1012,7 +1018,11 @@ function updateLogoUI() {
       <td style="text-align:right;">
         <input type="number" class="res-inp exp-inp-amt" value="${amt}" min="0" placeholder="0" step="100" oninput="updateExpTotals()">
       </td>
-      <td><button class="btn-del-row" onclick="this.closest('tr').remove();updateExpTotals();">×</button></td>`;
+      <td><button class="btn-del-row" onclick="this.closest('tr').remove();updateExpTotals();" aria-label="Delete">×</button></td>`;
+
+    tr.querySelector('.exp-inp-amt').addEventListener('blur', function() {
+      PylonValidate.markField(this, PylonValidate.nonNegative(this.value, 'Amount'));
+    });
 
     document.getElementById('exp-tbody').appendChild(tr);
     updateExpTotals();
@@ -1786,26 +1796,29 @@ function updateLogoUI() {
     else{out.setAttribute('style','display:block');ed.setAttribute('style','display:none');}
   });
 
-  // ── Undo / Redo ──
-  let _hist=[], _histIdx=-1, _suppHist=false, _histTimer=null, _lastSaved=null;
+  // ── Undo / Redo (backed by vendor/pyl0n-state.js) ──
+  let _lastSaved = null;
 
-  function _snapshot() {
-    if (_suppHist) return;
-    const s = JSON.stringify(collectState());
-    if (_hist[_histIdx]===s) return;
-    _hist=_hist.slice(0,_histIdx+1); _hist.push(s);
-    if(_hist.length>50) _hist.shift(); else _histIdx++;
-    _syncUndoUI();
-    localStorage.setItem('bidcast_state_resourcecast', s);
-  suiteWrite();
-    _lastSaved = Date.now(); _updateSavedLabel();
-  }
-  function _scheduleSnap() { if(_suppHist)return; clearTimeout(_histTimer); _histTimer=setTimeout(_snapshot,800); }
-  function undo() { clearTimeout(_histTimer); if(_histIdx<=0)return; _suppHist=true; _histIdx--; applyState(JSON.parse(_hist[_histIdx])); _suppHist=false; _syncUndoUI(); }
-  function redo() { clearTimeout(_histTimer); if(_histIdx>=_hist.length-1)return; _suppHist=true; _histIdx++; applyState(JSON.parse(_hist[_histIdx])); _suppHist=false; _syncUndoUI(); }
+  const _undoStack = PylonState.createUndoStack({
+    collect:    collectState,
+    apply:      applyState,
+    max:        50,
+    debounceMs: 800,
+    onChange: () => {
+      _syncUndoUI();
+      PylonState.safeWriteLS('bidcast_state_resourcecast', collectState());
+      suiteWrite();
+      _lastSaved = Date.now(); _updateSavedLabel();
+    },
+  });
+  function _snapshot()     { _undoStack.snapshot(); }
+  function _scheduleSnap() { _undoStack.scheduleSnap(); }
+  function undo()          { _undoStack.undo(); }
+  function redo()          { _undoStack.redo(); }
   function _syncUndoUI() {
-    const u=document.getElementById('btn-undo'), r=document.getElementById('btn-redo');
-    if(u) u.disabled=_histIdx<=0; if(r) r.disabled=_histIdx>=_hist.length-1;
+    const u = document.getElementById('btn-undo'), r = document.getElementById('btn-redo');
+    if (u) u.disabled = !_undoStack.canUndo;
+    if (r) r.disabled = !_undoStack.canRedo;
   }
   function _updateSavedLabel() {
     const el = document.getElementById('autosave-label');
@@ -1815,25 +1828,20 @@ function updateLogoUI() {
     el.textContent = s < 5 ? '● Saved' : s < 60 ? '● Saved ' + s + 's ago' : '● Saved ' + Math.floor(s / 60) + 'm ago';
   }
   document.addEventListener('keydown', e => {
-    if((e.ctrlKey||e.metaKey)&&e.key==='z'&&!e.shiftKey){e.preventDefault();undo();}
-    if((e.ctrlKey||e.metaKey)&&(e.key==='y'||(e.key==='z'&&e.shiftKey))){e.preventDefault();redo();}
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
       if (e.key === 's') { e.preventDefault(); saveJSON(); }
       if (e.key === 'e') { e.preventDefault(); exportPDF(); }
     }
   });
-  (function(){
-    const _rawApply=applyState;
-    applyState=s=>{_suppHist=true;_rawApply(s);_suppHist=false;};
-    const ed=document.getElementById('editor');
-    if(ed){
-      new MutationObserver(()=>{
-        if(_suppHist)return;
-        clearTimeout(_histTimer);_histTimer=setTimeout(_snapshot,400);
-      }).observe(ed,{childList:true,subtree:true});
-      ed.addEventListener('input',_scheduleSnap);
+  (function() {
+    const ed = document.getElementById('editor');
+    if (ed) {
+      new MutationObserver(_scheduleSnap).observe(ed, { childList: true, subtree: true });
+      ed.addEventListener('input', _scheduleSnap);
     }
-    setTimeout(_snapshot,300);
+    setTimeout(_snapshot, 300);
   })();
 
   // ── Init ──

@@ -9,6 +9,7 @@
 <script src="libs/xlsx.full.min.js"></script>
 <script src="libs/html2pdf.bundle.min.js"></script>
 <script src="vendor/pyl0n-native.js"></script>
+<script src="vendor/pyl0n-state.js"></script>
 <script src="vendor/pyl0n-validate.js"></script>
 <style id="page-size-style">@page { size: A3 landscape; margin: 8mm; }</style>
 <style>
@@ -296,7 +297,7 @@ input[type="number"] { font-family: 'DM Mono', monospace; }
     <button class="tb-btn green" onclick="exportExcel()">⬇ Export Excel</button>
     <button class="tb-btn" onclick="exportHTML()">⬇ Export HTML</button>
     <button class="tb-btn" onclick="exportPDF()">⬇ PDF</button>
-    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;">🌙</button>
+    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;" aria-label="Toggle dark mode">🌙</button>
     <div style="position:relative;display:inline-block;"><button class="tb-btn" id="backup-btn" onclick="_showBackups()" style="font-size:11px;">⏱ Backups</button></div>
     <span id="autosave-label" style="font-size:10px;color:var(--faint);"></span>
     <span class="save-confirm" id="save-confirm">✓ Saved!</span>
@@ -425,10 +426,11 @@ input[type="number"] { font-family: 'DM Mono', monospace; }
         </thead>
         <tbody id="cost-tbody"></tbody>
       </table>
+      <div id="cost-empty" style="display:none;padding:32px;text-align:center;color:var(--faint);font-size:13px;">No cost rows yet — click <strong>+ Add Item</strong> to start.</div>
     </div>
 
     <button class="btn-add-item" onclick="addCostRow()">+ Add Item</button>
-    <button class="tb-btn" onclick="addContingencyRow()" title="Add a contingency row that calculates as % of rows above" style="margin-left:8px;">+ Contingency %</button>
+    <button class="tb-btn" onclick="addContingencyRow()" title="Add a contingency row that calculates as % of rows above" style="margin-left:8px;" aria-label="Add a contingency row that calculates as % of rows above">+ Contingency %</button>
   </div>
 
   <!-- Section 4: LoA W2W Consolidated Summary -->
@@ -595,6 +597,8 @@ function getResourceCastTotal() {
 }
 
 function calculateModel() {
+  const empty = document.getElementById('cost-empty');
+  if (empty) empty.style.display = document.querySelectorAll('#cost-tbody .cost-row').length === 0 ? 'block' : 'none';
   // ── 1. Read global parameters ────────────────────────────────────────
   const fxMap = {
     EUR: 1.0,
@@ -736,29 +740,29 @@ function calculateModel() {
   _scheduleSnap();
 }
 
-/* ══ Undo / Redo ════════════════════════════════════════════════════════ */
-let _hist = [], _histIdx = -1, _suppHist = false, _histTimer = null, _lastSaved = null;
+/* ══ Undo / Redo (backed by vendor/pyl0n-state.js) ════════════════════ */
+let _lastSaved = null;
 
-function _snapshot() {
-  if (_suppHist) return;
-  const s = JSON.stringify(collectState());
-  if (_hist[_histIdx] === s) return;
-  _hist.splice(_histIdx + 1);
-  _hist.push(s);
-  if (_hist.length > 50) _hist.shift(); else _histIdx++;
-  _syncUndoUI();
-  localStorage.setItem('bidcast_state_calccast', s);
-  _lastSaved = Date.now(); _updateSavedLabel();
-}
-function _scheduleSnap() {
-  if (_suppHist) return;
-  clearTimeout(_histTimer); _histTimer = setTimeout(_snapshot, 800);
-}
+const _undoStack = PylonState.createUndoStack({
+  collect:    collectState,
+  apply:      applyState,
+  max:        50,
+  debounceMs: 800,
+  onChange: () => {
+    _syncUndoUI();
+    PylonState.safeWriteLS('bidcast_state_calccast', collectState());
+    _lastSaved = Date.now(); _updateSavedLabel();
+  },
+});
+function _snapshot()     { _undoStack.snapshot(); }
+function _scheduleSnap() { _undoStack.scheduleSnap(); }
+function undo()          { _undoStack.undo(); }
+function redo()          { _undoStack.redo(); }
 function _syncUndoUI() {
   const u = document.getElementById('btn-undo');
   const r = document.getElementById('btn-redo');
-  if (u) u.disabled = _histIdx <= 0;
-  if (r) r.disabled = _histIdx >= _hist.length - 1;
+  if (u) u.disabled = !_undoStack.canUndo;
+  if (r) r.disabled = !_undoStack.canRedo;
 }
 function _updateSavedLabel() {
   const el = document.getElementById('autosave-label');
@@ -766,20 +770,6 @@ function _updateSavedLabel() {
   if (!_lastSaved) { el.textContent = ''; return; }
   const s = Math.floor((Date.now() - _lastSaved) / 1000);
   el.textContent = s < 5 ? '● Saved' : s < 60 ? '● Saved ' + s + 's ago' : '● Saved ' + Math.floor(s / 60) + 'm ago';
-}
-function undo() {
-  clearTimeout(_histTimer);
-  if (_histIdx <= 0) return;
-  _histIdx--; _suppHist = true;
-  applyState(JSON.parse(_hist[_histIdx]));
-  _suppHist = false; _syncUndoUI();
-}
-function redo() {
-  clearTimeout(_histTimer);
-  if (_histIdx >= _hist.length - 1) return;
-  _histIdx++; _suppHist = true;
-  applyState(JSON.parse(_hist[_histIdx]));
-  _suppHist = false; _syncUndoUI();
 }
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
@@ -804,7 +794,7 @@ function addGuarRow(data = {}) {
     <td><input type="number" class="calc-inp num inp-guar-dur"  value="${data.duration ?? 2}" min="0" step="0.5" oninput="calculateModel()"></td>
     <td><input type="number" class="calc-inp num inp-guar-rate" value="${data.rate ?? 1.5}"  min="0" step="0.1" oninput="calculateModel()"></td>
     <td><span class="calc-readonly guar-cost-eur">—</span></td>
-    <td><button class="btn-del-row" onclick="this.closest('.guar-row').remove(); calculateModel();" title="Remove bond">✕</button></td>
+    <td><button class="btn-del-row" onclick="this.closest('.guar-row').remove(); calculateModel();" title="Remove bond" aria-label="Remove bond">✕</button></td>
   `;
   tbody.appendChild(tr);
   calculateModel();
@@ -919,8 +909,8 @@ function addCostRow(data = {}, insertAfter = null) {
     <td><span class="calc-readonly sell-eur">—</span></td>
     <td>
       <div class="row-actions">
-        <button class="btn-add-below" onclick="addCostRow({}, this.closest('.cost-row'))" title="Insert row below">+</button>
-        <button class="btn-del-row" onclick="deleteCostRow(this)" title="Remove row">✕</button>
+        <button class="btn-add-below" onclick="addCostRow({}, this.closest('.cost-row'))" title="Insert row below" aria-label="Insert row below">+</button>
+        <button class="btn-del-row" onclick="deleteCostRow(this)" title="Remove row" aria-label="Remove row">✕</button>
       </div>
     </td>
   `;
@@ -967,7 +957,7 @@ function addContingencyRow(data = {}, insertAfter = null) {
     <td><span class="calc-readonly sell-eur">—</span></td>
     <td>
       <div class="row-actions">
-        <button class="btn-del-row" onclick="deleteCostRow(this)" title="Remove row">✕</button>
+        <button class="btn-del-row" onclick="deleteCostRow(this)" title="Remove row" aria-label="Remove row">✕</button>
       </div>
     </td>
   `;
