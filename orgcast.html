@@ -379,6 +379,10 @@ function updateLogoUI() {
   const NODE_H    = () => compactMode ? 62  : 74;
   const H_GAP     = () => compactMode ? 18  : 22;
   const V_GAP     = () => compactMode ? 36  : 46;
+  // Top-down layout specifics (centered hierarchical tree)
+  const TD_H_GAP    = () => compactMode ? 12 : 15;
+  const TD_V_GAP    = () => compactMode ? 32 : 40;
+  const TD_MAX_COLS = 4;
 
   function setFormat(fmt) {
     currentFormat = fmt;
@@ -531,25 +535,61 @@ function updateLogoUI() {
     return people.filter(p => !p._parent);
   }
 
-  // Compute subtree width needed (in node units)
-  function subtreeWidth(node) {
-    if (!node.children.length) return 1;
-    return node.children.reduce((s,c) => s + subtreeWidth(c), 0);
+  // ── Centered top-down tree layout ─────────────────────────────────────
+  // Two-pass algorithm:
+  //   Pass 1: pixel size (w,h) of each subtree. Children line up in a row
+  //           under the parent; >TD_MAX_COLS children wrap into a grid.
+  //   Pass 2: position each node so parents sit centered above their kids.
+  function subtreeSize(node) {
+    const nw = NODE_W(), nh = NODE_H();
+    const hg = TD_H_GAP(), vg = TD_V_GAP();
+    if (!node.children.length) return { w: nw, h: nh };
+
+    const childSizes = node.children.map(subtreeSize);
+    const n    = node.children.length;
+    const cols = Math.min(TD_MAX_COLS, n);
+    const rows = Math.ceil(n / cols);
+
+    let maxRowW = 0, totalRowsH = 0;
+    for (let r = 0; r < rows; r++) {
+      const slice = childSizes.slice(r * cols, (r + 1) * cols);
+      const rowW  = slice.reduce((s, c, i) => s + c.w + (i ? hg : 0), 0);
+      const rowH  = Math.max.apply(null, slice.map(c => c.h));
+      if (rowW > maxRowW) maxRowW = rowW;
+      totalRowsH += rowH + (r ? vg : 0);
+    }
+    return { w: Math.max(nw, maxRowW), h: nh + vg + totalRowsH };
   }
 
-  // Assign x,y positions recursively
-  function layoutNode(node, depth, leftOffset, positions) {
-    const sw  = subtreeWidth(node);
-    const nw  = NODE_W(), hg = H_GAP(), vg = V_GAP(), nh = NODE_H();
-    const x   = leftOffset * (nw + hg) + (sw - 1) * (nw + hg) / 2;
-    const y   = depth * (nh + vg);
-    positions[node.id] = { x, y, w:nw, h:nh };
+  function layoutNodeTopDown(node, x, y, positions) {
+    const nw = NODE_W(), nh = NODE_H();
+    const hg = TD_H_GAP(), vg = TD_V_GAP();
+    const size = subtreeSize(node);
 
-    let childLeft = leftOffset;
-    node.children.forEach(child => {
-      layoutNode(child, depth + 1, childLeft, positions);
-      childLeft += subtreeWidth(child);
-    });
+    // Center this node above its subtree span
+    const nodeX = x + (size.w - nw) / 2;
+    positions[node.id] = { x: nodeX, y, w: nw, h: nh };
+
+    if (!node.children.length) return;
+
+    const n    = node.children.length;
+    const cols = Math.min(TD_MAX_COLS, n);
+    const rows = Math.ceil(n / cols);
+    const childSizes = node.children.map(subtreeSize);
+
+    let rowY = y + nh + vg;
+    for (let r = 0; r < rows; r++) {
+      const rowChildren = node.children.slice(r * cols, (r + 1) * cols);
+      const rowSizes    = childSizes.slice(r * cols, (r + 1) * cols);
+      const rowW = rowSizes.reduce((s, c, i) => s + c.w + (i ? hg : 0), 0);
+      const rowH = Math.max.apply(null, rowSizes.map(c => c.h));
+      let cursor = x + (size.w - rowW) / 2;
+      rowChildren.forEach((child, i) => {
+        layoutNodeTopDown(child, cursor, rowY, positions);
+        cursor += rowSizes[i].w + hg;
+      });
+      rowY += rowH + vg;
+    }
   }
 
   // ── Render chart ──
@@ -562,21 +602,20 @@ function updateLogoUI() {
       return;
     }
 
-    // Layout
+    // Layout — centered top-down tree with grid wrap for >4 children
     const positions = {};
-    let leftOffset = 0;
+    const tdHG = TD_H_GAP();
+    let leftX = 0, maxSubtreeH = 0;
     roots.forEach(r => {
-      layoutNode(r, 0, leftOffset, positions);
-      leftOffset += subtreeWidth(r);
+      layoutNodeTopDown(r, leftX, 0, positions);
+      const s = subtreeSize(r);
+      leftX += s.w + tdHG;
+      if (s.h > maxSubtreeH) maxSubtreeH = s.h;
     });
 
     // Canvas size
-    const nw = NODE_W(), nh = NODE_H(), hg = H_GAP(), vg = V_GAP();
-    const totalW = leftOffset * (nw + hg) - hg + 40;
-    const maxDepth = people.reduce((m,p) => {
-      let d=0, cur=p; while(cur._parent){d++;cur=cur._parent;} return Math.max(m,d);
-    }, 0);
-    const totalH = (maxDepth + 1) * (nh + vg) - vg + 20;
+    const totalW = (leftX - tdHG) + 40;
+    const totalH = maxSubtreeH + 20;
 
     canvas.style.width  = totalW + 'px';
     canvas.style.height = totalH + 'px';
@@ -634,39 +673,50 @@ function updateLogoUI() {
       canvas.appendChild(div);
     });
 
-    // Draw orthogonal connectors — grouped per parent (bus-bar style).
-    // Each parent gets: one vertical stub → one horizontal bus → per-child drops.
-    // This avoids overlapping lines when a parent has multiple children.
+    // Draw orthogonal top-down connectors — per-row bus-bar style.
+    // Pattern: parent bottom-center → 20px drop to row bus → horizontal to
+    // each child column → 20px drop to child top. Grid-wrapped children are
+    // grouped by row (shared top-y); each row has its own horizontal bus so
+    // the geometry stays clean when a parent has >4 kids.
     people.forEach(parent => {
       if (!parent.children.length) return;
       const pp = positions[parent.id];
       if (!pp) return;
 
-      const px   = pp.x + 20 + pp.w / 2;  // parent center-x
-      const py   = pp.y + 10 + pp.h;       // parent bottom-y
-      const busY = py + vg / 2;             // horizontal bus level
+      const parentCX     = pp.x + 20 + pp.w / 2;
+      const parentBottom = pp.y + 10 + pp.h;
 
-      const valid = parent.children
-        .map(c => ({ c, cp: positions[c.id] }))
-        .filter(({ cp }) => !!cp);
-      if (!valid.length) return;
+      const validCps = parent.children
+        .map(c => positions[c.id])
+        .filter(Boolean);
+      if (!validCps.length) return;
 
-      const xs   = valid.map(({ cp }) => cp.x + 20 + cp.w / 2);
-      const minX = Math.min(...xs);
-      const maxX = Math.max(...xs);
+      // Group children by displayed top-y (distinct row per y value)
+      const rowMap = new Map();
+      validCps.forEach(cp => {
+        const top = cp.y + 10;
+        if (!rowMap.has(top)) rowMap.set(top, []);
+        rowMap.get(top).push(cp);
+      });
+      const rowKeys = Array.from(rowMap.keys()).sort((a, b) => a - b);
+      const deepestBusY = rowKeys[rowKeys.length - 1] - 20;
 
-      // 1. Vertical stub: parent bottom → bus level
-      line(px, py, px, busY);
+      // Central spine from parent bottom down through all row buses
+      line(parentCX, parentBottom, parentCX, deepestBusY);
 
-      // 2. Horizontal bus spanning all child columns
-      //    Extend to px as well so the stub always meets the bus
-      line(Math.min(px, minX), busY, Math.max(px, maxX), busY);
-
-      // 3. Per-child vertical drop: bus → child top
-      valid.forEach(({ cp }) => {
-        const cx = cp.x + 20 + cp.w / 2;
-        const cy = cp.y + 10;
-        line(cx, busY, cx, cy);
+      rowKeys.forEach(rowTopY => {
+        const rowKids = rowMap.get(rowTopY);
+        const busY    = rowTopY - 20;
+        const xs      = rowKids.map(cp => cp.x + 20 + cp.w / 2);
+        const minX    = Math.min(parentCX, Math.min.apply(null, xs));
+        const maxX    = Math.max(parentCX, Math.max.apply(null, xs));
+        // Horizontal bus for this row
+        line(minX, busY, maxX, busY);
+        // Per-child drop: bus → child top
+        rowKids.forEach(cp => {
+          const cx = cp.x + 20 + cp.w / 2;
+          line(cx, busY, cx, cp.y + 10);
+        });
       });
     });
 
