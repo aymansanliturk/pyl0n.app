@@ -757,38 +757,7 @@ function updateLogoUI() {
           line(cx, busY, cx, cp.y + 10);
         });
       });
-    } else {
-      // ── Landscape connectors: bus-bar (parent bottom → busY → child top) ──
-      people.forEach(parent => {
-        if (!parent.children.length) return;
-        const pp = positions[parent.id];
-        if (!pp) return;
-
-        const px   = pp.x + 20 + pp.w / 2;  // parent center-x
-        const py   = pp.y + 10 + pp.h;       // parent bottom-y
-        const busY = py + vg / 2;             // horizontal bus level
-
-        const valid = parent.children
-          .map(c => ({ c, cp: positions[c.id] }))
-          .filter(({ cp }) => !!cp);
-        if (!valid.length) return;
-
-        const xs   = valid.map(({ cp }) => cp.x + 20 + cp.w / 2);
-        const minX = Math.min(...xs);
-        const maxX = Math.max(...xs);
-
-        // 1. Vertical stub: parent bottom → bus level
-        line(px, py, px, busY);
-        // 2. Horizontal bus spanning all child columns
-        line(Math.min(px, minX), busY, Math.max(px, maxX), busY);
-        // 3. Per-child vertical drop: bus → child top
-        valid.forEach(({ cp }) => {
-          const cx = cp.x + 20 + cp.w / 2;
-          const cy = cp.y + 10;
-          line(cx, busY, cx, cy);
-        });
-      });
-    }
+    });
 
     // Auto-scale for print
     autoScale(totalW, totalH);
