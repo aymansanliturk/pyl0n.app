@@ -208,6 +208,31 @@ if ('serviceWorker' in navigator) {
       console.warn('PYL0N SW registration failed:', err);
     });
 
+    // Inject Cloud Sync button into .tb-right if PylonCloud is available
+    if (window.PylonCloud) {
+      const tbRight = document.querySelector('.tb-right');
+      if (tbRight) {
+        const cloudBtn = document.createElement('button');
+        cloudBtn.id        = 'pyl0n-cloud-btn';
+        cloudBtn.className = 'tb-btn';
+        cloudBtn.setAttribute('aria-label', 'Save to OneDrive via Cloud Sync');
+        cloudBtn.style.cssText = 'display:inline-flex;align-items:center;gap:5px;';
+        cloudBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg> Cloud Sync';
+        cloudBtn.onclick = function () {
+          const sync      = SuiteManager.read();
+          const projName  = (sync.projectName || 'pyl0n-export').replace(/[^a-z0-9_\-. ]/gi, '_');
+          const filename  = projName + '_' + new Date().toISOString().slice(0, 10) + '.json';
+          const payload   = {};
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith('bidcast_')) payload[k] = localStorage.getItem(k);
+          }
+          PylonCloud.saveToCloud(filename, JSON.stringify(payload, null, 2));
+        };
+        tbRight.insertBefore(cloudBtn, tbRight.firstChild);
+      }
+    }
+
     // Inject breadcrumb "Return to …" button if a return path was stored
     const returnPath = SuiteManager.consumeReturnPath();
     if (returnPath && returnPath.url &&
