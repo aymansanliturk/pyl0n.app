@@ -552,17 +552,36 @@ function updateLogoUI() {
     return people.filter(p => !p._parent);
   }
 
-  // ── Saf Modern Top-Down (Ortogonal) Yerleşim ──────────────────────────
+  // ── Akıllı Matris (Double-Sided Spine) Top-Down Yerleşim ──
   function subtreeSize(node) {
     const nw = NODE_W(), nh = NODE_H();
     const hg = TD_H_GAP(), vg = TD_V_GAP();
     if (!node.children.length) return { w: nw, h: nh };
 
     const childSizes = node.children.map(subtreeSize);
-    const totalW = childSizes.reduce((s, c, i) => s + c.w + (i ? hg : 0), 0);
-    const maxH = Math.max.apply(null, childSizes.map(c => c.h));
 
-    return { w: Math.max(nw, totalW), h: nh + vg + maxH };
+    if (node.children.length <= 3) {
+      const totalW = childSizes.reduce((s, c, i) => s + c.w + (i ? hg : 0), 0);
+      const maxH = Math.max.apply(null, childSizes.map(c => c.h));
+      node._layoutType = 'row';
+      return { w: Math.max(nw, totalW), h: nh + vg + maxH };
+    } else {
+      let maxLeftW = 0, maxRightW = 0;
+      let totalRowsH = 0;
+      const rows = Math.ceil(node.children.length / 2);
+      for (let i = 0; i < rows; i++) {
+        const leftSize  = childSizes[i * 2]     || { w: 0, h: 0 };
+        const rightSize = childSizes[i * 2 + 1] || { w: 0, h: 0 };
+        if (leftSize.w  > maxLeftW)  maxLeftW  = leftSize.w;
+        if (rightSize.w > maxRightW) maxRightW = rightSize.w;
+        totalRowsH += Math.max(leftSize.h, rightSize.h) + vg;
+      }
+      node._layoutType = 'matrix';
+      node._maxLeftW   = maxLeftW;
+      const spineGap   = hg * 3;
+      const totalW     = maxLeftW + spineGap + maxRightW;
+      return { w: Math.max(nw, totalW), h: nh + totalRowsH };
+    }
   }
 
   function layoutNodeTopDown(node, x, y, positions) {
@@ -570,18 +589,46 @@ function updateLogoUI() {
     const hg = TD_H_GAP(), vg = TD_V_GAP();
     const size = subtreeSize(node);
 
-    const nodeX = x + (size.w - nw) / 2;
-    positions[node.id] = { x: nodeX, y, w: nw, h: nh };
+    if (node._layoutType === 'matrix') {
+      const spineGap = hg * 3;
+      const spineX   = x + node._maxLeftW + (spineGap / 2);
+      const nodeX    = spineX - nw / 2;
+      positions[node.id] = { x: nodeX, y, w: nw, h: nh };
 
-    if (!node.children.length) return;
+      if (!node.children.length) return;
 
-    let cx = x;
-    const childY = y + nh + vg;
-    node.children.forEach(child => {
-      const cSize = subtreeSize(child);
-      layoutNodeTopDown(child, cx, childY, positions);
-      cx += cSize.w + hg;
-    });
+      let rowY = y + nh + vg;
+      const rows = Math.ceil(node.children.length / 2);
+      for (let i = 0; i < rows; i++) {
+        const leftKid  = node.children[i * 2];
+        const rightKid = node.children[i * 2 + 1];
+        let rowMaxH = 0;
+        if (leftKid) {
+          const cSize = subtreeSize(leftKid);
+          layoutNodeTopDown(leftKid, spineX - (spineGap / 2) - cSize.w, rowY, positions);
+          if (cSize.h > rowMaxH) rowMaxH = cSize.h;
+        }
+        if (rightKid) {
+          const cSize = subtreeSize(rightKid);
+          layoutNodeTopDown(rightKid, spineX + (spineGap / 2), rowY, positions);
+          if (cSize.h > rowMaxH) rowMaxH = cSize.h;
+        }
+        rowY += rowMaxH + vg;
+      }
+    } else {
+      const nodeX = x + (size.w - nw) / 2;
+      positions[node.id] = { x: nodeX, y, w: nw, h: nh };
+
+      if (!node.children.length) return;
+
+      let cx = x;
+      const childY = y + nh + vg;
+      node.children.forEach(child => {
+        const cSize = subtreeSize(child);
+        layoutNodeTopDown(child, cx, childY, positions);
+        cx += cSize.w + hg;
+      });
+    }
   }
 
   // Portrait layout helpers ────────────────────────────────────────────────
@@ -699,21 +746,40 @@ function updateLogoUI() {
       const childrenCps = parent.children.map(c => positions[c.id]).filter(Boolean);
       if (!childrenCps.length) return;
 
-      const busY = pBottom + (TD_V_GAP() / 2);
+      if (parent._layoutType === 'matrix') {
+        const rows = Math.ceil(childrenCps.length / 2);
+        let spineBottom = pBottom;
+        for (let i = 0; i < rows; i++) {
+          const leftCp  = i * 2     < childrenCps.length ? childrenCps[i * 2]     : null;
+          const rightCp = i * 2 + 1 < childrenCps.length ? childrenCps[i * 2 + 1] : null;
+          const refCp   = leftCp || rightCp;
+          const busY    = refCp.y + 10 - (TD_V_GAP() / 2);
 
-      // 1. Ebeveynden yatay yola dikey iniş
-      line(pCX, pBottom, pCX, busY);
+          line(pCX, spineBottom, pCX, busY);
+          spineBottom = busY;
 
-      // 2. İlk çocuktan son çocuğa uzanan yatay köprü
-      const firstCX = childrenCps[0].x + 20 + childrenCps[0].w / 2;
-      const lastCX  = childrenCps[childrenCps.length - 1].x + 20 + childrenCps[childrenCps.length - 1].w / 2;
-      line(firstCX, busY, lastCX, busY);
-
-      // 3. Yatay köprüden her bir çocuğun kafasına dikey iniş
-      childrenCps.forEach(cp => {
-        const cCX = cp.x + 20 + cp.w / 2;
-        line(cCX, busY, cCX, cp.y + 10);
-      });
+          if (leftCp) {
+            const cCX = leftCp.x + 20 + leftCp.w / 2;
+            line(pCX, busY, cCX, busY);
+            line(cCX, busY, cCX, leftCp.y + 10);
+          }
+          if (rightCp) {
+            const cCX = rightCp.x + 20 + rightCp.w / 2;
+            line(pCX, busY, cCX, busY);
+            line(cCX, busY, cCX, rightCp.y + 10);
+          }
+        }
+      } else {
+        const busY = pBottom + (TD_V_GAP() / 2);
+        line(pCX, pBottom, pCX, busY);
+        const firstCX = childrenCps[0].x + 20 + childrenCps[0].w / 2;
+        const lastCX  = childrenCps[childrenCps.length - 1].x + 20 + childrenCps[childrenCps.length - 1].w / 2;
+        line(firstCX, busY, lastCX, busY);
+        childrenCps.forEach(cp => {
+          const cCX = cp.x + 20 + cp.w / 2;
+          line(cCX, busY, cCX, cp.y + 10);
+        });
+      }
     });
 
     // Auto-scale for print
