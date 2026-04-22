@@ -8,9 +8,11 @@
 <link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="libs/fonts.css">
 <script src="libs/chart.js"></script>
-<script src="vendor/pyl0n-validate.js"></script>
+<script src="vendor/pyl0n-native.js"></script>
 <script src="https://alcdn.msauth.net/browser/2.30.0/js/msal-browser.min.js"></script>
 <script src="vendor/pyl0n-cloud.js"></script>
+<script src="vendor/pyl0n-state.js"></script>
+<script src="vendor/pyl0n-validate.js"></script>
 <script src="vendor/pyl0n-suite.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -78,7 +80,8 @@ body {
   padding: 6px 12px; border-radius: 7px; border: 1.5px solid var(--border);
   background: var(--bg); color: var(--muted); cursor: pointer; white-space: nowrap; transition: all .15s;
 }
-.tb-btn:hover { border-color: var(--accent); color: var(--accent); background: #fff; }
+.tb-btn:hover    { border-color: var(--accent); color: var(--accent); background: #fff; }
+.tb-btn:disabled { opacity: 0.35; pointer-events: none; }
 #proj-name-display { font-size: 12px; color: var(--muted); font-weight: 500; }
 
 /* ── Tab Nav ── */
@@ -390,6 +393,11 @@ table.w2w-tbl tr.w2w-row-spacer td { height: 6px; background: var(--bg); padding
     <button class="tb-btn" onclick="location.href='index.html'">⌂ Dashboard</button>
   </div>
   <div class="tb-right">
+    <button class="tb-btn" id="btn-undo" onclick="undo()" disabled>↩ Undo</button>
+    <button class="tb-btn" id="btn-redo" onclick="redo()" disabled>↪ Redo</button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" onclick="saveJSON()">Save</button>
+    <div class="tb-sep"></div>
     <button class="tb-btn" onclick="refreshAll()">↻ Refresh from CalcCast</button>
     <span id="proj-name-display"></span>
     <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" aria-label="Toggle dark mode">🌙</button>
@@ -492,28 +500,28 @@ table.w2w-tbl tr.w2w-row-spacer td { height: 6px; background: var(--bg); padding
         <div class="card-title"><div class="card-title-bar"></div>KPI Inputs</div>
         <div class="fields" style="gap:10px;">
           <label>Specified Risk %
-            <input type="number" id="w-spec-risk" value="2.0" min="0" step="0.1" oninput="updateAll()">
+            <input type="number" id="w-spec-risk" value="2.0" min="0" step="0.1" oninput="updateAll();_scheduleSnap()">
           </label>
           <label>Unspecified Risk %
-            <input type="number" id="w-unspec-risk" value="3.0" min="0" step="0.1" oninput="updateAll()">
+            <input type="number" id="w-unspec-risk" value="3.0" min="0" step="0.1" oninput="updateAll();_scheduleSnap()">
           </label>
           <label>SG&amp;A %
-            <input type="number" id="w-sga" value="4.0" min="0" step="0.1" oninput="updateAll()">
+            <input type="number" id="w-sga" value="4.0" min="0" step="0.1" oninput="updateAll();_scheduleSnap()">
           </label>
           <label>HQ Adders EXU %
-            <input type="number" id="w-exu" value="3.0" min="0" step="0.1" oninput="updateAll()">
+            <input type="number" id="w-exu" value="3.0" min="0" step="0.1" oninput="updateAll();_scheduleSnap()">
           </label>
           <label>HQ Adders BA %
-            <input type="number" id="w-ba" value="2.0" min="0" step="0.1" oninput="updateAll()">
+            <input type="number" id="w-ba" value="2.0" min="0" step="0.1" oninput="updateAll();_scheduleSnap()">
           </label>
           <label>EBIT %
-            <input type="number" id="w-ebit" value="8.0" min="0" step="0.1" oninput="updateAll()">
+            <input type="number" id="w-ebit" value="8.0" min="0" step="0.1" oninput="updateAll();_scheduleSnap()">
           </label>
           <label>Negotiation Margin %
-            <input type="number" id="w-neg" value="5.0" min="0" step="0.1" oninput="updateAll()">
+            <input type="number" id="w-neg" value="5.0" min="0" step="0.1" oninput="updateAll();_scheduleSnap()">
           </label>
           <label>Warranty %
-            <input type="number" id="w-warranty" value="1.0" min="0" step="0.1" oninput="updateAll()">
+            <input type="number" id="w-warranty" value="1.0" min="0" step="0.1" oninput="updateAll();_scheduleSnap()">
           </label>
         </div>
         <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
@@ -669,12 +677,12 @@ table.w2w-tbl tr.w2w-row-spacer td { height: 6px; background: var(--bg); padding
       <div class="sc-card sc-b">
         <div class="sc-head sc-b-head">Scenario B · What-If</div>
         <div class="fields" style="gap:8px;margin-bottom:14px;">
-          <label>Risk %      <input type="number" id="sb-risk" value="5.0" min="0" step="0.1" oninput="updateScenarios()"></label>
-          <label>SG&amp;A %  <input type="number" id="sb-sga"  value="4.0" min="0" step="0.1" oninput="updateScenarios()"></label>
-          <label>HQ EXU %   <input type="number" id="sb-exu"  value="3.0" min="0" step="0.1" oninput="updateScenarios()"></label>
-          <label>HQ BA %    <input type="number" id="sb-ba"   value="2.0" min="0" step="0.1" oninput="updateScenarios()"></label>
-          <label>EBIT %     <input type="number" id="sb-ebit" value="8.0" min="0" step="0.1" oninput="updateScenarios()"></label>
-          <label>Neg. %     <input type="number" id="sb-neg"  value="5.0" min="0" step="0.1" oninput="updateScenarios()"></label>
+          <label>Risk %      <input type="number" id="sb-risk" value="5.0" min="0" step="0.1" oninput="updateScenarios();_scheduleSnap()"></label>
+          <label>SG&amp;A %  <input type="number" id="sb-sga"  value="4.0" min="0" step="0.1" oninput="updateScenarios();_scheduleSnap()"></label>
+          <label>HQ EXU %   <input type="number" id="sb-exu"  value="3.0" min="0" step="0.1" oninput="updateScenarios();_scheduleSnap()"></label>
+          <label>HQ BA %    <input type="number" id="sb-ba"   value="2.0" min="0" step="0.1" oninput="updateScenarios();_scheduleSnap()"></label>
+          <label>EBIT %     <input type="number" id="sb-ebit" value="8.0" min="0" step="0.1" oninput="updateScenarios();_scheduleSnap()"></label>
+          <label>Neg. %     <input type="number" id="sb-neg"  value="5.0" min="0" step="0.1" oninput="updateScenarios();_scheduleSnap()"></label>
         </div>
         <div style="padding-top:12px;border-top:1px solid var(--border);">
           <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--faint);margin-bottom:4px;">
@@ -702,17 +710,75 @@ let _fixedDC     = 0;    // EUR sum of rows explicitly marked fixed
 let _estimatedDC = 0;    // EUR sum of all other included rows
 let _lastResults = null; // last computeKpis() result (Scenario A)
 
-/* ══ W2W Report local persistence (factories survive CalcCast Refresh) ════ */
-let _w2wState = (() => {
-  try { return JSON.parse(localStorage.getItem('bidcast_state_w2wreport') || '{"factories":[]}'); }
-  catch { return { factories: [] }; }
-})();
-function saveW2WState() {
-  localStorage.setItem('bidcast_state_w2wreport', JSON.stringify(_w2wState));
+/* ══ State key ═════════════════════════════════════════════════════════════ */
+const STATE_KEY = 'bidcast_state_w2wreport';
+let _w2wState = { factories: [] };
+
+/* ══ collectState / applyState ═════════════════════════════════════════════ */
+function collectState() {
+  const v = id => parseFloat(document.getElementById(id)?.value) || 0;
+  return {
+    version: 1,
+    kpisA: {
+      specRisk:  v('w-spec-risk'), unspecRisk: v('w-unspec-risk'),
+      sga:       v('w-sga'),       exu:        v('w-exu'),
+      ba:        v('w-ba'),        ebit:       v('w-ebit'),
+      neg:       v('w-neg'),       warranty:   v('w-warranty'),
+    },
+    kpisB: {
+      risk: v('sb-risk'), sga:  v('sb-sga'), exu:  v('sb-exu'),
+      ba:   v('sb-ba'),   ebit: v('sb-ebit'), neg:  v('sb-neg'),
+    },
+    factories: _w2wState.factories,
+  };
+}
+
+function applyState(s) {
+  if (!s) return;
+  const setV = (id, val) => { const el = document.getElementById(id); if (el && val != null) el.value = val; };
+  if (s.kpisA) {
+    setV('w-spec-risk',  s.kpisA.specRisk);   setV('w-unspec-risk', s.kpisA.unspecRisk);
+    setV('w-sga',        s.kpisA.sga);         setV('w-exu',         s.kpisA.exu);
+    setV('w-ba',         s.kpisA.ba);          setV('w-ebit',        s.kpisA.ebit);
+    setV('w-neg',        s.kpisA.neg);         setV('w-warranty',    s.kpisA.warranty);
+  }
+  if (s.kpisB) {
+    setV('sb-risk', s.kpisB.risk); setV('sb-sga',  s.kpisB.sga);  setV('sb-exu',  s.kpisB.exu);
+    setV('sb-ba',   s.kpisB.ba);   setV('sb-ebit', s.kpisB.ebit); setV('sb-neg',  s.kpisB.neg);
+  }
+  if (s.factories) {
+    _w2wState = { factories: s.factories };
+    renderFactories();
+  }
+  updateAll();
+}
+
+/* ══ Undo / Redo (backed by vendor/pyl0n-state.js) ═════════════════════════ */
+const _undoStack = PylonState.createUndoStack({
+  collect: collectState,
+  apply:   applyState,
+  max:     50,
+  debounceMs: 600,
+  onChange: () => {
+    const u = document.getElementById('btn-undo');
+    const r = document.getElementById('btn-redo');
+    if (u) u.disabled = !_undoStack.canUndo;
+    if (r) r.disabled = !_undoStack.canRedo;
+    PylonState.safeWriteLS(STATE_KEY, collectState());
+  },
+});
+
+function _snapshot()    { _undoStack.snapshot(); }
+function _scheduleSnap(){ _undoStack.scheduleSnap(); }
+function undo()         { _undoStack.undo(); }
+function redo()         { _undoStack.redo(); }
+
+async function saveJSON() {
+  await nativeSaveText('w2w_backup.json', JSON.stringify(collectState(), null, 2), 'JSON', '.json');
 }
 
 /* ══ Data Ingestion ════════════════════════════════════════════════════════ */
-function loadCalcCastData() {
+function loadCalcCastData(seedKpis) {
   try {
     _ccState = JSON.parse(localStorage.getItem('bidcast_state_calccast') || '{}');
   } catch {
@@ -724,21 +790,23 @@ function loadCalcCastData() {
   const el = document.getElementById('proj-name-display');
   if (el) el.textContent = pn ? pn : '';
 
-  // Pre-fill KPI inputs from ccState (keep user's edits if already changed)
-  const kpiMap = [
-    ['w-spec-risk',   'kpiSpecRisk',   2.0],
-    ['w-unspec-risk', 'kpiUnspecRisk', 3.0],
-    ['w-sga',         'kpiSga',        4.0],
-    ['w-exu',         'kpiExu',        3.0],
-    ['w-ba',          'kpiBa',         2.0],
-    ['w-ebit',        'kpiEbit',       8.0],
-    ['w-neg',         'kpiNeg',        5.0],
-    ['w-warranty',    'kpiWarranty',   1.0],
-  ];
-  kpiMap.forEach(([elId, key, def]) => {
-    const inp = document.getElementById(elId);
-    if (inp) inp.value = parseFloat(_ccState[key] ?? def);
-  });
+  // Seed KPI inputs from CalcCast only on first run (no saved w2wreport state)
+  if (seedKpis) {
+    const kpiMap = [
+      ['w-spec-risk',   'kpiSpecRisk',   2.0],
+      ['w-unspec-risk', 'kpiUnspecRisk', 3.0],
+      ['w-sga',         'kpiSga',        4.0],
+      ['w-exu',         'kpiExu',        3.0],
+      ['w-ba',          'kpiBa',         2.0],
+      ['w-ebit',        'kpiEbit',       8.0],
+      ['w-neg',         'kpiNeg',        5.0],
+      ['w-warranty',    'kpiWarranty',   1.0],
+    ];
+    kpiMap.forEach(([elId, key, def]) => {
+      const inp = document.getElementById(elId);
+      if (inp) inp.value = parseFloat(_ccState[key] ?? def);
+    });
+  }
 
   // Compute aggregated direct cost
   const computed  = aggregateDirectCost(_ccState);
@@ -749,11 +817,11 @@ function loadCalcCastData() {
 
   updateAll();
   renderScope();
-  renderFactories();   // update live DC values; KPI inputs are not touched
+  renderFactories();
 }
 
 function refreshAll() {
-  loadCalcCastData();
+  loadCalcCastData(false);
 }
 
 /* ── Aggregate cost rows into EUR totals ── */
@@ -1178,13 +1246,13 @@ function addFactory() {
     category: cat,
     kpis: { rw: 5, sga: 4, exu: 3, ba: 2, ebit: 8 },
   });
-  saveW2WState();
+  _snapshot();
   renderFactories();
 }
 
 function removeFactory(id) {
   _w2wState.factories = _w2wState.factories.filter(f => f.id !== id);
-  saveW2WState();
+  _snapshot();
   renderFactories();
 }
 
@@ -1192,7 +1260,7 @@ function updateFactoryKpi(id, key, val) {
   const f = _w2wState.factories.find(f => f.id === id);
   if (!f) return;
   f.kpis[key] = parseFloat(val) || 0;
-  saveW2WState();
+  _snapshot();
   // Re-render only the results portion of this card to avoid losing focus
   _refreshFactoryStack(id);
   // Rebuild the W2W summary table with updated per-factory KPIs
@@ -1473,16 +1541,34 @@ function _applyTheme(theme) {
   if (btn) btn.textContent = theme === 'dark' ? '☀' : '🌙';
 }
 
+/* ══ Keyboard shortcuts ════════════════════════════════════════════════════ */
+document.addEventListener('keydown', e => {
+  const inField = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName);
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveJSON(); return; }
+  if (inField) return;
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') { e.preventDefault(); undo(); }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); redo(); }
+});
+
 /* ══ Boot ══════════════════════════════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', () => {
   SuiteManager.migrate();
   _applyTheme(localStorage.getItem('bidcast_theme') || 'light');
-  loadCalcCastData();
 
-  // Live sync: reload when CalcCast state changes from another tab
+  // Load saved state first; only seed KPI defaults from CalcCast on first run
+  const saved = PylonState.safeReadLS(STATE_KEY);
+  if (saved && typeof saved === 'object' && saved.version) {
+    applyState(saved);
+    loadCalcCastData(false);
+  } else {
+    loadCalcCastData(true);
+  }
+  _snapshot();
+
+  // Live sync: reload DC data when CalcCast state changes from another tab
   window.addEventListener('storage', e => {
     if (e.storageArea !== localStorage) return;
-    if (e.key === 'bidcast_state_calccast') loadCalcCastData();
+    if (e.key === 'bidcast_state_calccast') loadCalcCastData(false);
   });
 
   // Suite sync (project name, theme)
