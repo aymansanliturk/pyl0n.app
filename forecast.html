@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="libs/fonts.css">
 <script src="libs/xlsx.full.min.js"></script>
 <script src="libs/html2pdf.bundle.min.js"></script>
+<script src="libs/chart.js"></script>
 <script src="vendor/pyl0n-native.js"></script>
 <script src="https://alcdn.msauth.net/browser/2.30.0/js/msal-browser.min.js"></script>
 <script src="vendor/pyl0n-cloud.js"></script>
@@ -362,7 +363,7 @@ body {
   <div class="meta-row">
     <label>Pipeline Name</label>
     <input type="text" id="proj-name" placeholder="e.g. 2025 EMEA Pipeline"
-           oninput="_scheduleSnap(); _suiteWrite()">
+           oninput="_scheduleSnap()">
   </div>
 
   <!-- Capacity input -->
@@ -430,6 +431,24 @@ body {
 
   </div><!-- /.dash-grid -->
 
+  <!-- Quarterly chart -->
+  <div style="background:var(--surface); border:1.5px solid var(--border); border-radius:12px; padding:20px; margin-bottom:28px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <div class="sec-title" style="margin-bottom:0;">Quarterly Pipeline Distribution</div>
+      <select id="chart-type" onchange="_refreshDashboard(); _scheduleSnap();"
+              style="padding:6px 12px; border-radius:6px; border:1.5px solid var(--border);
+                     background:var(--bg); color:var(--text); font-family:inherit;
+                     font-size:12px; cursor:pointer; outline:none;">
+        <option value="bar">Bar Chart</option>
+        <option value="doughnut">Doughnut</option>
+        <option value="pie">Pie Chart</option>
+      </select>
+    </div>
+    <div style="position:relative; height:250px; width:100%; display:flex; align-items:center; justify-content:center;">
+      <canvas id="forecastChart"></canvas>
+    </div>
+  </div>
+
   <!-- Opportunities table -->
   <div class="sec-title">Pipeline Opportunities</div>
   <div class="opp-wrap">
@@ -490,6 +509,7 @@ function _setEl(id, text) {
 /* ══ Constants ═══════════════════════════════════════════════════════════ */
 const STATE_KEY = 'bidcast_state_forecast';
 let _nextId = 1;
+let forecastChartInst = null;
 
 /* ══ Opportunity row management ═════════════════════════════════════════ */
 function addOpportunity(data = {}) {
@@ -633,6 +653,56 @@ function _refreshDashboard() {
       }
     }
   });
+
+  /* ── Chart.js rendering ──────────────────────────────────────────────── */
+  const ctx       = document.getElementById('forecastChart');
+  const chartType = document.getElementById('chart-type')?.value || 'bar';
+
+  if (ctx) {
+    if (forecastChartInst) { forecastChartInst.destroy(); forecastChartInst = null; }
+
+    const totalQData = qw.Q1 + qw.Q2 + qw.Q3 + qw.Q4;
+    if (totalQData > 0) {
+      const isDark    = document.documentElement.getAttribute('data-theme') === 'dark';
+      const textColor = isDark ? '#9c9a94' : '#6b6860';
+      const gridColor = isDark ? '#2e2d2a' : '#e0ddd6';
+
+      forecastChartInst = new Chart(ctx, {
+        type: chartType,
+        data: {
+          labels: ['Q1', 'Q2', 'Q3', 'Q4'],
+          datasets: [{
+            label: 'Weighted Pipeline (M)',
+            data: [qw.Q1, qw.Q2, qw.Q3, qw.Q4],
+            backgroundColor: ['#c026d3', '#a21caf', '#86198f', '#701a75'],
+            borderWidth:   chartType === 'bar' ? 0 : 2,
+            borderColor:   isDark ? '#1c1c1a' : '#ffffff',
+            borderRadius:  chartType === 'bar' ? 4 : 0,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display:  chartType !== 'bar',
+              position: 'right',
+              labels: { color: textColor, font: { family: 'DM Sans', size: 11 } },
+            },
+            tooltip: {
+              callbacks: {
+                label: ctx => ' ' + ctx.formattedValue + ' M',
+              },
+            },
+          },
+          scales: chartType === 'bar' ? {
+            y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor } },
+            x: { grid: { display: false },                      ticks: { color: textColor } },
+          } : { x: { display: false }, y: { display: false } },
+        },
+      });
+    }
+  }
 }
 
 /* ══ State management ════════════════════════════════════════════════════ */
@@ -641,6 +711,7 @@ function collectState() {
     version:       1,
     projName:      document.getElementById('proj-name')?.value   || '',
     capacityLimit: parseFloat(document.getElementById('cap-limit')?.value) || 0,
+    chartType:     document.getElementById('chart-type')?.value  || 'bar',
     opportunities: _getOpportunities(),
   };
 }
@@ -650,6 +721,7 @@ function applyState(s) {
   const $  = id => document.getElementById(id);
   if ($('proj-name'))  $('proj-name').value  = s.projName      || '';
   if ($('cap-limit'))  $('cap-limit').value  = s.capacityLimit != null ? s.capacityLimit : '';
+  if ($('chart-type') && s.chartType) $('chart-type').value = s.chartType;
   $('opp-body').innerHTML = '';
   _nextId = 1;
   (s.opportunities || []).forEach(o => addOpportunity(o));
@@ -671,12 +743,6 @@ function _snapshot()     { _undoStack.snapshot(); }
 function _scheduleSnap() { _undoStack.scheduleSnap(); }
 function undo()          { _undoStack.undo(); }
 function redo()          { _undoStack.redo(); }
-
-/* ══ Suite sync ══════════════════════════════════════════════════════════ */
-function _suiteWrite() {
-  const n = document.getElementById('proj-name')?.value || '';
-  if (n) SuiteManager.write({ projectName: n }, 'forecast');
-}
 
 /* ══ File I/O ════════════════════════════════════════════════════════════ */
 async function saveJSON() {
@@ -770,16 +836,9 @@ document.addEventListener('DOMContentLoaded', () => {
       quarter:'Q2', grossValue:5.0,  probGo:60, probWin:35 });
     addOpportunity({ name:'Offshore Cable Contract',   customer:'NorthSea EPC',
       quarter:'Multi', grossValue:22.0, probGo:40, probWin:25 });
-    const sync = SuiteManager.read();
-    if (sync.projectName) document.getElementById('proj-name').value = sync.projectName;
   }
 
   _snapshot();
-
-  SuiteManager.onUpdate(sync => {
-    const el = document.getElementById('proj-name');
-    if (el && document.activeElement !== el && sync.projectName) el.value = sync.projectName;
-  });
 
   document.addEventListener('keydown', e => {
     const inField = ['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName);
