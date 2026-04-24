@@ -463,5 +463,333 @@ body {
 
 </div><!-- /#editor -->
 
+<script>
+/* ══ Helpers ═════════════════════════════════════════════════════════════ */
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fmtM(n) {
+  const v = Number(n) || 0;
+  if (Math.abs(v) >= 10000) return (v / 1000).toFixed(1) + ' G';
+  if (Math.abs(v) >= 100)   return v.toFixed(0) + ' M';
+  return v.toFixed(1) + ' M';
+}
+
+function fmtMFull(n) {
+  return (Number(n) || 0).toFixed(2) + ' M';
+}
+
+function _setEl(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
+/* ══ Constants ═══════════════════════════════════════════════════════════ */
+const STATE_KEY = 'bidcast_state_forecast';
+let _nextId = 1;
+
+/* ══ Opportunity row management ═════════════════════════════════════════ */
+function addOpportunity(data = {}) {
+  const id = (data.id != null) ? data.id : _nextId;
+  if (id >= _nextId) _nextId = id + 1;
+
+  const body  = document.getElementById('opp-body');
+  const row   = document.createElement('div');
+  row.className  = 'opp-row';
+  row.dataset.id = id;
+
+  const gross = data.grossValue != null ? data.grossValue : '';
+  const go    = data.probGo    != null ? data.probGo    : 50;
+  const win   = data.probWin   != null ? data.probWin   : 30;
+  const wt    = (parseFloat(gross)||0) * ((parseFloat(go)||0)/100) * ((parseFloat(win)||0)/100);
+
+  const qOpts = ['Q1','Q2','Q3','Q4','Multi'].map(q =>
+    `<option value="${q}"${(data.quarter||'Q1')===q?' selected':''}>${q}</option>`
+  ).join('');
+
+  row.innerHTML = `
+    <input type="text"   class="opp-name"     placeholder="Opportunity name…"
+           value="${esc(data.name||'')}"     oninput="onOppInput(event)">
+    <input type="text"   class="opp-customer" placeholder="Customer…"
+           value="${esc(data.customer||'')}" oninput="onOppInput(event)">
+    <select class="opp-quarter" onchange="onOppInput(event)">${qOpts}</select>
+    <input type="number" class="opp-gross"    placeholder="0.0" min="0" step="0.1"
+           value="${esc(gross)}"              oninput="onOppInput(event)">
+    <input type="number" class="opp-go"       placeholder="50"  min="0" max="100"
+           value="${esc(go)}"                 oninput="onOppInput(event)">
+    <input type="number" class="opp-win"      placeholder="30"  min="0" max="100"
+           value="${esc(win)}"                oninput="onOppInput(event)">
+    <div   class="weighted-cell" id="wt-${id}">${fmtMFull(wt)}</div>
+    <input type="text"   class="opp-owner"    placeholder="Owner / notes…"
+           value="${esc(data.owner||'')}"    oninput="onOppInput(event)">
+    <button class="opp-del" onclick="removeOpportunity(this)" title="Remove">✕</button>
+  `;
+
+  body.appendChild(row);
+  _refreshDashboard();
+}
+
+function removeOpportunity(btn) {
+  btn.closest('.opp-row').remove();
+  _refreshDashboard();
+  _scheduleSnap();
+}
+
+function onOppInput(evt) {
+  const row = evt.target.closest('.opp-row');
+  if (row) _updateRowWeighted(row);
+  _refreshDashboard();
+  _scheduleSnap();
+}
+
+function _updateRowWeighted(row) {
+  const gross = parseFloat(row.querySelector('.opp-gross')?.value) || 0;
+  const go    = parseFloat(row.querySelector('.opp-go')?.value)    || 0;
+  const win   = parseFloat(row.querySelector('.opp-win')?.value)   || 0;
+  const wt    = gross * (go/100) * (win/100);
+  const el    = document.getElementById('wt-' + row.dataset.id)
+             || row.querySelector('.weighted-cell');
+  if (el) el.textContent = fmtMFull(wt);
+}
+
+function _getOpportunities() {
+  return Array.from(document.querySelectorAll('#opp-body .opp-row')).map(r => ({
+    id:         Number(r.dataset.id),
+    name:       r.querySelector('.opp-name')?.value     || '',
+    customer:   r.querySelector('.opp-customer')?.value || '',
+    quarter:    r.querySelector('.opp-quarter')?.value  || 'Q1',
+    grossValue: parseFloat(r.querySelector('.opp-gross')?.value) || 0,
+    probGo:     parseFloat(r.querySelector('.opp-go')?.value)    || 0,
+    probWin:    parseFloat(r.querySelector('.opp-win')?.value)   || 0,
+    owner:      r.querySelector('.opp-owner')?.value    || '',
+  }));
+}
+
+/* ══ Dashboard refresh ═══════════════════════════════════════════════════ */
+function _refreshDashboard() {
+  const opps     = _getOpportunities();
+  const capLimit = parseFloat(document.getElementById('cap-limit')?.value) || 0;
+
+  let totalGross = 0, totalWt = 0;
+  const qw = { Q1: 0, Q2: 0, Q3: 0, Q4: 0 };
+
+  opps.forEach(o => {
+    totalGross += o.grossValue;
+    const wt = o.grossValue * (o.probGo/100) * (o.probWin/100);
+    totalWt += wt;
+    if (o.quarter === 'Multi') {
+      qw.Q1 += wt; qw.Q2 += wt; qw.Q3 += wt; qw.Q4 += wt;
+    } else if (qw[o.quarter] !== undefined) {
+      qw[o.quarter] += wt;
+    }
+  });
+
+  /* summary cards */
+  _setEl('dash-gross-val', fmtM(totalGross));
+  _setEl('dash-wt-val',    fmtM(totalWt));
+  _setEl('foot-gross',     fmtM(totalGross));
+  _setEl('foot-wt',        fmtM(totalWt));
+  _setEl('foot-count',     opps.length + ' opportunit' + (opps.length === 1 ? 'y' : 'ies'));
+
+  /* quarter cards */
+  const maxQ = Math.max(...Object.values(qw), capLimit || 0, 0.001);
+  ['Q1','Q2','Q3','Q4'].forEach(q => {
+    const val   = qw[q];
+    const qid   = q.toLowerCase();
+    const card  = document.getElementById('dash-' + qid);
+    const valEl = document.getElementById('dash-' + qid + '-val');
+    const fill  = document.getElementById('dash-' + qid + '-fill');
+    const badge = document.getElementById('dash-' + qid + '-badge');
+    if (!card) return;
+
+    if (valEl) valEl.textContent = fmtM(val);
+
+    /* progress bar width */
+    const pct = capLimit > 0
+      ? Math.min((val / capLimit) * 100, 100)
+      : (val / maxQ) * 100;
+    if (fill) {
+      fill.style.width = pct + '%';
+      fill.classList.remove('alarm','warn');
+    }
+    card.classList.remove('alarm','warn');
+    if (badge) badge.innerHTML = '';
+
+    /* alarm thresholds */
+    if (capLimit > 0) {
+      if (val > capLimit) {
+        card.classList.add('alarm');
+        if (fill)  fill.classList.add('alarm');
+        if (badge) badge.innerHTML =
+          '<span class="dash-alarm-badge">⚠ Resource Overlap Alert</span>';
+      } else if (val > capLimit * 0.75) {
+        card.classList.add('warn');
+        if (fill)  fill.classList.add('warn');
+        if (badge) badge.innerHTML =
+          '<span class="dash-warn-badge">⚠ Near Capacity (75%+)</span>';
+      }
+    }
+  });
+}
+
+/* ══ State management ════════════════════════════════════════════════════ */
+function collectState() {
+  return {
+    version:       1,
+    projName:      document.getElementById('proj-name')?.value   || '',
+    capacityLimit: parseFloat(document.getElementById('cap-limit')?.value) || 0,
+    opportunities: _getOpportunities(),
+  };
+}
+
+function applyState(s) {
+  if (!s) return;
+  const $  = id => document.getElementById(id);
+  if ($('proj-name'))  $('proj-name').value  = s.projName      || '';
+  if ($('cap-limit'))  $('cap-limit').value  = s.capacityLimit != null ? s.capacityLimit : '';
+  $('opp-body').innerHTML = '';
+  _nextId = 1;
+  (s.opportunities || []).forEach(o => addOpportunity(o));
+  _refreshDashboard();
+}
+
+/* ══ Undo / Redo (backed by vendor/pyl0n-state.js) ══════════════════════ */
+const _undoStack = PylonState.createUndoStack({
+  collect: collectState, apply: applyState, max: 50, debounceMs: 600,
+  onChange: () => {
+    const u = document.getElementById('btn-undo');
+    const r = document.getElementById('btn-redo');
+    if (u) u.disabled = !_undoStack.canUndo;
+    if (r) r.disabled = !_undoStack.canRedo;
+    PylonState.safeWriteLS(STATE_KEY, collectState());
+  },
+});
+function _snapshot()     { _undoStack.snapshot(); }
+function _scheduleSnap() { _undoStack.scheduleSnap(); }
+function undo()          { _undoStack.undo(); }
+function redo()          { _undoStack.redo(); }
+
+/* ══ Suite sync ══════════════════════════════════════════════════════════ */
+function _suiteWrite() {
+  const n = document.getElementById('proj-name')?.value || '';
+  if (n) SuiteManager.write({ projectName: n }, 'forecast');
+}
+
+/* ══ File I/O ════════════════════════════════════════════════════════════ */
+async function saveJSON() {
+  const s = collectState();
+  const fname = (s.projName || 'forecast').replace(/[^a-z0-9_\-. ]/gi,'_') + '.forecast.json';
+  await nativeSaveText(fname, JSON.stringify(s, null, 2), 'ForeCast JSON', '.json');
+  _snapshot();
+}
+
+async function loadJSON(input) {
+  await nativeOpenText(['.json'], txt => {
+    try {
+      const s = JSON.parse(txt);
+      applyState(s);
+      _snapshot();
+    } catch { alert('Invalid JSON file.'); }
+  }, input);
+}
+
+/* ══ Exports ══════════════════════════════════════════════════════════════ */
+function exportExcel() {
+  if (!window.XLSX) { alert('XLSX library not loaded.'); return; }
+  const opps = _getOpportunities();
+  const rows = [
+    ['#','Opportunity Name','Customer','Quarter',
+     'Gross Value (M)','P(Go) %','P(Win) %','Weighted Value (M)','Owner & Notes'],
+    ...opps.map((o, i) => [
+      i + 1, o.name, o.customer, o.quarter,
+      o.grossValue, o.probGo, o.probWin,
+      parseFloat((o.grossValue*(o.probGo/100)*(o.probWin/100)).toFixed(4)),
+      o.owner,
+    ]),
+    [],
+    ['','Total Pipeline (M)','','',
+     opps.reduce((s,o)=>s+o.grossValue,0).toFixed(4),'','',
+     opps.reduce((s,o)=>s+o.grossValue*(o.probGo/100)*(o.probWin/100),0).toFixed(4),''],
+    ['','Quarterly Capacity Limit (M)',
+     parseFloat(document.getElementById('cap-limit')?.value)||0],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [
+    {wch:4},{wch:36},{wch:20},{wch:8},
+    {wch:16},{wch:10},{wch:10},{wch:18},{wch:32},
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'ForeCast');
+  const base = (document.getElementById('proj-name')?.value||'forecast')
+    .replace(/[^a-z0-9_\-. ]/gi,'_');
+  nativeSaveXLSX(wb, base + '.forecast.xlsx');
+}
+
+async function exportPDF() {
+  const base  = (document.getElementById('proj-name')?.value||'forecast')
+    .replace(/[^a-z0-9_\-. ]/gi,'_');
+  const fname = base + '.forecast.pdf';
+  await nativeSavePDF(document.getElementById('editor'), fname, {
+    margin: [8,8,8,8], filename: fname,
+    image:     { type:'jpeg', quality:0.96 },
+    html2canvas:{ scale:2, useCORS:true },
+    jsPDF:     { unit:'mm', format:'a4', orientation:'landscape' },
+  });
+}
+
+/* ══ Theme ════════════════════════════════════════════════════════════════ */
+function _applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light');
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = t === 'dark' ? '☀️' : '🌙';
+}
+function toggleTheme() {
+  const t = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  _applyTheme(t);
+  try { localStorage.setItem('bidcast_theme', t); } catch {}
+}
+
+/* ══ Boot ═════════════════════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  SuiteManager.migrate();
+  _applyTheme(localStorage.getItem('bidcast_theme') || 'light');
+
+  const saved = localStorage.getItem(STATE_KEY);
+  if (saved) {
+    try { applyState(JSON.parse(saved)); } catch {}
+  } else {
+    /* seed with sample data so the dashboard is non-empty on first open */
+    addOpportunity({ name:'Wind Farm EPC Package A', customer:'GreenPower AS',
+      quarter:'Q2', grossValue:12.5, probGo:85, probWin:45 });
+    addOpportunity({ name:'Substation Upgrade Ph.1',  customer:'GridCo DK',
+      quarter:'Q3', grossValue:8.2,  probGo:70, probWin:60 });
+    addOpportunity({ name:'Solar BOS Supply',          customer:'SunTech GmbH',
+      quarter:'Q2', grossValue:5.0,  probGo:60, probWin:35 });
+    addOpportunity({ name:'Offshore Cable Contract',   customer:'NorthSea EPC',
+      quarter:'Multi', grossValue:22.0, probGo:40, probWin:25 });
+    const sync = SuiteManager.read();
+    if (sync.projectName) document.getElementById('proj-name').value = sync.projectName;
+  }
+
+  _snapshot();
+
+  SuiteManager.onUpdate(sync => {
+    const el = document.getElementById('proj-name');
+    if (el && document.activeElement !== el && sync.projectName) el.value = sync.projectName;
+  });
+
+  document.addEventListener('keydown', e => {
+    const inField = ['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName);
+    if ((e.ctrlKey||e.metaKey) && e.key === 's') { e.preventDefault(); saveJSON(); return; }
+    if (inField) return;
+    if ((e.ctrlKey||e.metaKey) && !e.shiftKey && e.key === 'z') { e.preventDefault(); undo(); }
+    if ((e.ctrlKey||e.metaKey) && (e.key==='y'||(e.shiftKey&&e.key==='z'))) { e.preventDefault(); redo(); }
+  });
+});
+</script>
+
 </body>
 </html>
