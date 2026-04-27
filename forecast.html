@@ -349,6 +349,7 @@ body {
     <div class="tb-sep"></div>
     <button class="tb-btn" onclick="saveJSON()">💾 Save</button>
     <label  class="tb-btn" style="cursor:pointer;">↑ Load<input type="file" accept=".json" style="display:none" onchange="loadJSON(this)"></label>
+    <label class="tb-btn" style="cursor:pointer; color:var(--accent); border-color:var(--accent);">📥 Import Salesforce<input type="file" accept=".xlsx, .xls" style="display:none" onchange="importSalesforce(this)"></label>
     <div class="tb-sep"></div>
     <button class="tb-btn green"   onclick="exportExcel()">⬇ Excel</button>
     <button class="tb-btn primary" onclick="exportPDF()">⬇ PDF</button>
@@ -848,6 +849,103 @@ document.addEventListener('DOMContentLoaded', () => {
     if ((e.ctrlKey||e.metaKey) && (e.key==='y'||(e.shiftKey&&e.key==='z'))) { e.preventDefault(); redo(); }
   });
 });
+
+/* ══ Salesforce / CRM Excel Importer ════════════════════════════════════ */
+async function importSalesforce(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+
+      // Convert to an array of arrays to manually parse the messy structure
+      const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+      let headerRowIndex = -1;
+
+      // 1. Scan for the actual table headers (skip top metadata)
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        if (Array.isArray(row)) {
+          const rowStr = row.join(' ').toLowerCase();
+          if (rowStr.includes('opportunity') && rowStr.includes('account')) {
+            headerRowIndex = i;
+            break;
+          }
+        }
+      }
+
+      if (headerRowIndex === -1) {
+        alert("Could not detect standard Salesforce columns. Please ensure the export includes 'Opportunity Name' and 'Account'.");
+        input.value = '';
+        return;
+      }
+
+      // Convert array rows to object mapping based on found headers
+      const oppData = XLSX.utils.sheet_to_json(worksheet, { range: headerRowIndex });
+
+      let importedCount = 0;
+
+      // 2. Iterate through rows and filter out subtotals/totals
+      oppData.forEach(row => {
+        const oppName = row['Opportunity / Project Name'] || row['Opportunity Name'] || '';
+        const account = row['Account'] || '';
+        const rawAmount = row['Converted Amount'] || row['Forecast Amount'] || 0;
+
+        // Skip rows that look like Subtotals, Grand Totals, or Grouping Headers
+        const rowString = JSON.stringify(row).toLowerCase();
+        if (!oppName || rowString.includes('subtotal') || rowString.includes('grand total')) {
+          return;
+        }
+
+        // 3. Map Data to ForeCast structure
+        // Attempt to extract Q1, Q2, Q3, Q4 from Fiscal Period, default to Q1
+        const fiscal = String(row['Fiscal Period'] || '').toUpperCase();
+        let targetQuarter = 'Q1';
+        if (fiscal.includes('Q2')) targetQuarter = 'Q2';
+        else if (fiscal.includes('Q3')) targetQuarter = 'Q3';
+        else if (fiscal.includes('Q4')) targetQuarter = 'Q4';
+
+        // Convert amount to Millions (M EUR/USD)
+        const grossInM = parseFloat(rawAmount) / 1000000;
+
+        // Build Owner & Notes combo
+        const owner    = row['Opportunity Owner'] || '';
+        const stage    = row['Stage'] || '';
+        const comments = row['Sales / Forecast Comments'] || row['Comments'] || '';
+        const combinedNotes = `${owner ? '['+owner+'] ' : ''}${stage ? 'Stage: '+stage+' | ' : ''}${comments}`.substring(0, 150);
+
+        // Append to pipeline (default probabilities to 50/30)
+        addOpportunity({
+          name:       oppName,
+          customer:   account,
+          quarter:    targetQuarter,
+          grossValue: parseFloat(grossInM.toFixed(2)),
+          probGo:     50,
+          probWin:    30,
+          owner:      combinedNotes,
+        });
+
+        importedCount++;
+      });
+
+      _snapshot();
+      alert(`Successfully imported ${importedCount} opportunities from Salesforce.`);
+
+    } catch (error) {
+      console.error(error);
+      alert('Error parsing the Excel file. Please check the format.');
+    } finally {
+      input.value = ''; // Reset input so the same file can be re-imported
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
 </script>
 
 </body>
