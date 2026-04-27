@@ -367,16 +367,6 @@ body {
            oninput="_scheduleSnap()">
   </div>
 
-  <!-- Capacity input -->
-  <div class="cap-row">
-    <label>Quarterly Capacity Limit</label>
-    <input type="number" id="cap-limit" class="cap-input"
-           placeholder="0" min="0" step="0.1"
-           oninput="_scheduleSnap(); _refreshDashboard()">
-    <span class="cap-unit">M EUR</span>
-    <span class="cap-hint">When any quarter's weighted pipeline exceeds this limit, an overlap alert is raised.</span>
-  </div>
-
   <!-- Dashboard -->
   <div class="dash-grid">
 
@@ -614,9 +604,8 @@ function _getOpportunities(visibleOnly = false) {
 
 /* ══ Dashboard refresh ═══════════════════════════════════════════════════ */
 function _refreshDashboard() {
-  const opps     = _getOpportunities(true); // visible rows only — respects active filters
-  const allOpps  = _getOpportunities();
-  const capLimit = parseFloat(document.getElementById('cap-limit')?.value) || 0;
+  const opps    = _getOpportunities(true); // visible rows only — respects active filters
+  const allOpps = _getOpportunities();
 
   let totalGross = 0, totalWt = 0;
   const qw = { Q1: 0, Q2: 0, Q3: 0, Q4: 0 };
@@ -671,7 +660,7 @@ function _refreshDashboard() {
   }
 
   /* quarter cards */
-  const maxQ = Math.max(...Object.values(qw), capLimit || 0, 0.001);
+  const maxQ = Math.max(...Object.values(qw), 0.001);
   ['Q1','Q2','Q3','Q4'].forEach(q => {
     const val   = qw[q];
     const qid   = q.toLowerCase();
@@ -683,31 +672,13 @@ function _refreshDashboard() {
 
     if (valEl) valEl.textContent = fmtM(val);
 
-    /* progress bar width */
-    const pct = capLimit > 0
-      ? Math.min((val / capLimit) * 100, 100)
-      : (val / maxQ) * 100;
+    const pct = (val / maxQ) * 100;
     if (fill) {
       fill.style.width = pct + '%';
       fill.classList.remove('alarm','warn');
     }
     card.classList.remove('alarm','warn');
     if (badge) badge.innerHTML = '';
-
-    /* alarm thresholds */
-    if (capLimit > 0) {
-      if (val > capLimit) {
-        card.classList.add('alarm');
-        if (fill)  fill.classList.add('alarm');
-        if (badge) badge.innerHTML =
-          '<span class="dash-alarm-badge">⚠ Resource Overlap Alert</span>';
-      } else if (val > capLimit * 0.75) {
-        card.classList.add('warn');
-        if (fill)  fill.classList.add('warn');
-        if (badge) badge.innerHTML =
-          '<span class="dash-warn-badge">⚠ Near Capacity (75%+)</span>';
-      }
-    }
   });
 
   /* ── Chart.js rendering ──────────────────────────────────────────────── */
@@ -817,9 +788,8 @@ function clearFilters() {
 function collectState() {
   return {
     version:       1,
-    projName:      document.getElementById('proj-name')?.value   || '',
-    capacityLimit: parseFloat(document.getElementById('cap-limit')?.value) || 0,
-    chartType:     document.getElementById('chart-type')?.value  || 'bar',
+    projName:      document.getElementById('proj-name')?.value  || '',
+    chartType:     document.getElementById('chart-type')?.value || 'bar',
     opportunities: _getOpportunities(),
   };
 }
@@ -827,8 +797,7 @@ function collectState() {
 function applyState(s) {
   if (!s) return;
   const $  = id => document.getElementById(id);
-  if ($('proj-name'))  $('proj-name').value  = s.projName      || '';
-  if ($('cap-limit'))  $('cap-limit').value  = s.capacityLimit != null ? s.capacityLimit : '';
+  if ($('proj-name'))  $('proj-name').value  = s.projName || '';
   if ($('chart-type') && s.chartType) $('chart-type').value = s.chartType;
   $('opp-body').innerHTML = '';
   _nextId = 1;
@@ -887,8 +856,6 @@ function exportExcel() {
     ['','Total Pipeline (M)','','','',
      opps.reduce((s,o)=>s+o.grossValue,0).toFixed(4),'','',
      opps.reduce((s,o)=>s+o.grossValue*(o.probGo/100)*(o.probWin/100),0).toFixed(4),'','',''],
-    ['','Quarterly Capacity Limit (M)',
-     parseFloat(document.getElementById('cap-limit')?.value)||0],
   ];
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws['!cols'] = [
@@ -1036,8 +1003,12 @@ async function importSalesforce(input) {
           return;
         }
 
-        // Quarter
-        const rawQ = String(row['Quarter'] || row['Fiscal Period'] || '').toUpperCase();
+        // Quarter — fuzzy key lookup handles Salesforce sort arrows e.g. "Fiscal Period  ↑"
+        const qKey = Object.keys(row).find(k => {
+          const u = k.toUpperCase();
+          return u.includes('FISCAL PERIOD') || u.includes('QUARTER');
+        });
+        const rawQ = String(qKey ? row[qKey] : '').toUpperCase();
         let targetQuarter = 'Q1';
         if (rawQ.includes('MULTI'))   targetQuarter = 'Multi';
         else if (rawQ.includes('Q2')) targetQuarter = 'Q2';
