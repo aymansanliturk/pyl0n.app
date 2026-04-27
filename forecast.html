@@ -850,7 +850,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-/* ══ Salesforce / CRM Excel Importer ════════════════════════════════════ */
+/* ══ Universal Excel Importer (Salesforce & Native) ═════════════════════ */
 async function importSalesforce(input) {
   const file = input.files[0];
   if (!file) return;
@@ -868,12 +868,12 @@ async function importSalesforce(input) {
       let headerRowIndex = -1;
       let rawHeaders = [];
 
-      // 1. Scan for the actual table headers
+      // 1. Scan for headers: 'opportunity' AND either 'account' (SF) OR 'customer' (Native)
       for (let i = 0; i < rawRows.length; i++) {
         const row = rawRows[i];
         if (Array.isArray(row)) {
           const rowStr = row.join(' ').toLowerCase();
-          if (rowStr.includes('opportunity') && rowStr.includes('account')) {
+          if (rowStr.includes('opportunity') && (rowStr.includes('account') || rowStr.includes('customer'))) {
             headerRowIndex = i;
             rawHeaders = row;
             break;
@@ -882,12 +882,11 @@ async function importSalesforce(input) {
       }
 
       if (headerRowIndex === -1) {
-        alert("Could not detect standard Salesforce columns. Please ensure the export includes 'Opportunity Name' and 'Account'.");
+        alert("Could not detect valid columns. Please ensure the export includes 'Opportunity Name' and 'Account/Customer'.");
         input.value = '';
         return;
       }
 
-      // 2. Parse from the header row, forcibly trimming headers to remove hidden Salesforce spaces
       const cleanedHeaders = rawHeaders.map(h => String(h || '').trim());
       const oppData = XLSX.utils.sheet_to_json(worksheet, {
         range: headerRowIndex + 1,
@@ -896,72 +895,81 @@ async function importSalesforce(input) {
 
       let importedCount = 0;
 
-      // Robust currency parser — handles "1,234,567.89", "1.234.567,89", "1 234.56"
       const parseCurrency = (val) => {
         if (typeof val === 'number') return val;
         if (!val) return 0;
         let str = String(val).trim();
         const lastComma  = str.lastIndexOf(',');
         const lastPeriod = str.lastIndexOf('.');
-        // If comma appears after period it's EU format (e.g. 1.234,56)
         if (lastComma > lastPeriod && lastComma !== -1) {
           str = str.replace(/\./g, '').replace(',', '.');
         } else {
-          str = str.replace(/,/g, ''); // US format (e.g. 1,234.56)
+          str = str.replace(/,/g, '');
         }
         str = str.replace(/[^0-9.-]/g, '');
         return parseFloat(str) || 0;
       };
 
-      // 3. Iterate through rows
       oppData.forEach(row => {
-        const oppName   = row['Opportunity / Project Name'] || row['Opportunity Name'] || '';
-        const account   = row['Account'] || '';
-        const rawAmount = row['Converted Amount'] || row['Forecast Amount'] || row['Amount'] || 0;
+        const oppName  = row['Opportunity Name'] || row['Opportunity / Project Name'] || '';
+        const customer = row['Customer'] || row['Account'] || '';
 
-        // Skip rows that look like Subtotals, Grand Totals, or Grouping Headers
+        // Support both Native ("Gross Value (M)") and Salesforce amounts
+        const rawAmount = row['Gross Value (M)'] || row['Converted Amount'] || row['Forecast Amount'] || row['Amount'] || 0;
+
         const rowString = JSON.stringify(row).toLowerCase();
-        if (!oppName || rowString.includes('subtotal') || rowString.includes('grand total')) {
+        if (!oppName || rowString.includes('total pipeline') || rowString.includes('subtotal') || rowString.includes('grand total')) {
           return;
         }
 
-        const fiscal = String(row['Fiscal Period'] || '').toUpperCase();
+        // Quarter — native exports use "Quarter", Salesforce uses "Fiscal Period"
+        const rawQ = String(row['Quarter'] || row['Fiscal Period'] || '').toUpperCase();
         let targetQuarter = 'Q1';
-        if (fiscal.includes('Q2')) targetQuarter = 'Q2';
-        else if (fiscal.includes('Q3')) targetQuarter = 'Q3';
-        else if (fiscal.includes('Q4')) targetQuarter = 'Q4';
+        if (rawQ.includes('MULTI'))     targetQuarter = 'Multi';
+        else if (rawQ.includes('Q2'))   targetQuarter = 'Q2';
+        else if (rawQ.includes('Q3'))   targetQuarter = 'Q3';
+        else if (rawQ.includes('Q4'))   targetQuarter = 'Q4';
 
         const cleanAmount = parseCurrency(rawAmount);
-        // Auto-scale to millions: if > 10 000 it's raw currency (e.g. 1 500 000 → 1.5 M)
         let grossInM = cleanAmount;
         if (Math.abs(cleanAmount) > 10000) grossInM = cleanAmount / 1000000;
 
-        const owner    = row['Opportunity Owner'] || '';
-        const stage    = row['Stage'] || '';
-        const comments = row['Sales / Forecast Comments'] || row['Comments'] || '';
-        const combinedNotes = `${owner ? '['+owner+'] ' : ''}${stage ? 'Stage: '+stage+' | ' : ''}${comments}`.substring(0, 150);
+        // Probabilities — native exports carry exact values; Salesforce gets defaults
+        const pGo  = row['P(Go) %']  !== undefined ? (parseFloat(row['P(Go) %'])  || 0) : 50;
+        const pWin = row['P(Win) %'] !== undefined ? (parseFloat(row['P(Win) %']) || 0) : 30;
+
+        // Notes — native "Owner & Notes" is used as-is; Salesforce fields are combined
+        let finalOwner;
+        if (row['Owner & Notes'] !== undefined) {
+          finalOwner = String(row['Owner & Notes'] || '');
+        } else {
+          const sf    = row['Opportunity Owner'] || '';
+          const stage = row['Stage'] || '';
+          const cmts  = row['Sales / Forecast Comments'] || row['Comments'] || '';
+          finalOwner  = `${sf ? '['+sf+'] ' : ''}${stage ? 'Stage: '+stage+' | ' : ''}${cmts}`.substring(0, 150);
+        }
 
         addOpportunity({
           name:       oppName,
-          customer:   account,
+          customer:   customer,
           quarter:    targetQuarter,
           grossValue: parseFloat(grossInM.toFixed(3)),
-          probGo:     50,
-          probWin:    30,
-          owner:      combinedNotes,
+          probGo:     pGo,
+          probWin:    pWin,
+          owner:      finalOwner,
         });
 
         importedCount++;
       });
 
       _snapshot();
-      alert(`Successfully imported ${importedCount} opportunities from Salesforce.`);
+      alert(`Successfully imported ${importedCount} opportunities.`);
 
     } catch (error) {
       console.error(error);
       alert('Error parsing the Excel file. Please check the format.');
     } finally {
-      input.value = ''; // Reset input
+      input.value = '';
     }
   };
   reader.readAsArrayBuffer(file);
