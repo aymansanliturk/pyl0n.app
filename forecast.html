@@ -1067,7 +1067,7 @@ async function importSalesforce(input) {
 
     } catch (error) {
       console.error(error);
-      alert('Error parsing the Excel file. Please check the format.');
+      alert('Error parsing the Excel file:\n\n' + error.message);
     } finally {
       input.value = '';
     }
