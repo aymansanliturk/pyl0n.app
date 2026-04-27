@@ -933,7 +933,7 @@ async function importSalesforce(input) {
   reader.onload = (e) => {
     try {
       const data = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(data, { type: 'array' });
+      const workbook = XLSX.read(data, { type: 'array', cellDates: true });
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
 
@@ -961,7 +961,6 @@ async function importSalesforce(input) {
         return;
       }
 
-      // 2. Clear table prompt to prevent duplicates
       if (document.querySelectorAll('#opp-body .opp-row').length > 0) {
         if (confirm('Replace current pipeline with imported data?\n\n(Click OK to Replace, Cancel to Append)')) {
           document.getElementById('opp-body').innerHTML = '';
@@ -969,7 +968,6 @@ async function importSalesforce(input) {
         }
       }
 
-      // 3. raw:false guarantees formatted text — solves percentage (0.85 → "85%") and currency string bugs
       const cleanedHeaders = rawHeaders.map(h => String(h || '').trim());
       const oppData = XLSX.utils.sheet_to_json(worksheet, {
         range: headerRowIndex + 1,
@@ -978,6 +976,7 @@ async function importSalesforce(input) {
       });
 
       let importedCount = 0;
+      let currentGroupQuarter = 'Q1'; // cascading state for Salesforce visual grouping rows
 
       const parseCurrency = (val) => {
         if (typeof val === 'number') return val;
@@ -994,39 +993,54 @@ async function importSalesforce(input) {
         return parseFloat(str) || 0;
       };
 
+      // Resolve the fiscal-period key once — handles "Fiscal Period  ↑" sort arrows
+      const qKey = cleanedHeaders.find(k => {
+        const u = k.toUpperCase();
+        return u.includes('FISCAL PERIOD') || u.includes('QUARTER');
+      });
+
       oppData.forEach(row => {
+        const rowString = JSON.stringify(row).toLowerCase();
+
+        // 2. Stateful quarter detection — Salesforce prints "Q1-2027" on a grouping row
+        //    and leaves the column blank for every data row underneath it.
+        if (qKey && row[qKey]) {
+          const rawQ = String(row[qKey]).toUpperCase();
+          if      (rawQ.includes('Q1'))    currentGroupQuarter = 'Q1';
+          else if (rawQ.includes('Q2'))    currentGroupQuarter = 'Q2';
+          else if (rawQ.includes('Q3'))    currentGroupQuarter = 'Q3';
+          else if (rawQ.includes('Q4'))    currentGroupQuarter = 'Q4';
+          else if (rawQ.includes('MULTI')) currentGroupQuarter = 'Multi';
+        }
+
         const oppName  = row['Opportunity Name'] || row['Opportunity / Project Name'] || '';
         const customer = row['Account Name'] || row['Account'] || row['Customer'] || '';
 
-        const rowString = JSON.stringify(row).toLowerCase();
+        // Skip grouping headers, subtotals, and grand totals
         if (!oppName || rowString.includes('total pipeline') || rowString.includes('subtotal') || rowString.includes('grand total')) {
           return;
         }
 
-        // Quarter — fuzzy key lookup handles Salesforce sort arrows e.g. "Fiscal Period  ↑"
-        const qKey = Object.keys(row).find(k => {
-          const u = k.toUpperCase();
-          return u.includes('FISCAL PERIOD') || u.includes('QUARTER');
-        });
-        const rawQ = String(qKey ? row[qKey] : '').toUpperCase();
-        let targetQuarter = 'Q1';
-        if (rawQ.includes('MULTI'))   targetQuarter = 'Multi';
-        else if (rawQ.includes('Q2')) targetQuarter = 'Q2';
-        else if (rawQ.includes('Q3')) targetQuarter = 'Q3';
-        else if (rawQ.includes('Q4')) targetQuarter = 'Q4';
+        // 3. Use explicit row quarter if present; otherwise cascade from the group header
+        let targetQuarter = currentGroupQuarter;
+        if (qKey && row[qKey] && String(row[qKey]).trim() !== '') {
+          const rowQ = String(row[qKey]).toUpperCase();
+          if      (rowQ.includes('Q1'))    targetQuarter = 'Q1';
+          else if (rowQ.includes('Q2'))    targetQuarter = 'Q2';
+          else if (rowQ.includes('Q3'))    targetQuarter = 'Q3';
+          else if (rowQ.includes('Q4'))    targetQuarter = 'Q4';
+          else if (rowQ.includes('MULTI')) targetQuarter = 'Multi';
+        }
 
-        // Amount — "Amount in EUR" first (SF), then native "Gross Value (M)" (already in millions)
         const isNativeScale = row['Gross Value (M)'] !== undefined;
         const rawAmount = row['Amount in EUR'] || row['Amount'] || row['Converted Amount'] || row['Gross Value (M)'] || 0;
         const cleanAmount = parseCurrency(rawAmount);
         let grossInM = cleanAmount;
         if (!isNativeScale && Math.abs(cleanAmount) > 10000) grossInM = cleanAmount / 1000000;
 
-        // Probabilities — raw:false delivers "85%" strings; parseFloat strips the % sign cleanly
         const pGo  = row['P(Go) %']  !== undefined ? (parseFloat(row['P(Go) %'])  || 0) : 50;
         const pWin = row['P(Win) %'] !== undefined ? (parseFloat(row['P(Win) %']) || 0) : 30;
 
-        // Exact 1-to-1 column mapping
         const rawStage      = row['Stage'] || '';
         const rawOwner      = row['Opportunity Owner'] || row['Owner'] || '';
         const rawBidManager = row['Proposal Manager'] || row['Bid Manager'] || '';
