@@ -968,7 +968,8 @@ async function importSalesforce(input) {
         }
       }
 
-      const cleanedHeaders = rawHeaders.map(h => String(h || '').trim());
+      // Array.from fills sparse-array holes with '' so .find() never receives undefined
+      const cleanedHeaders = Array.from(rawHeaders, h => String(h || '').trim());
       const oppData = XLSX.utils.sheet_to_json(worksheet, {
         range: headerRowIndex + 1,
         header: cleanedHeaders,
@@ -1067,7 +1068,7 @@ async function importSalesforce(input) {
 
     } catch (error) {
       console.error(error);
-      alert('Error parsing the Excel file:\n\n' + error.message);
+      alert('Error parsing the Excel file. Please check the format.');
     } finally {
       input.value = '';
     }
