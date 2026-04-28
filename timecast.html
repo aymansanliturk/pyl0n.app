@@ -413,27 +413,26 @@
     <button class="tb-btn" onclick="location.href='index.html'">← Dashboard</button>
   </div>
   <div class="tb-right">
-    <button class="tb-btn" onclick="setFormat('A4')" data-fmt="A4">A4</button>
-    <button class="tb-btn active" onclick="setFormat('A3')" data-fmt="A3">A3</button>
-    <button class="tb-btn" onclick="setFormat('A2')" data-fmt="A2">A2</button>
-    <button class="tb-btn" onclick="setFormat('screen')" data-fmt="screen">Screen</button>
-    <div class="tb-sep"></div>
-    <label style="font-size:11px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:6px;">Projects
-      <input type="number" id="proj-count-input" style="width:46px;text-align:center;padding:4px 6px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);font-family:'DM Sans',sans-serif;" value="1" min="1" max="8" oninput="onProjCountChange(this.value)">
-    </label>
-    <span class="warn-badge" id="proj-warn">⚠ May exceed A3</span>
-    <div class="tb-sep"></div>
     <button class="tb-btn" id="btn-undo" onclick="undo()" disabled>↩ Undo</button>
     <button class="tb-btn" id="btn-redo" onclick="redo()" disabled>↪ Redo</button>
     <div class="tb-sep"></div>
     <button class="tb-btn" onclick="saveJSON()">💾 Save</button>
+    <label class="tb-btn" style="cursor:pointer;">↑ Load<input type="file" accept=".json" style="display:none" onchange="loadJSON(this)"></label>
     <div class="tb-sep"></div>
+    <button class="tb-btn" onclick="setFormat('A4')" data-fmt="A4">A4</button>
+    <button class="tb-btn active" onclick="setFormat('A3')" data-fmt="A3">A3</button>
+    <button class="tb-btn" onclick="setFormat('A2')" data-fmt="A2">A2</button>
+    <button class="tb-btn" onclick="setFormat('screen')" data-fmt="screen">Screen</button>
+    <label style="font-size:11px;font-weight:500;color:var(--muted);display:flex;align-items:center;gap:6px;">Projects
+      <input type="number" id="proj-count-input" style="width:46px;text-align:center;padding:4px 6px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);font-family:'DM Sans',sans-serif;" value="1" min="1" max="8" oninput="onProjCountChange(this.value)">
+    </label>
+    <span class="warn-badge" id="proj-warn">⚠ May exceed A3</span>
     <button class="tb-btn" onclick="exportHTML()">⬇ Export HTML</button>
-    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;" aria-label="Toggle dark mode">🌙</button>
     <div style="position:relative;display:inline-block;"><button class="tb-btn" id="backup-btn" onclick="_showBackups()" style="font-size:11px;">⏱ Backups</button></div>
     <span id="autosave-label" style="font-size:10px;color:var(--faint);"></span>
     <span class="save-confirm" id="save-confirm">✓ Saved!</span>
     <span class="kb-hint">Ctrl+S save · Ctrl+E PDF</span>
+    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;" aria-label="Toggle dark mode">🌙</button>
   </div>
 </div>
 <div class="screen-hint" id="screen-hint">
