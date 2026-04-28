@@ -396,19 +396,19 @@ textarea.tall { min-height: 100px; }
     <button class="tb-btn" onclick="location.href='index.html'">← Dashboard</button>
   </div>
   <div class="tb-right">
-    <input type="file" id="load-file" accept=".json" style="display:none" onchange="loadJSON(this)">
     <button class="tb-btn" id="btn-undo" onclick="undo()" disabled title="Undo (Ctrl+Z)" aria-label="Undo (Ctrl+Z)">↩ Undo</button>
     <button class="tb-btn" id="btn-redo" onclick="redo()" disabled title="Redo (Ctrl+Y)" aria-label="Redo (Ctrl+Y)">↪ Redo</button>
     <div class="tb-sep"></div>
-    <button class="tb-btn" onclick="document.getElementById('load-file').click()">↑ Load JSON</button>
-    <button class="tb-btn" onclick="saveJSON()">↓ Save JSON</button>
-    <div style="position:relative;display:inline-block;"><button class="tb-btn" id="backup-btn" onclick="_showBackups()" style="font-size:11px;" title="View autosave backups" aria-label="View autosave backups">⏱ Backups</button></div>
+    <button class="tb-btn" onclick="saveJSON()">💾 Save</button>
+    <label class="tb-btn" style="cursor:pointer;">↑ Load<input type="file" accept=".json" style="display:none" onchange="loadJSON(this)"></label>
+    <div class="tb-sep"></div>
     <button class="tb-btn" onclick="exportHTML()">⬡ Export HTML</button>
     <button class="tb-btn primary" onclick="generate()">Preview →</button>
     <button class="tb-btn green" onclick="exportPDF()">⬇ Export PDF</button>
-    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;" aria-label="Toggle dark mode">🌙</button>
+    <div style="position:relative;display:inline-block;"><button class="tb-btn" id="backup-btn" onclick="_showBackups()" style="font-size:11px;" title="View autosave backups" aria-label="View autosave backups">⏱ Backups</button></div>
     <span id="autosave-label" style="font-size:10px;color:var(--green);white-space:nowrap;"></span>
     <span class="save-confirm" id="save-confirm">✓ Saved!</span>
+    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;" aria-label="Toggle dark mode">🌙</button>
   </div>
 </div>
 

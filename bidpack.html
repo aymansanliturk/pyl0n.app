@@ -219,12 +219,13 @@
     <button class="tb-btn" id="btn-undo" onclick="undo()" disabled>↩ Undo</button>
     <button class="tb-btn" id="btn-redo" onclick="redo()" disabled>↪ Redo</button>
     <div class="tb-sep"></div>
-    <button class="tb-btn" onclick="saveJSON()">Save</button>
-    <label class="tb-btn" style="cursor:pointer">Load<input type="file" accept=".json" onchange="loadJSON(this)" style="display:none"></label>
+    <button class="tb-btn" onclick="saveJSON()">💾 Save</button>
+    <label class="tb-btn" style="cursor:pointer;">↑ Load<input type="file" accept=".json" style="display:none" onchange="loadJSON(this)"></label>
     <div class="tb-sep"></div>
     <button class="tb-btn" onclick="exportHTML()">HTML</button>
     <button class="tb-btn" onclick="exportPDF()">PDF</button>
     <button class="tb-btn primary" onclick="generate()">Assemble ›</button>
+    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;" aria-label="Toggle dark mode">🌙</button>
   </div>
 </div>
 
@@ -454,6 +455,26 @@ function loadJSON(input) {
   reader.onload = e => { try { applyState(JSON.parse(e.target.result)); _snapshot(); } catch { alert('Invalid JSON file.'); } };
   reader.readAsText(file);
   input.value = '';
+}
+
+/* ── Dark mode ── */
+function toggleTheme() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const newTheme = isDark ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', newTheme);
+  localStorage.setItem('bidcast_theme', newTheme);
+  const btn = document.getElementById('theme-toggle-btn');
+  if (btn) btn.textContent = newTheme === 'dark' ? '☀' : '🌙';
+  try {
+    const sync = JSON.parse(localStorage.getItem('bidcast_suite_sync') || '{}');
+    sync.theme = newTheme; sync._ts = Date.now();
+    localStorage.setItem('bidcast_suite_sync', JSON.stringify(sync));
+  } catch(e) {}
+}
+function _applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme || 'light');
+  const btn = document.getElementById('theme-toggle-btn');
+  if (btn) btn.textContent = theme === 'dark' ? '☀' : '🌙';
 }
 
 /* ══ Helpers (shared with renderers) ═════════════════════════════════ */
@@ -927,6 +948,7 @@ document.addEventListener('keydown', e => {
 /* ══ Init ══════════════════════════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', () => {
   SuiteManager.migrate();
+  _applyTheme(localStorage.getItem('bidcast_theme') || 'light');
   const saved = localStorage.getItem(STATE_KEY);
   if (saved) {
     try { applyState(JSON.parse(saved)); }

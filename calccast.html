@@ -290,22 +290,19 @@ input[type="number"] { font-family: 'DM Mono', monospace; }
     <button class="tb-btn" id="btn-undo" onclick="undo()" disabled>↩ Undo</button>
     <button class="tb-btn" id="btn-redo" onclick="redo()" disabled>↪ Redo</button>
     <div class="tb-sep"></div>
+    <button class="tb-btn" onclick="saveJSON()">💾 Save</button>
+    <label class="tb-btn" style="cursor:pointer;">↑ Load<input type="file" accept=".json" style="display:none" onchange="loadJSON(this)"></label>
+    <div class="tb-sep"></div>
     <button class="tb-btn" onclick="SuiteManager.setReturnPath('calccast.html','CalcCast');location.href='w2w-report.html'" style="border-color: var(--accent); color: var(--accent);">◱ W2W Report</button>
     <button class="tb-btn" onclick="SuiteManager.setReturnPath('calccast.html','CalcCast');location.href='cashflow.html'" style="border-color: var(--green); color: var(--green);">◱ Cash Flow &amp; Risk</button>
-    <label class="tb-btn" style="cursor:pointer;">
-      ↑ Load JSON
-      <input type="file" accept=".json" style="display:none;" onchange="loadJSON(this)">
-    </label>
-    <button class="tb-btn primary" onclick="saveJSON()">↓ Save JSON</button>
-    <div class="tb-sep"></div>
     <button class="tb-btn green" onclick="exportExcel()">⬇ Export Excel</button>
     <button class="tb-btn" onclick="exportHTML()">⬇ Export HTML</button>
     <button class="tb-btn" onclick="exportPDF()">⬇ PDF</button>
-    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;" aria-label="Toggle dark mode">🌙</button>
     <div style="position:relative;display:inline-block;"><button class="tb-btn" id="backup-btn" onclick="_showBackups()" style="font-size:11px;">⏱ Backups</button></div>
     <span id="autosave-label" style="font-size:10px;color:var(--faint);"></span>
     <span class="save-confirm" id="save-confirm">✓ Saved!</span>
     <span class="kb-hint">Ctrl+S save · Ctrl+E PDF</span>
+    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;" aria-label="Toggle dark mode">🌙</button>
   </div>
 </div>
 

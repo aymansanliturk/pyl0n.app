@@ -358,19 +358,19 @@
     <button class="tb-btn" onclick="location.href='index.html'">← Dashboard</button>
   </div>
   <div class="tb-right">
-    <input type="file" id="load-file" accept=".json" style="display:none" onchange="loadJSON(this)">
     <button class="tb-btn" id="btn-undo" onclick="undo()" disabled title="Undo (Ctrl+Z)" aria-label="Undo (Ctrl+Z)">↩ Undo</button>
     <button class="tb-btn" id="btn-redo" onclick="redo()" disabled title="Redo (Ctrl+Y)" aria-label="Redo (Ctrl+Y)">↪ Redo</button>
     <div class="tb-sep"></div>
-    <button class="tb-btn" onclick="document.getElementById('load-file').click()">↑ Load JSON</button>
-    <button class="tb-btn" onclick="saveJSON()">↓ Save JSON</button>
+    <button class="tb-btn" onclick="saveJSON()">💾 Save</button>
+    <label class="tb-btn" style="cursor:pointer;">↑ Load<input type="file" accept=".json" style="display:none" onchange="loadJSON(this)"></label>
+    <div class="tb-sep"></div>
     <button class="tb-btn primary" onclick="generate()">Preview →</button>
     <button class="tb-btn green" onclick="exportPDF()">⬇ Export PDF</button>
-    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;" aria-label="Toggle dark mode">🌙</button>
     <div style="position:relative;display:inline-block;"><button class="tb-btn" id="backup-btn" onclick="_showBackups()" style="font-size:11px;">⏱ Backups</button></div>
     <span id="autosave-label" style="font-size:10px;color:var(--faint);"></span>
     <span class="save-confirm" id="save-confirm">✓ Saved!</span>
     <span class="kb-hint">Ctrl+Z undo · Ctrl+S save · Ctrl+E PDF</span>
+    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;" aria-label="Toggle dark mode">🌙</button>
   </div>
 </div>
 
@@ -386,21 +386,21 @@
           <input type="text" id="proj-name" placeholder="e.g. UK Substation Package 2025" oninput="onProjName()">
         </label>
         <label class="field">Date
-          <input type="date" id="doc-date">
+          <input type="date" id="doc-date" oninput="_scheduleSnap()">
         </label>
         <label class="field">Revision / Ref No.
-          <input type="text" id="doc-ref" placeholder="e.g. Rev.A · OFR-2025-001">
+          <input type="text" id="doc-ref" placeholder="e.g. Rev.A · OFR-2025-001" oninput="_scheduleSnap()">
         </label>
       </div>
       <div class="fields f3">
         <label class="field">Customer Company Name
-          <input type="text" id="cust-company" placeholder="e.g. National Grid plc">
+          <input type="text" id="cust-company" placeholder="e.g. National Grid plc" oninput="_scheduleSnap()">
         </label>
         <label class="field">Attention To
-          <input type="text" id="cust-attn" placeholder="e.g. Mr. John Smith">
+          <input type="text" id="cust-attn" placeholder="e.g. Mr. John Smith" oninput="_scheduleSnap()">
         </label>
         <label class="field">Subject Line
-          <input type="text" id="doc-subject" placeholder="e.g. Commercial Offer — 400kV GIS Package">
+          <input type="text" id="doc-subject" placeholder="e.g. Commercial Offer — 400kV GIS Package" oninput="_scheduleSnap()">
         </label>
       </div>
     </div>
@@ -444,7 +444,7 @@
   <div class="section">
     <div class="section-hd"><span class="section-title">Introduction Text</span></div>
     <div class="section-body">
-      <textarea class="intro" id="intro-text"
+      <textarea class="intro" id="intro-text" oninput="_scheduleSnap()"
         placeholder="We are pleased to submit our commercial offer in response to your enquiry dated …&#10;&#10;Please find below our proposed scope, key assumptions, and commercial terms."></textarea>
     </div>
   </div>

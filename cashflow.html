@@ -277,6 +277,7 @@ label {
     <button class="tb-btn" id="btn-redo" onclick="redo()" disabled>↪ Redo</button>
     <div class="tb-sep"></div>
     <button class="tb-btn" onclick="saveState()">💾 Save</button>
+    <label class="tb-btn" style="cursor:pointer;">↑ Load<input type="file" accept=".json" style="display:none" onchange="loadStateFromFile(this)"></label>
     <div class="tb-sep"></div>
     <button class="tb-btn" onclick="loadSuiteData(); simulate();" style="border-color:var(--accent);color:var(--accent);">↺ Refresh Data</button>
     <button class="tb-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle dark mode" aria-label="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;">🌙</button>
@@ -458,6 +459,7 @@ const _undoStack = PylonState.createUndoStack({
     const r = document.getElementById('btn-redo');
     if (u) u.disabled = !_undoStack.canUndo;
     if (r) r.disabled = !_undoStack.canRedo;
+    PylonState.safeWriteLS(STATE_KEY, collectState());
   },
 });
 function _snapshot()     { _undoStack.snapshot(); }
@@ -509,6 +511,18 @@ function loadState() {
   const fcEl = document.getElementById('sim-fc-curve');
   if (fcEl) fcEl.value = _simState.fcCurve || 'linear';
 
+}
+
+async function loadStateFromFile(input) {
+  const file = input.files[0]; if (!file) return;
+  try {
+    const parsed = JSON.parse(await file.text());
+    _simState = { ..._simState, ...parsed };
+    loadState();
+    simulate();
+    _snapshot();
+  } catch { alert('Invalid JSON file'); }
+  input.value = '';
 }
 
 function updateMilestone(idx, field, val) {
