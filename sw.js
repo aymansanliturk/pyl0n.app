@@ -4,7 +4,7 @@
    "response has redirections" (WebKitInternal:0).
 */
 
-const CACHE_NAME = 'pyl0n-v5';
+const CACHE_NAME = 'pyl0n-v6';
 
 const PRECACHE_ASSETS = [
   './index.html',
@@ -15,6 +15,7 @@ const PRECACHE_ASSETS = [
   './vendor/pyl0n-state.js',
   './vendor/pyl0n-validate.js',
   './libs/fonts.css',
+  './libs/pptxgen.bundle.js',
 ];
 
 // Tool page stems — used for extensionless offline URL matching

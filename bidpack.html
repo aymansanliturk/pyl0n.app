@@ -7,6 +7,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <script src="libs/xlsx.full.min.js"></script>
   <script src="libs/html2pdf.bundle.min.js"></script>
+  <script src="libs/pptxgen.bundle.js"></script>
   <link rel="stylesheet" href="libs/fonts.css">
   <script src="vendor/pyl0n-native.js"></script>
   <script src="libs/msal-browser.min.js"></script>
@@ -224,6 +225,7 @@
     <div class="tb-sep"></div>
     <button class="tb-btn" onclick="exportHTML()">HTML</button>
     <button class="tb-btn" onclick="exportPDF()">PDF</button>
+    <button class="tb-btn" style="color:#d35400;border-color:#d35400;font-weight:600;" onclick="exportPPTX()">📊 PPTX</button>
     <button class="tb-btn primary" onclick="generate()">Assemble ›</button>
     <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;" aria-label="Toggle dark mode">🌙</button>
   </div>
@@ -934,6 +936,209 @@ async function exportHTML() {
   <\/script>`;
   const html = document.documentElement.outerHTML.replace('</body>', inject + '</body>');
   await nativeSaveHTML(fn, html);
+}
+
+/* ══ Export PPTX ══════════════════════════════════════════════════════ */
+async function exportPPTX() {
+  const st  = collectState();
+  const proj = st.projName || 'Bid Document';
+  const pres = new PptxGenJS();
+  pres.layout = 'LAYOUT_WIDE';
+
+  const NAVY   = '1e40af';
+  const WHITE  = 'FFFFFF';
+  const LIGHT  = 'F5F4F0';
+  const MUTED  = '6b6966';
+  const BORDER = 'E0DDD6';
+
+  /* ── helpers ── */
+  function titleSlide(title, subtitle) {
+    const sl = pres.addSlide();
+    sl.addShape(pres.ShapeType.rect, { x:0, y:0, w:'100%', h:'100%', fill:{ color:NAVY } });
+    sl.addShape(pres.ShapeType.rect, { x:0, y:3.4, w:'100%', h:0.04, fill:{ color:WHITE }, line:{ color:WHITE } });
+    if (title)    sl.addText(title,    { x:0.6, y:1.2, w:11.8, h:1.2, fontSize:36, bold:true, color:WHITE, fontFace:'Arial', align:'left' });
+    if (subtitle) sl.addText(subtitle, { x:0.6, y:2.6, w:11.8, h:0.6, fontSize:16, color:'C7D2FE', fontFace:'Arial', align:'left' });
+    sl.addText('BidPack · PYL0N', { x:0.6, y:6.8, w:11.8, h:0.3, fontSize:9, color:'93A8D8', fontFace:'Arial', align:'left' });
+    return sl;
+  }
+
+  function sectionHeader(num, title) {
+    const sl = pres.addSlide();
+    sl.addShape(pres.ShapeType.rect, { x:0, y:0, w:'100%', h:1.1, fill:{ color:NAVY } });
+    sl.addText(`Section ${num}`, { x:0.5, y:0.12, w:12, h:0.4, fontSize:10, color:'93A8D8', fontFace:'Arial', bold:false });
+    sl.addText(title,            { x:0.5, y:0.5,  w:12, h:0.55, fontSize:22, color:WHITE,   fontFace:'Arial', bold:true  });
+    sl.addText('BidPack · PYL0N', { x:0.5, y:6.8, w:12, h:0.3, fontSize:9, color:MUTED, fontFace:'Arial' });
+    return sl;
+  }
+
+  function tableSlide(num, secTitle, headers, rows) {
+    const sl = sectionHeader(num, secTitle);
+    if (!rows.length) {
+      sl.addText('No data available.', { x:0.5, y:1.5, w:12, h:0.5, fontSize:13, color:MUTED, fontFace:'Arial' });
+      return;
+    }
+    const tableData = [
+      headers.map(h => ({ text: h, options: { bold:true, color:WHITE, fill:{ color:NAVY }, fontSize:10, fontFace:'Arial' } })),
+      ...rows.map(row => row.map(cell => ({ text: String(cell ?? ''), options: { fontSize:10, fontFace:'Arial', color:'1a1916' } }))),
+    ];
+    sl.addTable(tableData, { x:0.5, y:1.3, w:12.5, colW: Array(headers.length).fill(12.5/headers.length),
+      border:{ pt:0.5, color:BORDER }, fill:{ color:WHITE }, rowH:0.32 });
+  }
+
+  /* ── Cover slide ── */
+  const coverSl = pres.addSlide();
+  coverSl.addShape(pres.ShapeType.rect, { x:0, y:0, w:'100%', h:'100%', fill:{ color:NAVY } });
+  coverSl.addShape(pres.ShapeType.rect, { x:0, y:3.6, w:'100%', h:0.05, fill:{ color:WHITE }, line:{ color:WHITE } });
+  coverSl.addText(proj, { x:0.7, y:1.5, w:11.6, h:1.4, fontSize:40, bold:true, color:WHITE, fontFace:'Arial', align:'left' });
+  if (st.customer)   coverSl.addText(st.customer, { x:0.7, y:3.1, w:11.6, h:0.5, fontSize:18, color:'C7D2FE', fontFace:'Arial' });
+  const meta = [st.revision, st.preparedBy, st.date ? new Date(st.date+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}) : ''].filter(Boolean).join('   ·   ');
+  if (meta) coverSl.addText(meta, { x:0.7, y:4.0, w:11.6, h:0.4, fontSize:12, color:'93A8D8', fontFace:'Arial' });
+  if (st.confidentiality) coverSl.addText(st.confidentiality.toUpperCase(), { x:0.7, y:6.6, w:11.6, h:0.35, fontSize:9, color:'FCA5A5', fontFace:'Arial', bold:true });
+  coverSl.addText('Generated with BidPack · PYL0N', { x:0.7, y:7.0, w:11.6, h:0.25, fontSize:8, color:'475569', fontFace:'Arial' });
+
+  /* ── TOC slide ── */
+  const enabled = st.sections.filter(s => s.enabled);
+  if (enabled.length) {
+    const tocSl = titleSlide('Table of Contents', proj);
+    const tocRows = enabled.map((s, i) => [{ text:`${String(i+1).padStart(2,'0')}  ${s.title}`, options:{ fontSize:14, color:WHITE, fontFace:'Arial' } }]);
+    tocSl.addTable(tocRows, { x:0.7, y:1.0, w:11.6, colW:[11.6], border:{ pt:0, color:NAVY }, fill:{ color:NAVY }, rowH:0.42 });
+  }
+
+  /* ── Section slides ── */
+  enabled.forEach((sec, idx) => {
+    const num = String(idx + 1).padStart(2, '0');
+    try {
+      switch (sec.id) {
+        case 'bidscore': {
+          const d = JSON.parse(localStorage.getItem('bidcast_state_bidscore') || 'null');
+          if (!d || !(d.criteria||[]).length) { sectionHeader(num, sec.title).addText('No data available.', { x:0.5, y:1.5, w:12, h:0.5, fontSize:13, color:MUTED, fontFace:'Arial' }); break; }
+          let nW = 0, dW = 0;
+          d.criteria.forEach(c => { nW += (parseFloat(c.weight)||0)*(parseInt(c.score)||0); dW += (parseFloat(c.weight)||0)*5; });
+          const score = dW > 0 ? Math.round(nW/dW*100) : 0;
+          const verdict = score >= 65 ? 'BID' : score >= 40 ? 'CONDITIONAL' : 'NO BID';
+          const vColor  = score >= 65 ? '059669' : score >= 40 ? 'd97706' : 'dc2626';
+          const sl = sectionHeader(num, sec.title);
+          sl.addText(`${score}`, { x:0.5, y:1.25, w:2, h:1.2, fontSize:60, bold:true, color:NAVY, fontFace:'Arial', align:'center' });
+          sl.addText('out of 100', { x:0.5, y:2.4, w:2, h:0.3, fontSize:10, color:MUTED, fontFace:'Arial', align:'center' });
+          sl.addText(verdict, { x:2.7, y:1.4, w:2.4, h:0.7, fontSize:20, bold:true, color:WHITE, fill:{ color:vColor }, fontFace:'Arial', align:'center', valign:'middle' });
+          const hdrs = ['Category', 'Criterion', 'Weight', 'Score', 'Weighted'];
+          const rows = d.criteria.map(c => {
+            const w = parseFloat(c.weight)||0, sc = parseInt(c.score)||0;
+            return [c.category||'', c.name||c.label||'', `${w}%`, `${sc}/5`, `${w>0?(w*sc/5).toFixed(1):'0.0'}%`];
+          });
+          const td = [hdrs.map(h => ({ text:h, options:{ bold:true, color:WHITE, fill:{ color:NAVY }, fontSize:10, fontFace:'Arial' } })),
+            ...rows.map(r => r.map(cell => ({ text:String(cell), options:{ fontSize:10, fontFace:'Arial', color:'1a1916' } })))];
+          sl.addTable(td, { x:0.5, y:2.9, w:12.5, colW:[2.5,4,1.5,1.5,1.5], border:{ pt:0.5, color:BORDER }, fill:{ color:WHITE }, rowH:0.32 });
+          break;
+        }
+        case 'timeline': {
+          const d = JSON.parse(localStorage.getItem('bidcast_state_timecast') || 'null');
+          const hdrs = ['Task / Milestone', 'Project', 'Phase', 'Start', 'End', 'Notes'];
+          const rows = [];
+          (d?.projects||[]).forEach(p => {
+            [['Bid', p.bidTasks||[]], ['Execution', p.execTasks||[]]].forEach(([lane, tasks]) => {
+              tasks.forEach(t => {
+                if (!t.name) return;
+                const isM = t.type === 'milestone';
+                const sm = t.sm??t.startMonth??0, sy = t.sy??t.startYear??'';
+                const em = isM ? sm : (t.em??t.endMonth??sm), ey = isM ? sy : (t.ey??t.endYear??sy);
+                rows.push([`${isM?'[MS] ':''}${t.name}`, p.name||'', lane,
+                  sy ? `${_MON[sm]} ${sy}` : '—', isM ? '—' : (ey ? `${_MON[em]} ${ey}` : '—'), t.notes||'']);
+              });
+            });
+          });
+          tableSlide(num, sec.title, hdrs, rows);
+          break;
+        }
+        case 'commercial': {
+          const d = JSON.parse(localStorage.getItem('bidcast_state_calccast') || 'null');
+          const costRows = (d?.costRows||[]).filter(r => r.rowType !== 'contingency');
+          const hdrs = ['Category', 'Description', 'Supplier', 'Qty / Unit', 'Unit Price'];
+          const rows = [];
+          let grand = 0;
+          const cats = {};
+          costRows.forEach(r => {
+            const cat = r.category||'Other';
+            if (!cats[cat]) cats[cat] = { items:[], total:0 };
+            const line = (parseFloat(r.qty)||0)*(parseFloat(r.unitPrice)||0);
+            cats[cat].items.push({...r, line}); cats[cat].total += line; grand += line;
+          });
+          Object.entries(cats).forEach(([cat, data]) => {
+            rows.push([{ text:cat, options:{ bold:true, color:NAVY, fontSize:10, fontFace:'Arial' } }, '', '', '', '']);
+            data.items.forEach(r => rows.push(['', r.desc||'', r.supplier||'', `${r.qty||''} ${r.units||''}`.trim(), `${r.currency||'EUR'} ${parseFloat(r.unitPrice||0).toLocaleString('en-GB',{maximumFractionDigits:0})}`]));
+          });
+          rows.push([{ text:'TOTAL DIRECT COST', options:{ bold:true, fontSize:10, fontFace:'Arial' } }, '', '', '',
+            { text:`EUR ${Math.round(grand).toLocaleString('en-GB')}`, options:{ bold:true, fontSize:10, fontFace:'Arial' } }]);
+          tableSlide(num, sec.title, hdrs, rows);
+          break;
+        }
+        case 'resources': {
+          const d = JSON.parse(localStorage.getItem('bidcast_state_resourcecast') || 'null');
+          const roles = d?.roles||[];
+          const hdrs = ['Role', 'Total Hours', 'Rate (EUR/h)', 'Cost (EUR)'];
+          let totalHrs = 0, totalCost = 0;
+          const rows = roles.map(r => {
+            const hrs = Object.values(r.monthHours||{}).reduce((s,v) => s+(parseFloat(v)||0), 0);
+            const rate = parseFloat(r.rate)||0, cost = hrs*rate;
+            totalHrs += hrs; totalCost += cost;
+            return [r.name||'', `${Math.round(hrs).toLocaleString('en-GB')} h`, rate ? `EUR ${rate.toLocaleString('en-GB',{maximumFractionDigits:0})}` : '—', cost ? `EUR ${Math.round(cost).toLocaleString('en-GB')}` : '—'];
+          });
+          (d?.expenses||[]).forEach(e => { const amt = parseFloat(e.amount)||0; totalCost += amt; rows.push([e.label||'', '(expense)', '', `EUR ${Math.round(amt).toLocaleString('en-GB')}`]); });
+          rows.push([{ text:'TOTAL', options:{ bold:true, fontSize:10, fontFace:'Arial' } },
+            `${Math.round(totalHrs).toLocaleString('en-GB')} h`, '',
+            { text:`EUR ${Math.round(totalCost).toLocaleString('en-GB')}`, options:{ bold:true, fontSize:10, fontFace:'Arial' } }]);
+          tableSlide(num, sec.title, hdrs, rows);
+          break;
+        }
+        case 'risks': {
+          const d = JSON.parse(localStorage.getItem('bidcast_state_riskcast') || 'null');
+          const risks = d?.risks||[];
+          const hdrs = ['Type', 'Category', 'Description', 'L', 'I', 'Level', 'Mitigation'];
+          const rows = risks.map(r => {
+            const l = parseInt(r.likelihood)||1, i = parseInt(r.impact)||1;
+            const score = r.score ?? l*i;
+            const isOpp = (r.type||'risk') === 'opportunity';
+            const level = isOpp ? 'Gain' : score>=15 ? 'Critical' : score>=10 ? 'High' : score>=5 ? 'Medium' : 'Low';
+            return [r.type||'risk', r.category||'', r.desc||r.topic||'', isOpp?'—':l, isOpp?'—':i, `${level}${isOpp?'':' ('+score+')'}`, r.mitigation||''];
+          });
+          tableSlide(num, sec.title, hdrs, rows);
+          break;
+        }
+        case 'suppliers': {
+          const d = JSON.parse(localStorage.getItem('bidcast_state_rfqcast') || 'null');
+          const items = d?.items||[];
+          const today = new Date(); today.setHours(0,0,0,0);
+          const vStatus = v => { if (v.validity && new Date(v.validity)<today) return 'Expired'; if (v.binding==='Yes') return 'Binding'; if (v.offerRec) return 'Received'; if (v.enquiry) return 'Waiting'; return 'Not Started'; };
+          const hdrs = ['Item', 'Supplier', 'Status', 'Quoted Price', 'Validity'];
+          const rows = [];
+          items.forEach(item => {
+            const vendors = (item.vendors||[]).filter(v => v.name);
+            if (!vendors.length) { rows.push([item.desc||item.description||'', '—', '—', '', '']); return; }
+            vendors.forEach((v, vi) => {
+              const price = v.price ? `${v.currency||'EUR'} ${parseFloat(v.price).toLocaleString('en-GB',{maximumFractionDigits:0})}` : '—';
+              rows.push([vi===0 ? item.desc||item.description||'' : '', `${v.name}${v.isWinner?' ★':''}`, vStatus(v), price, v.validity ? _fmtDate(v.validity) : '']);
+            });
+          });
+          tableSlide(num, sec.title, hdrs, rows);
+          break;
+        }
+        case 'actions': {
+          const d = JSON.parse(localStorage.getItem('bidcast_state_actionlog') || 'null');
+          const actions = d?.actions||[];
+          const hdrs = ['Category', 'Action', 'Owner', 'Due Date', 'Priority', 'Status'];
+          const rows = actions.map(a => [a.category||'', a.desc||'', a.owner||'', a.due ? _fmtDate(a.due) : '—', a.priority||'', a.status||'Open']);
+          tableSlide(num, sec.title, hdrs, rows);
+          break;
+        }
+      }
+    } catch(e) {
+      const sl = sectionHeader(num, sec.title);
+      sl.addText('Error loading section data.', { x:0.5, y:1.5, w:12, h:0.5, fontSize:13, color:'dc2626', fontFace:'Arial' });
+    }
+  });
+
+  const fn = (proj).replace(/[^a-z0-9]/gi, '_') + '_bidpack.pptx';
+  await pres.writeFile({ fileName: fn });
 }
 
 /* ══ Keyboard shortcuts ════════════════════════════════════════════════ */
