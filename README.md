@@ -47,6 +47,9 @@ PYL0N is written in vanilla HTML, CSS, and JavaScript with no build pipeline, no
 | `w2w-report.html` | W2W Report | Wall-to-Wall financial report (factory KPI breakdown + P&L) |
 | `cvcast.html` | CVCast | CV / résumé generator with two-column A4 PDF export |
 | `forecast.html` | ForeCast | Pipeline & overlap monitor with Salesforce Excel importer |
+| `bidscore.html` | BidScore | Bid / No-Bid decision tool with weighted scoring criteria |
+| `actionlog.html` | ActionLog | Bid action tracker with owner, priority, and status tracking |
+| `bidpack.html` | BidPack | Bid package assembler — compiles all suite data into a single PDF/PPTX/HTML document |
 
 ## Run it
 
@@ -58,7 +61,7 @@ open index.html
 python3 -m http.server 8080   # visit http://localhost:8080
 ```
 
-All libraries (XLSX, html2pdf, html2canvas, Chart.js) and fonts (DM Sans, DM Mono) are bundled in `libs/`. Populate once after cloning:
+All libraries (XLSX, html2pdf, html2canvas, Chart.js, PptxGenJS, MSAL) and fonts (DM Sans, DM Mono) are bundled in `libs/`. Populate once after cloning:
 
 ```bash
 node scripts/download-libs.js
@@ -80,4 +83,4 @@ All data persists in the browser via `localStorage` under the `bidcast_` prefix.
 
 ## Version
 
-Current release: **v2.0.0**
+Current release: **v2.0.1**

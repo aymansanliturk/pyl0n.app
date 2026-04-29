@@ -72,6 +72,8 @@ This downloads:
 | `libs/html2pdf.bundle.min.js` | 0.10.1 | PDF export in all tools |
 | `libs/html2canvas.min.js` | 1.4.1 | TimeCast / OrgCast PNG export |
 | `libs/chart.js` | latest UMD | CashFlow, W2W Report |
+| `libs/pptxgen.bundle.js` | latest | BidPack PPTX export |
+| `libs/msal-browser.min.js` | latest | Cloud sync / auth (BidPack, ForeCast) |
 | `libs/fonts.css` + `libs/fonts/*.woff2` | — | DM Sans + DM Mono |
 
 `libs/` is committed so clones are immediately offline-capable; the download

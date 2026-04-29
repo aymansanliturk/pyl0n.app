@@ -9,7 +9,7 @@ This file documents the codebase structure, conventions, and workflows for AI as
 - **Electron desktop app** — packaged `.dmg` for macOS (x64 + Apple Silicon) via electron-builder
 - **Cloudflare Pages** — static hosting from the repo; security headers enforced via `_headers`
 
-The suite consists of twelve specialized planning tools plus a landing page.
+The suite consists of fifteen specialized planning tools plus a landing page.
 
 ## Tools in the Suite
 
@@ -27,6 +27,10 @@ The suite consists of twelve specialized planning tools plus a landing page.
 | `cashflow.html` | CashFlow | Monthly cash-flow simulation with per-item cost distribution and cancellation curve |
 | `w2w-report.html` | W2W Report | Wall-to-Wall financial report; factory-level KPI breakdown consolidated into a business area summary table |
 | `cvcast.html` | CVCast | Curriculum vitae / résumé generator with experience, education, skills, languages, and A4 PDF export |
+| `forecast.html` | ForeCast | Pipeline & overlap monitor with Salesforce Excel importer; per-quarter analysis and Bid Manager workload cards |
+| `bidscore.html` | BidScore | Bid / No-Bid decision tool with weighted scoring criteria and live verdict gauge |
+| `actionlog.html` | ActionLog | Bid action tracker with category, owner, priority, due date, and status |
+| `bidpack.html` | BidPack | Bid package assembler — pulls live data from all suite tools into a single PDF, PPTX, or standalone HTML document |
 | `favicon.svg` | — | Brand favicon |
 | `logo.svg` | — | Brand logo (34×34px grid) |
 
@@ -57,6 +61,8 @@ All libraries live in `libs/` — no CDN calls at runtime:
 | `libs/html2pdf.bundle.min.js` | 0.10.1 | PDF export in all tools |
 | `libs/html2canvas.min.js` | 1.4.1 | `timecast.html` and `orgcast.html` PNG export |
 | `libs/chart.js` | latest UMD | `cashflow.html`, `w2w-report.html` |
+| `libs/pptxgen.bundle.js` | latest | `bidpack.html` PPTX export |
+| `libs/msal-browser.min.js` | latest | Cloud sync / auth (`bidpack.html`, `forecast.html`) |
 | `libs/fonts.css` | — | Local @font-face rules for DM Sans + DM Mono |
 | `libs/fonts/*.woff2` | — | DM Sans (300–700, italic) + DM Mono (400,500) |
 
@@ -231,7 +237,7 @@ The `<footer>` in `index.html` carries a `v2.0.0`-style badge (DM Mono pill, `va
 
 **Rule: bump the patch version (`v2.0.X`) at the end of every feature-phase task.** If the work adds a major new tool or a cross-cutting architectural change, bump the minor version instead (`v2.X.0`). Update the badge in the same commit as the feature work — do not create a separate version-bump commit.
 
-Current version: `v2.0.0` (set Phase 109 — version badge introduction)
+Current version: `v2.0.1` (Phase 113 — native PowerPoint export for BidPack)
 
 ### Git Workflow
 
@@ -431,6 +437,34 @@ then `release` downloads them and creates a GitHub Release from the tag.
 - `_byCategory` — object keyed by CalcCast category name → total EUR value; drives factory DC lookup
 - Dark mode supported via `[data-theme="dark"]` on `<html>`
 - External dependency: Chart.js (local `libs/chart.js`)
+
+### ForeCast (`forecast.html`)
+- Pipeline and overlap monitor; primary input is a Salesforce report exported as Excel
+- Handles real-world Salesforce export quirks: metadata rows, visual grouping headers (quarter label appears once, all rows beneath inherit it), sort-arrow suffixes on column headers, EU/US number formatting, merged cells producing sparse arrays, formatted percentage strings
+- Per-quarter overlap analysis, Bid Manager workload cards, dynamic filters
+- State key: `bidcast_state_forecast`
+
+### BidScore (`bidscore.html`)
+- Bid / No-Bid decision tool with a configurable set of weighted scoring criteria
+- Live verdict gauge: score ≥ 65 → **BID** (green), ≥ 40 → **CONDITIONAL** (amber), < 40 → **NO BID** (red)
+- Weighted score = Σ(weight × score) / Σ(weight × 5) × 100
+- State key: `bidcast_state_bidscore`
+- Data consumed by BidPack `_renderBidScore()` and `exportPPTX()`
+
+### ActionLog (`actionlog.html`)
+- Bid action tracker with category, action description, owner, due date, priority (High / Medium / Low), and status (Open / In Progress / Done / Blocked)
+- Overdue actions (status ≠ Done, due date in the past) are highlighted in the output
+- State key: `bidcast_state_actionlog`
+- Data consumed by BidPack `_renderActions()` and `exportPPTX()`
+
+### BidPack (`bidpack.html`)
+- Bid package assembler — pulls live data from all seven source tools (BidScore, TimeCast, CalcCast, ResourceCast, RiskCast, RFQCast, ActionLog) into a single document
+- Sections are user-orderable via drag-and-drop and individually togglable; order/state persisted under `bidcast_state_bidpack`
+- **Export formats**: PDF (via `window.print()`), standalone HTML (self-contained snapshot with embedded state), and native PowerPoint (`.pptx`) via PptxGenJS
+- **`exportPPTX()`**: generates a 16:9 widescreen presentation using `PptxGenJS`; cover slide, TOC slide, then one content slide per enabled section. Each section reads from the same localStorage key as its HTML renderer. Requires `libs/pptxgen.bundle.js`.
+- `_hasData(id)` — checks whether the source tool's localStorage key contains renderable data; drives the `✓ Data` / `No data` badge on each section row
+- Section renderers (`_renderBidScore`, `_renderTimeline`, `_renderCommercial`, `_renderResources`, `_renderRisks`, `_renderSuppliers`, `_renderActions`) — read from localStorage and return HTML strings for the assembled document
+- State key: `bidcast_state_bidpack`
 
 ### CVCast (`cvcast.html`)
 - Curriculum vitae / résumé generator producing a two-column A4 PDF-ready layout
@@ -718,3 +752,29 @@ Each cost row includes an `estFix` field (`"Fixed"` or `"Estimated"`) indicating
 | `_snapshot()` / `_scheduleSnap()` / `undo()` / `redo()` / `_syncUndoUI()` | Undo/redo stack |
 | `toggleTheme()` | Cycles between light and dark mode |
 | `_applyTheme(theme)` | Applies theme class to `<html>` and persists to `bidcast_theme` |
+
+### bidpack.html
+
+| Function | Description |
+|----------|-------------|
+| `_hasData(id)` | Checks localStorage for a section's source tool data; returns `true` if renderable content exists |
+| `_buildSecRow(sec)` | Creates a draggable section list row with checkbox, title, description, and data badge |
+| `renderSectionList(sections)` | Renders the ordered section list in `#section-list` |
+| `toggleSection(id, enabled)` | Enables/disables a section by id and saves state |
+| `collectState()` / `applyState()` | Standard state serialization; stored under `bidcast_state_bidpack` |
+| `saveJSON()` / `loadJSON(input)` | Download/restore state as `.json` |
+| `_renderCover(st)` | Renders the cover page with logo, project name, customer, revision, date, preparer, confidentiality |
+| `_renderToc(enabledSecs, projName)` | Renders the Table of Contents page |
+| `_renderBidScore(sec, num, proj)` | Renders Executive Summary section from `bidcast_state_bidscore` |
+| `_renderTimeline(sec, num, proj)` | Renders Project Timeline section from `bidcast_state_timecast` |
+| `_renderCommercial(sec, num, proj)` | Renders Commercial Breakdown section from `bidcast_state_calccast` |
+| `_renderResources(sec, num, proj)` | Renders Resource Plan section from `bidcast_state_resourcecast` |
+| `_renderRisks(sec, num, proj)` | Renders Risk Register section from `bidcast_state_riskcast` |
+| `_renderSuppliers(sec, num, proj)` | Renders Supplier Quotes section from `bidcast_state_rfqcast` |
+| `_renderActions(sec, num, proj)` | Renders Action Items section from `bidcast_state_actionlog` |
+| `_noDataPage(sec, num, source, proj)` | Renders a placeholder page when a section has no source data |
+| `generate()` | Assembles all enabled sections into `#doc-wrap` and switches to output view |
+| `goBack()` | Returns from output view to editor |
+| `exportPDF()` | Calls `generate()` then `window.print()` for print-to-PDF |
+| `exportHTML()` | Creates a fully self-contained HTML snapshot with embedded state |
+| `exportPPTX()` | Generates a native `.pptx` presentation via PptxGenJS; cover + TOC + one slide per enabled section |
