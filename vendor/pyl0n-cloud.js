@@ -1,11 +1,11 @@
 /* pyl0n-cloud.js — Microsoft OneDrive cloud sync for the PYL0N suite
    Requires msal-browser.min.js loaded before this script.
-   Placeholder credentials: replace IT_DEN_BEKLENIYOR values with real
+   Placeholder credentials: replace YOUR_CLIENT_ID and YOUR_TENANT_ID with real
    Azure app registration details before enabling cloud sync.
 */
 const PylonCloud = (() => {
-  const CLIENT_ID = 'IT_DEN_BEKLENIYOR';
-  const TENANT_ID = 'IT_DEN_BEKLENIYOR';
+  const CLIENT_ID = 'YOUR_CLIENT_ID';
+  const TENANT_ID = 'YOUR_TENANT_ID';
 
   const GRAPH_FILES = 'https://graph.microsoft.com/v1.0/me/drive/root:/PYL0N/';
 
@@ -27,7 +27,7 @@ const PylonCloud = (() => {
   /* ── Credential guard ──────────────────────────────────────────────────── */
 
   function _credentialsReady() {
-    return CLIENT_ID !== 'IT_DEN_BEKLENIYOR' && TENANT_ID !== 'IT_DEN_BEKLENIYOR';
+    return CLIENT_ID !== 'YOUR_CLIENT_ID' && TENANT_ID !== 'YOUR_TENANT_ID';
   }
 
   /* ── MSAL initialisation ───────────────────────────────────────────────── */
@@ -96,7 +96,7 @@ const PylonCloud = (() => {
     if (!_credentialsReady()) {
       alert(
         'PYL0N Cloud Sync is not yet configured.\n\n' +
-        'Azure app registration credentials are pending (IT_DEN_BEKLENIYOR).\n' +
+        'Azure app registration credentials have not been configured yet.\n' +
         'Contact your administrator to enable OneDrive sync.'
       );
       return;
