@@ -12,9 +12,9 @@
 <script src="vendor/pyl0n-native.js"></script>
 <script src="libs/msal-browser.min.js"></script>
 <script src="vendor/pyl0n-cloud.js"></script>
+<script src="vendor/pyl0n-suite.js"></script>
 <script src="vendor/pyl0n-state.js"></script>
 <script src="vendor/pyl0n-validate.js"></script>
-<script src="vendor/pyl0n-suite.js"></script>
 <style id="page-size-style">@page { size: A3 landscape; margin: 8mm; }</style>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -299,7 +299,7 @@ input:focus, select:focus { border-color:var(--accent); background:var(--input-b
     <span id="autosave-label" style="font-size:10px;color:var(--faint);"></span>
     <span class="save-confirm" id="save-confirm">✓ Saved!</span>
     <span class="kb-hint">Ctrl+S save · Ctrl+E PDF</span>
-    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;" aria-label="Toggle dark mode">🌙</button>
+    <button class="tb-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;" aria-label="Toggle dark mode">🌙</button>
   </div>
 </div>
 
@@ -786,7 +786,7 @@ function _suiteBundle(ownState) {
 
 async function saveJSON() {
   const state = collectState();
-  localStorage.setItem('bidcast_state_dorcast', JSON.stringify(state));
+  PylonState.safeWriteLS(STATE_KEY, state);
   const name  = (state.title||'dor').replace(/[^a-z0-9_-]/gi,'_').toLowerCase();
   await nativeSaveText(name+'_suite.json', JSON.stringify(_suiteBundle(state),null,2), 'JSON Files', 'json');
   const c=document.getElementById('save-confirm');
@@ -918,6 +918,7 @@ window.addEventListener('afterprint',function(){
 })();
 
 // ── Undo / Redo (backed by vendor/pyl0n-state.js) ──
+const STATE_KEY = 'bidcast_state_dorcast';
 let _lastSaved = null;
 
 const _undoStack = PylonState.createUndoStack({
@@ -927,7 +928,7 @@ const _undoStack = PylonState.createUndoStack({
   debounceMs: 800,
   onChange: () => {
     _syncUndoUI();
-    PylonState.safeWriteLS('bidcast_state_dorcast', collectState());
+    PylonState.safeWriteLS(STATE_KEY, collectState());
     _lastSaved = Date.now(); _updateSavedLabel();
   },
 });
@@ -986,8 +987,8 @@ async function exportPDF() {
 document.addEventListener('DOMContentLoaded', () => {
   _applyTheme(localStorage.getItem('bidcast_theme') || 'light');
   updateLogoUI();
-  const _saved = localStorage.getItem('bidcast_state_dorcast');
-  if (_saved) { try { applyState(JSON.parse(_saved)); } catch(e) {} }
+  const _saved = PylonState.safeReadLS(STATE_KEY);
+  if (_saved) { try { applyState(_saved); } catch(e) {} }
   _lastSaved = Date.now(); _updateSavedLabel();
   setInterval(_updateSavedLabel, 15000);
   suiteRead(SuiteManager.read());
@@ -1005,7 +1006,7 @@ function toggleTheme() {
   const newTheme = isDark ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', newTheme);
   localStorage.setItem('bidcast_theme', newTheme);
-  const btn = document.getElementById('theme-toggle-btn');
+  const btn = document.getElementById('theme-btn');
   if (btn) btn.textContent = newTheme === 'dark' ? '☀' : '🌙';
   try {
     const sync = JSON.parse(localStorage.getItem('bidcast_suite_sync') || '{}');
@@ -1015,14 +1016,14 @@ function toggleTheme() {
 }
 function _applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme || 'light');
-  const btn = document.getElementById('theme-toggle-btn');
+  const btn = document.getElementById('theme-btn');
   if (btn) btn.textContent = theme === 'dark' ? '☀' : '🌙';
 }
 
 function _writeBackup() {
-  const toolKey = 'bidcast_state_dorcast';
-  const stateStr = localStorage.getItem(toolKey);
-  if (!stateStr) return;
+  const state = PylonState.safeReadLS(STATE_KEY);
+  if (!state) return;
+  const stateStr = JSON.stringify(state);
   localStorage.setItem('bidcast_backup_dorcast_' + Date.now(), stateStr);
   // Prune: keep only last 5 backups for this tool
   const prefix = 'bidcast_backup_dorcast_';

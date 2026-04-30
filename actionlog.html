@@ -294,8 +294,6 @@ function applyState(s){
   (s.actions||[]).forEach(a=>addAction(a));
   _refreshSummary();
 }
-function _saveLocal() { PylonState.safeWriteLS(STATE_KEY, collectState()); }
-
 function _getActions(){
   return Array.from(document.querySelectorAll('#action-body .action-row')).map(row=>({
     id:      +row.dataset.id||0,

@@ -11,9 +11,9 @@
 <script src="vendor/pyl0n-native.js"></script>
 <script src="libs/msal-browser.min.js"></script>
 <script src="vendor/pyl0n-cloud.js"></script>
+<script src="vendor/pyl0n-suite.js"></script>
 <script src="vendor/pyl0n-state.js"></script>
 <script src="vendor/pyl0n-validate.js"></script>
-<script src="vendor/pyl0n-suite.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -276,8 +276,8 @@ label {
     <button class="tb-btn" id="btn-undo" onclick="undo()" disabled>↩ Undo</button>
     <button class="tb-btn" id="btn-redo" onclick="redo()" disabled>↪ Redo</button>
     <div class="tb-sep"></div>
-    <button class="tb-btn" onclick="saveState()">💾 Save</button>
-    <label class="tb-btn" style="cursor:pointer;">↑ Load<input type="file" accept=".json" style="display:none" onchange="loadStateFromFile(this)"></label>
+    <button class="tb-btn" onclick="saveJSON()">💾 Save</button>
+    <label class="tb-btn" style="cursor:pointer;">↑ Load<input type="file" accept=".json" style="display:none" onchange="loadJSON(this)"></label>
     <div class="tb-sep"></div>
     <button class="tb-btn" onclick="loadSuiteData(); simulate();" style="border-color:var(--accent);color:var(--accent);">↺ Refresh Data</button>
     <button class="tb-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle dark mode" aria-label="Toggle dark mode" style="font-size:14px;padding:4px 8px;border:none;background:transparent;cursor:pointer;">🌙</button>
@@ -490,19 +490,18 @@ function renderMilestones() {
   if (typeof simulate === 'function') simulate();
 }
 
-function saveState() {
+function saveJSON() {
   PylonState.safeWriteLS(STATE_KEY, _simState);
   SuiteManager.write({ cashflow_updated: Date.now() }, 'cashflow');
   _scheduleSnap();
 }
 function loadState() {
   try {
-    const raw = localStorage.getItem(STATE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
+    const parsed = PylonState.safeReadLS(STATE_KEY);
+    if (parsed) {
       _simState = { ..._simState, ...parsed }; // Merge loaded state
     }
-  } catch(e) { console.warn('CashFlow: Could not load state', e); }
+  } catch(e) { }
 
   // Sync HTML inputs to match loaded state
   const dcEl = document.getElementById('sim-dc-curve');
@@ -513,7 +512,7 @@ function loadState() {
 
 }
 
-async function loadStateFromFile(input) {
+async function loadJSON(input) {
   const file = input.files[0]; if (!file) return;
   try {
     const parsed = JSON.parse(await file.text());
@@ -535,25 +534,25 @@ function updateMilestone(idx, field, val) {
   if (field === 'p' && parsedVal < 0) parsedVal = 0;
   _simState.milestones[idx][field] = parsedVal;
 
-  saveState(); // ADDED
+  saveJSON();
   renderMilestones();
 }
 
 function addMilestone() {
   _simState.milestones.push({ m: _simData.duration || 60, p: 0 });
-  saveState(); // ADDED
+  saveJSON();
   renderMilestones();
 }
 
 function removeMilestone(idx) {
   _simState.milestones.splice(idx, 1);
-  saveState(); // ADDED
+  saveJSON();
   renderMilestones();
 }
 
 function updateSimState(key, val) {
   _simState[key] = isNaN(parseFloat(val)) ? val : parseFloat(val);
-  saveState(); // ADDED
+  saveJSON();
   if (typeof simulate === 'function') simulate();
 }
 
@@ -592,9 +591,8 @@ function loadSuiteData() {
 
   /* ── CalcCast ─────────────────────────────────────────────────────── */
   try {
-    const raw = localStorage.getItem('bidcast_state_calccast');
-    if (raw) {
-      const s = JSON.parse(raw);
+    const s = PylonState.safeReadLS('bidcast_state_calccast');
+    if (s) {
       if (s.projName) projectName = s.projName;
 
       const fx = {
@@ -663,14 +661,13 @@ function loadSuiteData() {
 
       isLive = true;
     }
-  } catch(e) { console.warn('CashFlow: CalcCast ingest error', e); }
+  } catch(e) { }
 
   /* ── TimeCast ─────────────────────────────────────────────────────── */
   let tcEndMonth = 11, tcEndYear = new Date().getFullYear() + 4;
   try {
-    const raw = localStorage.getItem('bidcast_state_timecast');
-    if (raw) {
-      const ts = JSON.parse(raw);
+    const ts = PylonState.safeReadLS('bidcast_state_timecast');
+    if (ts) {
       // Compute actual task span (min start → max end across all tasks)
       let minAbs = Infinity, maxAbs = -Infinity;
       (ts.projects || []).forEach(proj => {
@@ -698,7 +695,7 @@ function loadSuiteData() {
       tcEndMonth = em;
       tcEndYear  = ey;
     }
-  } catch(e) { console.warn('CashFlow: TimeCast ingest error', e); }
+  } catch(e) { }
 
   /* ── Fallback sample if nothing loaded ─────────────────────────────── */
   if (contractValue === 0) {
@@ -1058,7 +1055,7 @@ function updateItemDist(itemId, type) {
   if (type === 'milestones' && !(_simState.itemDist[itemId].milestones || []).length) {
     _simState.itemDist[itemId].milestones = [{ m: Math.round((_simData.duration || 60) / 2), p: 100 }];
   }
-  saveState();
+  saveJSON();
   renderItemDist();
   simulate();
 }
@@ -1067,7 +1064,7 @@ function addItemMilestone(itemId) {
   _ensureItemDist(itemId);
   (_simState.itemDist[itemId].milestones = _simState.itemDist[itemId].milestones || [])
     .push({ m: _simData.duration || 60, p: 0 });
-  saveState();
+  saveJSON();
   renderItemDist();
   simulate();
 }
@@ -1075,7 +1072,7 @@ function addItemMilestone(itemId) {
 function removeItemMilestone(itemId, idx) {
   _ensureItemDist(itemId);
   (_simState.itemDist[itemId].milestones || []).splice(idx, 1);
-  saveState();
+  saveJSON();
   renderItemDist();
   simulate();
 }
@@ -1086,7 +1083,7 @@ function updateItemMilestone(itemId, idx, field, val) {
   if (field === 'm') v = Math.max(1, Math.min(_simData.duration || 120, v));
   if (field === 'p' && v < 0) v = 0;
   (_simState.itemDist[itemId].milestones || [])[idx][field] = v;
-  saveState();
+  saveJSON();
   renderItemDist();
   simulate();
 }
@@ -1111,7 +1108,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.ctrlKey || e.metaKey) {
       if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
       if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
-      if (e.key === 's') { e.preventDefault(); saveState(); }
+      if (e.key === 's') { e.preventDefault(); saveJSON(); }
     }
   });
 });

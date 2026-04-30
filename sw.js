@@ -4,7 +4,7 @@
    "response has redirections" (WebKitInternal:0).
 */
 
-const CACHE_NAME = 'pyl0n-v6';
+const CACHE_NAME = 'pyl0n-v7';
 
 const PRECACHE_ASSETS = [
   './index.html',
@@ -16,6 +16,12 @@ const PRECACHE_ASSETS = [
   './vendor/pyl0n-validate.js',
   './libs/fonts.css',
   './libs/pptxgen.bundle.js',
+  './vendor/pyl0n-cloud.js',
+  './libs/msal-browser.min.js',
+  './libs/html2pdf.bundle.min.js',
+  './libs/html2canvas.min.js',
+  './libs/chart.js',
+  './libs/xlsx.full.min.js',
 ];
 
 // Tool page stems — used for extensionless offline URL matching
@@ -23,6 +29,7 @@ const PAGES = [
   'timecast', 'resourcecast', 'orgcast', 'rfqcast',
   'dorcast', 'riskcast', 'calccast', 'lettercast',
   'cashflow', 'w2w-report', 'cvcast',
+  'bidpack', 'bidscore', 'actionlog', 'forecast',
 ];
 
 self.addEventListener('install', event => {

@@ -204,9 +204,7 @@ if ('serviceWorker' in navigator) {
   });
 
   window.addEventListener('load', function () {
-    navigator.serviceWorker.register('./sw.js').catch(function (err) {
-      console.warn('PYL0N SW registration failed:', err);
-    });
+    navigator.serviceWorker.register('./sw.js').catch(function () {});
 
     // Inject Cloud Sync button into .tb-right if PylonCloud is available
     if (window.PylonCloud) {
