@@ -555,7 +555,7 @@ function updateLogoUI() {
     return people.filter(p => !p._parent);
   }
 
-  // ── Akıllı Matris (Double-Sided Spine) Top-Down Yerleşim ──
+  // ── Smart Matrix (Double-Sided Spine) Top-Down Layout ──
   function subtreeSize(node) {
     const nw = NODE_W(), nh = NODE_H();
     const hg = TD_H_GAP(), vg = TD_V_GAP();
@@ -737,7 +737,7 @@ function updateLogoUI() {
       canvas.appendChild(div);
     });
 
-    // ── Kusursuz Ortogonal Çizgiler ──
+    // ── Clean Orthogonal Lines ──
     people.forEach(parent => {
       if (!parent.children.length) return;
       const pp = positions[parent.id];
