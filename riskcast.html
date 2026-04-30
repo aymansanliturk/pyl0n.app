@@ -875,16 +875,6 @@ function loadJSON(input) {
   reader.readAsText(file); input.value = '';
 }
 
-async function exportHTML() {
-  const state   = collectState();
-  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(state))));
-  const src     = document.documentElement.outerHTML;
-  const injected = src.replace('</body>',
-    `<script>try{applyState(JSON.parse(decodeURIComponent(escape(atob("${encoded}")))))}catch(e){}<\/script></body>`);
-  const name = (state.title||'risk').replace(/[^a-z0-9_-]/gi,'_').toLowerCase();
-  await nativeSaveHTML(name + '_riskcast.html', injected);
-}
-
 /* ══ Export ═════════════════════════════════════════════════════════ */
 async function exportPDF() {
   const state = collectState();

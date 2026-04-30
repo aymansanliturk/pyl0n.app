@@ -448,7 +448,7 @@ function addItem(data) {
     ).join('');
     // Also inject if it's a legacy type not in CATEGORIES
     if (current && !CATEGORIES.includes(current)) {
-      return `<option value="${current}" selected>${current}</option>` + 
+      return `<option value="${current}" selected>${current}</option>` +
              CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
     }
   }
@@ -706,7 +706,7 @@ function updateVendorPills(tr, vendors) {
         pr.textContent = (v.currency||'EUR') + ' ' + Number(v.price).toLocaleString();
         td.appendChild(pr);
       }
-      
+
       // Show Winner indicator
       if (v.isWinner) {
         const w = document.createElement('div');
@@ -824,7 +824,7 @@ function pushToCalcCast() {
       desc: item.desc || '',
       scope: 'included',
       supplier: winner.name || '',
-      estFix: 'Fixed', 
+      estFix: 'Fixed',
       units: item.units || 'pcs',
       qty: item.qty || 1,
       unitPrice: parseFloat(winner.price) || 0,
@@ -844,7 +844,7 @@ function pushToCalcCast() {
   });
 
   localStorage.setItem('bidcast_state_calccast', JSON.stringify(ccState));
-  
+
   const sync = JSON.parse(localStorage.getItem('bidcast_suite_sync') || '{}');
   sync._ts = Date.now();
   localStorage.setItem('bidcast_suite_sync', JSON.stringify(sync));
@@ -953,7 +953,7 @@ function generate() {
   grouped.forEach((items, catName) => {
     // Category Header
     tableHtml += `<tr><td colspan="8" style="padding:12px 0 4px; border-bottom:2px solid var(--accent);"><div style="font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--accent);">${esc(catName)}</div></td></tr>`;
-    
+
     // Sub Table Header
     tableHtml += `<tr style="background:#f7f5f2;">
       <th style="font-size:9px;font-weight:700;text-align:left;padding:4px 6px;color:var(--faint);">Description</th>
@@ -971,14 +971,14 @@ function generate() {
       tableHtml += `<td class="out-desc">${esc(item.desc)}</td>`;
       tableHtml += `<td class="out-mark">${esc(item.qty||'')}</td>`;
       tableHtml += `<td style="font-size:8.5px;">${esc(item.techResp||'')}</td>`;
-      
+
       item.vendors.forEach(v => {
         if (!v.name) { tableHtml += '<td>—</td>'; return; }
         const s = vendorStatus(v);
-        
+
         let cell = `<div style="font-size:9px; font-weight:700; margin-bottom:3px;">${esc(v.name)}</div>`;
         cell += `<span class="out-v-pill ${statusClass(s)}">${statusLabel(s)}</span> `;
-        
+
         if (v.price) {
           cell += `<div style="font-size:9.5px; font-family:monospace; font-weight:600; margin-top:4px;">${v.currency||'EUR'} ${Number(v.price).toLocaleString()}</div>`;
         }
@@ -997,7 +997,7 @@ function generate() {
 
         tableHtml += `<td style="vertical-align:top; padding:6px;">${cell}</td>`;
       });
-      
+
       tableHtml += `<td style="font-size:8px;color:var(--muted);">${esc(item.comments||'')}</td>`;
       tableHtml += '</tr>';
 

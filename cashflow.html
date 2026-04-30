@@ -501,7 +501,7 @@ function loadState() {
     if (parsed) {
       _simState = { ..._simState, ...parsed }; // Merge loaded state
     }
-  } catch(e) { console.warn('CashFlow: Could not load state', e); }
+  } catch(e) { }
 
   // Sync HTML inputs to match loaded state
   const dcEl = document.getElementById('sim-dc-curve');
@@ -534,25 +534,25 @@ function updateMilestone(idx, field, val) {
   if (field === 'p' && parsedVal < 0) parsedVal = 0;
   _simState.milestones[idx][field] = parsedVal;
 
-  saveJSON(); // ADDED
+  saveJSON();
   renderMilestones();
 }
 
 function addMilestone() {
   _simState.milestones.push({ m: _simData.duration || 60, p: 0 });
-  saveJSON(); // ADDED
+  saveJSON();
   renderMilestones();
 }
 
 function removeMilestone(idx) {
   _simState.milestones.splice(idx, 1);
-  saveJSON(); // ADDED
+  saveJSON();
   renderMilestones();
 }
 
 function updateSimState(key, val) {
   _simState[key] = isNaN(parseFloat(val)) ? val : parseFloat(val);
-  saveJSON(); // ADDED
+  saveJSON();
   if (typeof simulate === 'function') simulate();
 }
 
@@ -661,7 +661,7 @@ function loadSuiteData() {
 
       isLive = true;
     }
-  } catch(e) { console.warn('CashFlow: CalcCast ingest error', e); }
+  } catch(e) { }
 
   /* ── TimeCast ─────────────────────────────────────────────────────── */
   let tcEndMonth = 11, tcEndYear = new Date().getFullYear() + 4;
@@ -695,7 +695,7 @@ function loadSuiteData() {
       tcEndMonth = em;
       tcEndYear  = ey;
     }
-  } catch(e) { console.warn('CashFlow: TimeCast ingest error', e); }
+  } catch(e) { }
 
   /* ── Fallback sample if nothing loaded ─────────────────────────────── */
   if (contractValue === 0) {
